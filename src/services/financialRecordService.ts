@@ -15,6 +15,7 @@ function rowToRecord(row: Record<string, unknown>): FinancialRecord {
     paid_so_far: Number(row.paid_so_far),
     remaining_amount: Number(row.remaining_amount),
     status: row.status as PaymentStatus,
+    payment_method: row.payment_method as PaymentMethod | undefined,
     notes: row.notes as string | undefined,
     created_at: row.created_at as string | undefined,
   };

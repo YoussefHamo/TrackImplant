@@ -36,11 +36,8 @@ export const patientService = {
   },
 
   async getById(id: string): Promise<Patient | null> {
-    const { data, error } = await supabase.from('patients').select('*').eq('id', id).single();
-    if (error) {
-      if (error.code === 'PGRST116') return null;
-      throw new Error(error.message);
-    }
+    const { data, error } = await supabase.from('patients').select('*').eq('id', id).maybeSingle();
+    if (error) throw new Error(error.message);
     return data ? patientFromRow(data) : null;
   },
 

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* الألوان الطبية الفخمة الخاصة بمشروعك Precision Medical */
+  /* Default Dark Theme */
   --color-surface: #101415;
   --color-surface-dim: #101415;
   --color-surface-bright: #363a3b;
@@ -25,7 +25,6 @@
   --color-on-primary-container: #798098;
   --color-primary-fixed: #dae2fd;
   
-  /* لون السايان المتوهج الرئيسي */
   --color-secondary: #4cd7f6;
   --color-on-secondary: #003640;
   --color-secondary-container: #03b5d3;
@@ -36,6 +35,81 @@
   --color-tertiary-container: #00163a;
   
   --color-error: #ffb4ab;
+}
+
+/* Light theme overrides */
+.light-theme {
+  --color-surface: #f8f9fa;
+  --color-surface-dim: #e8eaed;
+  --color-surface-bright: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f0f1f3;
+  --color-surface-container: #e8eaed;
+  --color-surface-container-high: #dddde0;
+  --color-surface-container-highest: #d0d1d4;
+  
+  --color-on-surface: #1a1c1e;
+  --color-on-surface-variant: #44474f;
+  --color-inverse-surface: #1a1c1e;
+  --color-inverse-on-surface: #e0e3e5;
+  
+  --color-outline: #74777f;
+  --color-outline-variant: #c4c6d0;
+  
+  --color-primary: #1a3b5c;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #d1e4ff;
+  --color-on-primary-container: #001d36;
+  
+  --color-secondary: #006b7a;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #a6f0ff;
+  --color-on-secondary-container: #001f26;
+  
+  --color-tertiary: #004d9a;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #d4e3ff;
+  
+  --color-error: #ba1a1a;
+}
+
+/* Runtime theme CSS variables for components */
+:root {
+  --app-bg: linear-gradient(135deg, #050B14 0%, #08111F 50%, #0D1B2A 100%);
+  --app-surface: rgba(13,24,40,0.82);
+  --app-surface-modal: rgba(13,24,40,0.95);
+  --app-overlay: rgba(5,11,20,0.85);
+  --app-border: rgba(255,255,255,0.05);
+  --app-border-light: rgba(255,255,255,0.08);
+  --app-text: #ffffff;
+  --app-text-muted: rgba(255,255,255,0.35);
+  --app-text-dim: rgba(255,255,255,0.45);
+  --app-card-bg: rgba(13,24,40,0.82);
+  --app-input-bg: rgba(255,255,255,0.04);
+  --app-input-border: rgba(255,255,255,0.06);
+  --app-sidebar-bg: rgba(8,15,25,0.92);
+  --app-header-bg: rgba(8,15,25,0.6);
+  --app-hover: rgba(79,209,255,0.06);
+  --app-table-hover: rgba(255,255,255,0.02);
+}
+
+.light-theme {
+  --app-bg: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 50%, #d0d8e0 100%);
+  --app-surface: rgba(255,255,255,0.85);
+  --app-surface-modal: rgba(255,255,255,0.97);
+  --app-overlay: rgba(0,0,0,0.4);
+  --app-border: rgba(0,0,0,0.06);
+  --app-border-light: rgba(0,0,0,0.1);
+  --app-text: #1a1c1e;
+  --app-text-muted: rgba(0,0,0,0.4);
+  --app-text-dim: rgba(0,0,0,0.5);
+  --app-card-bg: rgba(255,255,255,0.85);
+  --app-input-bg: rgba(0,0,0,0.03);
+  --app-input-border: rgba(0,0,0,0.08);
+  --app-sidebar-bg: rgba(255,255,255,0.92);
+  --app-header-bg: rgba(255,255,255,0.7);
+  --app-hover: rgba(0,107,122,0.06);
+  --app-table-hover: rgba(0,0,0,0.02);
 }
 
 /* تأثيرات الزجاج والتوهج الـ Cyber اللي في تصميمك */
@@ -54,7 +128,13 @@
 }
 @layer base {
   body {
-    @apply bg-[#0d0f12] text-gray-100 font-mono antialiased selection:bg-cyan-500 selection:text-black;
+    @apply font-mono antialiased selection:bg-cyan-500 selection:text-black;
+    background: #0d0f12;
+    color: #e0e3e5;
+  }
+  :root.light-theme body, .light-theme body {
+    background: #f0f4f8;
+    color: #1a1c1e;
   }
 }
 

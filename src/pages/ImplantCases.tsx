@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Procedure } from '../types';
+import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 
 const statusStyles: Record<string, { bg: string; text: string; dot: string }> = {
   'Consultation': { bg: 'rgba(79,209,255,0.12)', text: '#4FD1FF', dot: '#4FD1FF' },
@@ -25,12 +27,14 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string }> = 
 };
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useLanguage();
   const c = statusStyles[status] || { bg: 'rgba(255,255,255,0.05)', text: 'rgba(255,255,255,0.5)', dot: 'rgba(255,255,255,0.3)' };
+  const statusKey = `cases.status_${status.toLowerCase().replace(/\s+/g, '_')}`;
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
       style={{ background: c.bg, color: c.text }}>
       <span className="w-1.5 h-1.5 rounded-full" style={{ background: c.dot }} />
-      {status}
+      {t(statusKey)}
     </span>
   );
 }
@@ -39,15 +43,8 @@ const inputCls = 'w-full h-10 px-3 rounded-xl text-sm outline-none transition-al
 const labelCls = 'text-[11px] font-semibold uppercase tracking-wider block mb-1.5';
 const sectionCls = 'rounded-xl p-4';
 
-const steps = [
-  { num: 1, label: 'Patient & Basic' },
-  { num: 2, label: 'CT Scan & History' },
-  { num: 3, label: 'Implant Planning' },
-  { num: 4, label: 'Confirm & Save' },
-];
-
-const boneConditions = ['Type I (Dense)', 'Type II (Medium)', 'Type III (Soft)', 'Type IV (Very Soft)'];
-const boneDensities = ['High (>850 HU)', 'Medium (500-850 HU)', 'Low (<500 HU)'];
+const boneConditionValues = ['Type I (Dense)', 'Type II (Medium)', 'Type III (Soft)', 'Type IV (Very Soft)'];
+const boneDensityValues = ['High (>850 HU)', 'Medium (500-850 HU)', 'Low (<500 HU)'];
 const decisions = ['Immediate', 'Delayed', 'Not Possible'] as const;
 
 type FormData = {
@@ -95,6 +92,9 @@ function StepCircle({ num, active, done }: { num: number; active: boolean; done:
 }
 
 export function ImplantCases() {
+  const { t } = useLanguage();
+  const { user } = useAuth();
+  const userBranchId = user?.branch_id;
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -139,6 +139,13 @@ export function ImplantCases() {
   }, [implants, form.implant_brand]);
   const abutmentTypes = useMemo(() => abutmentInv.map(a => a.type), [abutmentInv]);
 
+  const steps = [
+    { num: 1, label: t('cases.wizard_step1') },
+    { num: 2, label: t('cases.wizard_step2') },
+    { num: 3, label: t('cases.wizard_step3') },
+    { num: 4, label: t('cases.wizard_step4') },
+  ];
+
   const filtered = useMemo(() => {
     if (!searchQuery) return procedures;
     const q = searchQuery.toLowerCase();
@@ -165,14 +172,14 @@ export function ImplantCases() {
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => procedureService.updateStatus(id, status),
-    onSuccess: () => { toast.success('Status updated'); invalidateAll(); },
+    onSuccess: () => { toast.success(t('cases.toast_status_updated')); invalidateAll(); },
     onError: (err: Error) => toast.error(err.message),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: Omit<Procedure, 'id' | 'created_at'>) => procedureService.create(data),
+    mutationFn: (data: Omit<Procedure, 'id' | 'created_at'>) => procedureService.create(data, userBranchId),
     onSuccess: () => {
-      toast.success('Implant case created');
+      toast.success(t('cases.toast_case_created'));
       invalidateAll();
       closeWizard();
     },
@@ -182,7 +189,7 @@ export function ImplantCases() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Procedure> }) => procedureService.update(id, data),
     onSuccess: () => {
-      toast.success('Procedure updated');
+      toast.success(t('cases.toast_procedure_updated'));
       invalidateAll();
       closeWizard();
     },
@@ -192,7 +199,7 @@ export function ImplantCases() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => procedureService.delete(id),
     onSuccess: () => {
-      toast.success('Procedure deleted');
+      toast.success(t('cases.toast_procedure_deleted'));
       invalidateAll();
       setDeleteConfirmId(null);
       if (selectedId === deleteConfirmId) setSearchParams({});
@@ -221,9 +228,9 @@ export function ImplantCases() {
   const validateStep = (step: number): boolean => {
     const errs: Record<string, string> = {};
     if (step === 1) {
-      if (!form.patient_id) errs.patient_id = 'Patient is required';
-      if (!form.procedure_name.trim()) errs.procedure_name = 'Procedure name is required';
-      if (!form.procedure_date) errs.procedure_date = 'Date is required';
+      if (!form.patient_id) errs.patient_id = t('cases.wizard_error_patient');
+      if (!form.procedure_name.trim()) errs.procedure_name = t('cases.wizard_error_procedure');
+      if (!form.procedure_date) errs.procedure_date = t('cases.wizard_error_date');
     }
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
@@ -265,22 +272,20 @@ export function ImplantCases() {
   const handleSave = () => {
     if (!validateStep(1) || !validateStep(2) || !validateStep(3)) return;
     const patient = patients.find(p => p.id === form.patient_id);
-    if (!patient) { toast.error('Patient not found'); return; }
+    if (!patient) { toast.error(t('cases.toast_patient_not_found')); return; }
 
-    // Check implant stock
     if (form.implant_brand && form.implant_size) {
       const invItem = implants.find(i => i.brand === form.implant_brand && i.size === form.implant_size);
       if (invItem && invItem.quantity <= 0) {
-        toast.error('No stock available for selected implant.');
+        toast.error(t('cases.toast_no_stock_implant'));
         return;
       }
     }
 
-    // Check abutment stock
     if (form.abutment_type) {
       const abtItem = abutmentInv.find(a => a.type === form.abutment_type);
       if (abtItem && abtItem.quantity <= 0) {
-        toast.error('No stock available for selected abutment.');
+        toast.error(t('cases.toast_no_stock_abutment'));
         return;
       }
     }
@@ -351,23 +356,23 @@ export function ImplantCases() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Procedure Tracking</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white">{t('cases.title')}</h1>
           <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
-            {isLoading ? 'Loading...' : `${procedures.length} procedures`}
+            {isLoading ? t('common.loading') : t('cases.subtitle', { count: procedures.length })}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative max-w-xs w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
             <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search procedures..."
+              placeholder={t('cases.search_placeholder')}
               className="w-full h-10 pl-10 pr-4 rounded-xl text-sm outline-none transition-all"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)' }} />
           </div>
           <button onClick={() => setShowWizard(true)}
             className="h-10 px-5 rounded-xl flex items-center gap-2 text-sm font-bold transition-all duration-300 active:scale-[0.98]"
             style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
-            <Plus className="w-4 h-4" /> New Procedure
+            <Plus className="w-4 h-4" /> {t('cases.new_procedure')}
           </button>
         </div>
       </div>
@@ -378,11 +383,11 @@ export function ImplantCases() {
           style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
           <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
             style={{ color: 'rgba(255,255,255,0.25)' }}>
-            <div className="flex-[2.5]">Patient / Procedure</div>
-            <div className="flex-[1.5]">Tooth</div>
-            <div className="flex-[1.5]">Doctor</div>
-            <div className="flex-[1.5]">Status</div>
-            <div className="flex-[1.5]">Date</div>
+            <div className="flex-[2.5]">{t('cases.table_patient')}</div>
+            <div className="flex-[1.5]">{t('cases.table_tooth')}</div>
+            <div className="flex-[1.5]">{t('cases.table_doctor')}</div>
+            <div className="flex-[1.5]">{t('cases.table_status')}</div>
+            <div className="flex-[1.5]">{t('cases.table_date')}</div>
           </div>
 
           <div className="divide-y divide-[rgba(255,255,255,0.04)]">
@@ -392,7 +397,7 @@ export function ImplantCases() {
               </div>
             ) : filtered.length === 0 ? (
               <div className="py-16 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                {searchQuery ? 'No procedures match your search' : 'No procedures yet.'}
+                {searchQuery ? t('cases.empty_search') : t('cases.empty_all')}
               </div>
             ) : filtered.map(proc => {
               const patient = patientMap.get(proc.patient_id);
@@ -406,22 +411,22 @@ export function ImplantCases() {
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full" style={{ background: '#4FD1FF', boxShadow: '0 0 8px rgba(79,209,255,0.5)' }} />
                   )}
                   <div className="flex-[2.5]">
-                    <div className="text-sm font-medium text-white">{patient?.full_name || 'Unknown'}</div>
+                    <div className="text-sm font-medium text-white">{patient?.full_name || t('common.unknown')}</div>
                     <div className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{proc.procedure_name}</div>
                   </div>
-                  <div className="flex-[1.5] text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>{proc.tooth_number || '—'}</div>
-                  <div className="flex-[1.5] text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>{proc.doctor_name || '—'}</div>
+                  <div className="flex-[1.5] text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>{proc.tooth_number || t('common.dash')}</div>
+                  <div className="flex-[1.5] text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>{proc.doctor_name || t('common.dash')}</div>
                   <div className="flex-[1.5] flex items-center gap-2">
                     <StatusBadge status={proc.status} />
                     {proc.status === 'Conclusion' && procFailureMap.has(proc.patient_id) && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold"
                         style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}>
-                        <AlertTriangle className="w-2.5 h-2.5" /> Failure
+                        <AlertTriangle className="w-2.5 h-2.5" /> {t('cases.failure_badge')}
                       </span>
                     )}
                   </div>
                   <div className="flex-[1.5] text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                    {proc.procedure_date ? new Date(proc.procedure_date).toLocaleDateString() : '—'}
+                    {proc.procedure_date ? new Date(proc.procedure_date).toLocaleDateString() : t('common.dash')}
                   </div>
                 </div>
               );
@@ -439,7 +444,7 @@ export function ImplantCases() {
                 {(patientMap.get(selectedProc.patient_id)?.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-bold text-white truncate">{patientMap.get(selectedProc.patient_id)?.full_name || 'Unknown Patient'}</h3>
+                <h3 className="text-lg font-bold text-white truncate">{patientMap.get(selectedProc.patient_id)?.full_name || t('common.unknown')}</h3>
                 <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{selectedProc.procedure_name}</p>
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -447,14 +452,14 @@ export function ImplantCases() {
                   className="w-8 h-8 rounded-lg flex items-center justify-center transition-all" style={{ color: 'rgba(255,255,255,0.3)' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(79,209,255,0.1)'; e.currentTarget.style.color = '#4FD1FF'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
-                  title="Edit Procedure">
+                  title={t('common.edit')}>
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button onClick={() => setDeleteConfirmId(selectedProc.id)}
                   className="w-8 h-8 rounded-lg flex items-center justify-center transition-all" style={{ color: 'rgba(255,255,255,0.3)' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#ef4444'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
-                  title="Delete Procedure">
+                  title={t('common.delete')}>
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -463,13 +468,13 @@ export function ImplantCases() {
             {/* Progress Timeline — Horizontal Stepper */}
             <div className="mb-6 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Progress Timeline</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.detail_progress')}</span>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={selectedProc.status} />
                   {selectedProc.status === 'Conclusion' && procFailureMap.has(selectedProc.patient_id) && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold"
                       style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}>
-                      <AlertTriangle className="w-3 h-3" /> Returned Due To Failure
+                      <AlertTriangle className="w-3 h-3" /> {t('cases.failure_returned')}
                     </span>
                   )}
                 </div>
@@ -506,7 +511,7 @@ export function ImplantCases() {
                           </button>
                           <span className="text-[9px] font-semibold text-center leading-tight transition-all"
                             style={{ color: labelColor, maxWidth: 72 }}>
-                            {s}
+                            {t(`cases.status_${s.toLowerCase().replace(/\s+/g, '_')}`)}
                           </span>
                         </div>
                         {/* Connector line (not after last) */}
@@ -524,34 +529,34 @@ export function ImplantCases() {
             <div className="grid grid-cols-2 gap-3 mb-5">
               <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Tooth</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.detail_tooth')}</span>
                 </div>
-                <span className="text-sm font-medium text-white">{selectedProc.tooth_number || '—'}</span>
+                <span className="text-sm font-medium text-white">{selectedProc.tooth_number || t('common.dash')}</span>
               </div>
               <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div className="flex items-center gap-1.5 mb-1">
                   <Activity className="w-3 h-3" style={{ color: 'rgba(255,255,255,0.3)' }} />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>System</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.detail_system')}</span>
                 </div>
-                <span className="text-sm font-medium text-white">{selectedProc.implant_system || '—'}</span>
+                <span className="text-sm font-medium text-white">{selectedProc.implant_system || t('common.dash')}</span>
               </div>
               <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Impl. Size</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.detail_size')}</span>
                 </div>
-                <span className="text-sm font-medium text-white">{selectedProc.implant_size || '—'}</span>
+                <span className="text-sm font-medium text-white">{selectedProc.implant_size || t('common.dash')}</span>
               </div>
               <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div className="flex items-center gap-1.5 mb-1">
                   <User className="w-3 h-3" style={{ color: 'rgba(255,255,255,0.3)' }} />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Doctor</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.detail_doctor')}</span>
                 </div>
-                <span className="text-sm font-medium text-white">{selectedProc.doctor_name || '—'}</span>
+                <span className="text-sm font-medium text-white">{selectedProc.doctor_name || t('common.dash')}</span>
               </div>
               {selectedProc.implant_decision && (
                 <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Decision</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.detail_decision')}</span>
                   </div>
                   <span className="text-sm font-medium text-white">{selectedProc.implant_decision}</span>
                 </div>
@@ -559,7 +564,7 @@ export function ImplantCases() {
               {selectedProc.abutment_type && (
                 <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Abutment</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.detail_abutment')}</span>
                   </div>
                   <span className="text-sm font-medium text-white">{selectedProc.abutment_type}</span>
                 </div>
@@ -569,36 +574,36 @@ export function ImplantCases() {
             {/* Clinical Details */}
             {(selectedProc.bone_condition || selectedProc.bone_density) && (
               <div className="mb-5 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>CBCT Analysis</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.detail_cbct')}</span>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                  {selectedProc.bone_condition && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Bone: </span><span className="text-white">{selectedProc.bone_condition}</span></div>}
-                  {selectedProc.bone_density && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Density: </span><span className="text-white">{selectedProc.bone_density}</span></div>}
-                  {selectedProc.bone_height && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Height: </span><span className="text-white">{selectedProc.bone_height} mm</span></div>}
-                  {selectedProc.bone_width && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Width: </span><span className="text-white">{selectedProc.bone_width} mm</span></div>}
+                  {selectedProc.bone_condition && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.detail_bone')} </span><span className="text-white">{selectedProc.bone_condition}</span></div>}
+                  {selectedProc.bone_density && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.detail_density')} </span><span className="text-white">{selectedProc.bone_density}</span></div>}
+                  {selectedProc.bone_height && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.detail_height')} </span><span className="text-white">{selectedProc.bone_height} mm</span></div>}
+                  {selectedProc.bone_width && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.detail_width')} </span><span className="text-white">{selectedProc.bone_width} mm</span></div>}
                 </div>
               </div>
             )}
 
             {selectedProc.ct_scan_notes && (
               <div className="mb-5 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>CT Notes</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.detail_ct_notes')}</span>
                 <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>{selectedProc.ct_scan_notes}</p>
               </div>
             )}
 
             {(selectedProc.chronic_disease || selectedProc.medication) && (
               <div className="mb-5 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Medical History</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.detail_medical')}</span>
                 <div className="mt-2 space-y-1 text-sm">
-                  {selectedProc.chronic_disease && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Chronic Disease: </span><span className="text-white">{selectedProc.chronic_disease}</span></div>}
-                  {selectedProc.medication && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Medication: </span><span className="text-white">{selectedProc.medication}</span></div>}
+                  {selectedProc.chronic_disease && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.detail_chronic')} </span><span className="text-white">{selectedProc.chronic_disease}</span></div>}
+                  {selectedProc.medication && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.detail_medication')} </span><span className="text-white">{selectedProc.medication}</span></div>}
                 </div>
               </div>
             )}
 
             {selectedProc.notes && (
               <div className="mb-5 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Notes</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.detail_notes')}</span>
                 <p className="text-sm mt-1 leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>{selectedProc.notes}</p>
               </div>
             )}
@@ -606,17 +611,17 @@ export function ImplantCases() {
             <div className="rounded-xl p-4" style={{ background: 'rgba(79,209,255,0.04)', border: '1px solid rgba(79,209,255,0.1)' }}>
               <div className="flex items-center gap-2 mb-1">
                 <Calendar className="w-4 h-4 text-[#4FD1FF]" />
-                <span className="text-sm font-semibold text-white">Procedure Date</span>
+                <span className="text-sm font-semibold text-white">{t('cases.detail_date')}</span>
               </div>
               <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                {selectedProc.procedure_date ? new Date(selectedProc.procedure_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}
+                {selectedProc.procedure_date ? new Date(selectedProc.procedure_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : t('common.dash')}
               </div>
             </div>
           </div>
         ) : (
           <div className="rounded-[22px] p-6 flex items-center justify-center h-64"
             style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <p style={{ color: 'rgba(255,255,255,0.2)' }} className="text-sm">Select a procedure to view details</p>
+            <p style={{ color: 'rgba(255,255,255,0.2)' }} className="text-sm">{t('cases.detail_empty')}</p>
           </div>
         )}
       </div>
@@ -629,7 +634,7 @@ export function ImplantCases() {
           <div className="w-full max-w-2xl rounded-[24px] overflow-hidden" style={{ background: 'rgba(13,24,40,0.97)', border: '1px solid rgba(255,255,255,0.08)' }}>
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
-              <h2 className="text-lg font-bold text-white">{editProcId ? 'Edit Implant Procedure' : 'New Implant Procedure'}</h2>
+              <h2 className="text-lg font-bold text-white">{editProcId ? t('cases.wizard_title_edit') : t('cases.wizard_title_new')}</h2>
               <button onClick={closeWizard} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
                 <X className="w-4 h-4" />
               </button>
@@ -656,41 +661,41 @@ export function ImplantCases() {
               {wizardStep === 1 && (
                 <>
                   <div>
-                    <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Patient *</label>
+                    <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step1_patient')}</label>
                     <select value={form.patient_id} onChange={e => {
                       const p = patients.find(pt => pt.id === e.target.value);
                       updateField('patient_id', e.target.value);
                       if (p) updateField('patient_name', p.full_name);
                     }} className={inputCls + ' cursor-pointer appearance-none'}>
-                      <option value="" style={{ background: '#0D1B2A' }}>Select patient...</option>
+                      <option value="" style={{ background: '#0D1B2A' }}>{t('cases.wizard_placeholder_patient')}</option>
                       {patients.map(p => <option key={p.id} value={p.id} style={{ background: '#0D1B2A' }}>{p.full_name}</option>)}
                     </select>
                     {formErrors.patient_id && <p className="text-[11px] mt-1 text-red-400">{formErrors.patient_id}</p>}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Procedure Name *</label>
+                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step1_procedure')}</label>
                       <input value={form.procedure_name} onChange={e => updateField('procedure_name', e.target.value)}
-                        placeholder="e.g. Implant #14" className={inputCls} />
+                        placeholder={t('cases.wizard_placeholder_procedure')} className={inputCls} />
                       {formErrors.procedure_name && <p className="text-[11px] mt-1 text-red-400">{formErrors.procedure_name}</p>}
                     </div>
                     <div>
-                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Tooth Number</label>
+                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step1_tooth')}</label>
                       <input value={form.tooth_number} onChange={e => updateField('tooth_number', e.target.value)}
-                        placeholder="e.g. #14" className={inputCls} />
+                        placeholder={t('cases.wizard_placeholder_tooth')} className={inputCls} />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Procedure Date *</label>
+                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step1_date')}</label>
                       <input type="date" value={form.procedure_date} onChange={e => updateField('procedure_date', e.target.value)}
                         className={inputCls + ' [color-scheme:dark]'} />
                       {formErrors.procedure_date && <p className="text-[11px] mt-1 text-red-400">{formErrors.procedure_date}</p>}
                     </div>
                     <div>
-                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Doctor Name</label>
+                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step1_doctor')}</label>
                       <input value={form.doctor_name} onChange={e => updateField('doctor_name', e.target.value)}
-                        placeholder="Dr. name" className={inputCls} />
+                        placeholder={t('cases.wizard_placeholder_doctor')} className={inputCls} />
                     </div>
                   </div>
                 </>
@@ -701,60 +706,60 @@ export function ImplantCases() {
                 <>
                   <div className={sectionCls} style={{ background: 'rgba(79,209,255,0.04)', border: '1px solid rgba(79,209,255,0.1)' }}>
                     <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-[#4FD1FF]" /> CBCT Scan Analysis
+                      <Activity className="w-4 h-4 text-[#4FD1FF]" /> {t('cases.wizard_step2_cbct')}
                     </h3>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Bone Condition</label>
+                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step2_bone_condition')}</label>
                         <select value={form.bone_condition} onChange={e => updateField('bone_condition', e.target.value)}
                           className={inputCls + ' cursor-pointer appearance-none'}>
-                          <option value="" style={{ background: '#0D1B2A' }}>Select...</option>
-                          {boneConditions.map(o => <option key={o} value={o} style={{ background: '#0D1B2A' }}>{o}</option>)}
+                          <option value="" style={{ background: '#0D1B2A' }}>{t('cases.wizard_bone_select')}</option>
+                          {boneConditionValues.map((o, i) => <option key={o} value={o} style={{ background: '#0D1B2A' }}>{t(`cases.wizard_bone_type${i + 1}`)}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Bone Density</label>
+                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step2_bone_density')}</label>
                         <select value={form.bone_density} onChange={e => updateField('bone_density', e.target.value)}
                           className={inputCls + ' cursor-pointer appearance-none'}>
-                          <option value="" style={{ background: '#0D1B2A' }}>Select...</option>
-                          {boneDensities.map(o => <option key={o} value={o} style={{ background: '#0D1B2A' }}>{o}</option>)}
+                          <option value="" style={{ background: '#0D1B2A' }}>{t('cases.wizard_bone_select')}</option>
+                          {boneDensityValues.map((o, i) => <option key={o} value={o} style={{ background: '#0D1B2A' }}>{t(`cases.wizard_density_${['high', 'medium', 'low'][i]}`)}</option>)}
                         </select>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Bone Height (mm)</label>
+                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step2_bone_height')}</label>
                         <input type="number" min="0" step="0.1" value={form.bone_height} onChange={e => updateField('bone_height', e.target.value)}
                           placeholder="0.0" className={inputCls} />
                       </div>
                       <div>
-                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Bone Width (mm)</label>
+                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step2_bone_width')}</label>
                         <input type="number" min="0" step="0.1" value={form.bone_width} onChange={e => updateField('bone_width', e.target.value)}
                           placeholder="0.0" className={inputCls} />
                       </div>
                     </div>
                     <div className="mb-4">
-                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Pathology / Infection</label>
+                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step2_pathology')}</label>
                       <input value={form.pathology} onChange={e => updateField('pathology', e.target.value)}
                         placeholder="Any pathology or infection noted on CBCT" className={inputCls} />
                     </div>
                     <div>
-                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>CT Scan Notes</label>
+                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step2_ct_notes')}</label>
                       <textarea value={form.ct_scan_notes} onChange={e => updateField('ct_scan_notes', e.target.value)}
                         rows={2} className={inputCls + ' h-16 pt-2 resize-none'} placeholder="Additional observations..." />
                     </div>
                   </div>
 
                   <div className={sectionCls} style={{ background: 'rgba(0,229,168,0.03)', border: '1px solid rgba(0,229,168,0.08)' }}>
-                    <h3 className="text-sm font-semibold text-white mb-4">Medical History</h3>
+                    <h3 className="text-sm font-semibold text-white mb-4">{t('cases.wizard_step2_medical')}</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Chronic Disease</label>
+                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step2_chronic')}</label>
                         <input value={form.chronic_disease} onChange={e => updateField('chronic_disease', e.target.value)}
                           placeholder="e.g. Diabetes, HTN" className={inputCls} />
                       </div>
                       <div>
-                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Medication</label>
+                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step2_medication')}</label>
                         <input value={form.medication} onChange={e => updateField('medication', e.target.value)}
                           placeholder="e.g. Anticoagulants" className={inputCls} />
                       </div>
@@ -767,28 +772,28 @@ export function ImplantCases() {
               {wizardStep === 3 && (
                 <>
                   <div className={sectionCls} style={{ background: 'rgba(124,92,255,0.04)', border: '1px solid rgba(124,92,255,0.1)' }}>
-                    <h3 className="text-sm font-semibold text-white mb-4">Implant Decision</h3>
+                    <h3 className="text-sm font-semibold text-white mb-4">{t('cases.wizard_step3_decision')}</h3>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Implant Decision *</label>
+                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step3_decision_field')}</label>
                         <select value={form.implant_decision} onChange={e => updateField('implant_decision', e.target.value)}
                           className={inputCls + ' cursor-pointer appearance-none'}>
-                          <option value="" style={{ background: '#0D1B2A' }}>Select...</option>
+                          <option value="" style={{ background: '#0D1B2A' }}>{t('cases.wizard_bone_select')}</option>
                           {decisions.map(o => <option key={o} value={o} style={{ background: '#0D1B2A' }}>{o}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Extraction Needed</label>
+                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step3_extraction')}</label>
                         <div className="flex items-center gap-3 h-10">
                           <label className="flex items-center gap-1.5 text-sm cursor-pointer">
                             <input type="radio" name="extraction" checked={form.extraction_needed === true}
                               onChange={() => updateField('extraction_needed', true)} className="accent-[#4FD1FF]" />
-                            <span style={{ color: 'rgba(255,255,255,0.7)' }}>Yes</span>
+                            <span style={{ color: 'rgba(255,255,255,0.7)' }}>{t('common.yes')}</span>
                           </label>
                           <label className="flex items-center gap-1.5 text-sm cursor-pointer">
                             <input type="radio" name="extraction" checked={form.extraction_needed === false}
                               onChange={() => updateField('extraction_needed', false)} className="accent-[#4FD1FF]" />
-                            <span style={{ color: 'rgba(255,255,255,0.7)' }}>No</span>
+                            <span style={{ color: 'rgba(255,255,255,0.7)' }}>{t('common.no')}</span>
                           </label>
                         </div>
                       </div>
@@ -796,41 +801,41 @@ export function ImplantCases() {
                   </div>
 
                   <div className={sectionCls} style={{ background: 'rgba(255,193,7,0.04)', border: '1px solid rgba(255,193,7,0.1)' }}>
-                    <h3 className="text-sm font-semibold text-white mb-4">Implant Selection</h3>
+                    <h3 className="text-sm font-semibold text-white mb-4">{t('cases.wizard_step3_selection')}</h3>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Implant Brand</label>
+                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step3_brand')}</label>
                         <select value={form.implant_brand} onChange={e => { updateField('implant_brand', e.target.value); updateField('implant_size', ''); }}
                           className={inputCls + ' cursor-pointer appearance-none'}>
-                          <option value="" style={{ background: '#0D1B2A' }}>Select brand...</option>
+                          <option value="" style={{ background: '#0D1B2A' }}>{t('cases.wizard_placeholder_brand')}</option>
                           {implantBrands.map(o => <option key={o} value={o} style={{ background: '#0D1B2A' }}>{o}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Implant Size</label>
+                        <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step3_size')}</label>
                         <select value={form.implant_size} onChange={e => updateField('implant_size', e.target.value)}
                           disabled={!form.implant_brand}
                           className={inputCls + ' cursor-pointer appearance-none'}>
-                          <option value="" style={{ background: '#0D1B2A' }}>{form.implant_brand ? 'Select size...' : 'Select a brand first'}</option>
+                          <option value="" style={{ background: '#0D1B2A' }}>{form.implant_brand ? t('cases.wizard_placeholder_size') : t('cases.wizard_placeholder_size_brand_first')}</option>
                           {implantSizesForBrand.map(item => (
                             <option key={item.id} value={item.size} disabled={item.quantity <= 0} style={{ background: '#0D1B2A' }}>
-                              {item.size} (Available: {item.quantity})
+                              {t('cases.wizard_size_available', { size: item.size, count: item.quantity })}
                             </option>
                           ))}
                         </select>
                       </div>
                     </div>
                     <div>
-                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Abutment Type</label>
+                      <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step3_abutment')}</label>
                       <select value={form.abutment_type} onChange={e => updateField('abutment_type', e.target.value)}
                         className={inputCls + ' cursor-pointer appearance-none'}>
-                        <option value="" style={{ background: '#0D1B2A' }}>Select...</option>
+                        <option value="" style={{ background: '#0D1B2A' }}>{t('cases.wizard_bone_select')}</option>
                         {abutmentTypes.map(o => {
                           const inv = abutmentInv.find(a => a.type === o);
                           const disabled = inv ? inv.quantity <= 0 : false;
                           return (
                             <option key={o} value={o} disabled={disabled} style={{ background: '#0D1B2A' }}>
-                              {o}{inv ? ` (Available: ${inv.quantity})` : ''}
+                              {t('cases.wizard_abutment_available', { type: o, count: inv ? inv.quantity : 0 })}
                             </option>
                           );
                         })}
@@ -839,9 +844,9 @@ export function ImplantCases() {
                   </div>
 
                   <div>
-                    <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>Additional Notes</label>
+                    <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('common.notes')}</label>
                     <textarea value={form.notes} onChange={e => updateField('notes', e.target.value)}
-                      rows={2} className={inputCls + ' h-16 pt-2 resize-none'} placeholder="Any additional notes..." />
+                      rows={2} className={inputCls + ' h-16 pt-2 resize-none'} placeholder={t('cases.wizard_notes_placeholder')} />
                   </div>
                 </>
               )}
@@ -850,38 +855,38 @@ export function ImplantCases() {
               {wizardStep === 4 && (
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#00E5A8]" /> Review & Confirm
+                    <Check className="w-4 h-4 text-[#00E5A8]" /> {t('cases.wizard_step4_review')}
                   </h3>
                   <div className={sectionCls} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(79,209,255,0.6)' }}>Step 1: Patient & Basic</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(79,209,255,0.6)' }}>{t('cases.wizard_step4_section1')}</span>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Patient: </span><span className="text-white">{form.patient_name || '—'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Procedure: </span><span className="text-white">{form.procedure_name || '—'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Tooth: </span><span className="text-white">{form.tooth_number || '—'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Date: </span><span className="text-white">{form.procedure_date || '—'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Doctor: </span><span className="text-white">{form.doctor_name || '—'}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_patient')} </span><span className="text-white">{form.patient_name || t('common.dash')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_procedure')} </span><span className="text-white">{form.procedure_name || t('common.dash')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_tooth')} </span><span className="text-white">{form.tooth_number || t('common.dash')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_date')} </span><span className="text-white">{form.procedure_date || t('common.dash')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_doctor')} </span><span className="text-white">{form.doctor_name || t('common.dash')}</span></div>
                     </div>
                   </div>
                   <div className={sectionCls} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(79,209,255,0.6)' }}>Step 2: CBCT & Medical History</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(79,209,255,0.6)' }}>{t('cases.wizard_step4_section2')}</span>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Bone: </span><span className="text-white">{form.bone_condition || '—'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Density: </span><span className="text-white">{form.bone_density || '—'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Height: </span><span className="text-white">{form.bone_height || '—'} mm</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Width: </span><span className="text-white">{form.bone_width || '—'} mm</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Pathology: </span><span className="text-white">{form.pathology || '—'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Chronic Disease: </span><span className="text-white">{form.chronic_disease || '—'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Medication: </span><span className="text-white">{form.medication || '—'}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_bone')} </span><span className="text-white">{form.bone_condition || t('common.dash')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_density')} </span><span className="text-white">{form.bone_density || t('common.dash')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_height')} </span><span className="text-white">{form.bone_height || t('common.dash')} mm</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_width')} </span><span className="text-white">{form.bone_width || t('common.dash')} mm</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_pathology')} </span><span className="text-white">{form.pathology || t('common.dash')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_chronic')} </span><span className="text-white">{form.chronic_disease || t('common.dash')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_medication')} </span><span className="text-white">{form.medication || t('common.dash')}</span></div>
                     </div>
                   </div>
                   <div className={sectionCls} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(79,209,255,0.6)' }}>Step 3: Implant Planning</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(79,209,255,0.6)' }}>{t('cases.wizard_step4_section3')}</span>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Decision: </span><span className="text-white">{form.implant_decision || '—'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Extraction: </span><span className="text-white">{form.extraction_needed ? 'Yes' : 'No'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Brand: </span><span className="text-white">{form.implant_brand || '—'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Size: </span><span className="text-white">{form.implant_size || '—'}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Abutment: </span><span className="text-white">{form.abutment_type || '—'}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_decision')} </span><span className="text-white">{form.implant_decision || t('common.dash')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_extraction')} </span><span className="text-white">{form.extraction_needed ? t('common.yes') : t('common.no')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_brand')} </span><span className="text-white">{form.implant_brand || t('common.dash')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_size')} </span><span className="text-white">{form.implant_size || t('common.dash')}</span></div>
+                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_abutment')} </span><span className="text-white">{form.abutment_type || t('common.dash')}</span></div>
                     </div>
                   </div>
                 </div>
@@ -892,27 +897,27 @@ export function ImplantCases() {
             <div className="flex items-center justify-between px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
               <button onClick={closeWizard}
                 className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>
-                Cancel
+                {t('cases.wizard_cancel')}
               </button>
               <div className="flex items-center gap-3">
                 {wizardStep > 1 && (
                   <button onClick={handlePrev}
                     className="h-10 px-4 rounded-xl text-sm font-medium flex items-center gap-1.5"
                     style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>
-                    <ChevronLeft className="w-4 h-4" /> Back
+                    <ChevronLeft className="w-4 h-4" /> {t('cases.wizard_back')}
                   </button>
                 )}
                 {wizardStep < 4 ? (
                   <button onClick={handleNext}
                     className="h-10 px-5 rounded-xl text-sm font-bold flex items-center gap-1.5 transition-all active:scale-[0.98]"
                     style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
-                    Next <ChevronRight className="w-4 h-4" />
+                    {t('cases.wizard_next')} <ChevronRight className="w-4 h-4" />
                   </button>
                 ) : (
                   <button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}
                     className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
                     style={{ background: 'linear-gradient(135deg, #00E5A8, #45D6FF)', color: '#050B14', boxShadow: '0 4px 20px rgba(0,229,168,0.25)' }}>
-                    {createMutation.isPending || updateMutation.isPending ? 'Saving...' : editProcId ? 'Update Procedure' : 'Create Implant Case'}
+                    {createMutation.isPending || updateMutation.isPending ? t('cases.wizard_saving') : editProcId ? t('cases.wizard_update') : t('cases.wizard_create')}
                   </button>
                 )}
               </div>
@@ -931,20 +936,20 @@ export function ImplantCases() {
               <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(239,68,68,0.1)' }}>
                 <Trash2 className="w-6 h-6" style={{ color: '#ef4444' }} />
               </div>
-              <h3 className="text-lg font-bold text-white text-center mb-2">Delete Procedure?</h3>
+              <h3 className="text-lg font-bold text-white text-center mb-2">{t('cases.modal_delete_title')}</h3>
               <p className="text-sm text-center" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                This will permanently delete this implant case and cannot be undone.
+                {t('cases.modal_delete_desc')}
               </p>
             </div>
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
               <button onClick={() => setDeleteConfirmId(null)}
                 className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>
-                Cancel
+                {t('cases.modal_delete_cancel')}
               </button>
               <button onClick={() => deleteMutation.mutate(deleteConfirmId)} disabled={deleteMutation.isPending}
                 className="h-10 px-5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
                 style={{ background: '#ef4444', color: 'white' }}>
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                {deleteMutation.isPending ? t('cases.modal_delete_deleting') : t('cases.modal_delete_confirm')}
               </button>
             </div>
           </div>

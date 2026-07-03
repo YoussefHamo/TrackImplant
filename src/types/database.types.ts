@@ -1,12 +1,32 @@
-export type UserRole = 'Admin' | 'Doctor' | 'Assistant' | 'Receptionist';
+export type UserRole = 'Manager' | 'Admin' | 'Doctor' | 'Assistant' | 'Receptionist';
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 export type PaymentStatus = 'Pending' | 'Partial' | 'Paid';
 export type PaymentMethod = 'cash' | 'card' | 'insurance' | 'bank_transfer';
 export type RecordType = 'invoice' | 'payment';
 export type AuditAction = 'INSERT' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'USER_CREATED' | 'ROLE_CHANGED' | 'INVENTORY_CHANGE' | 'PAYMENT_CHANGE';
 export type InventoryItemType = 'implant' | 'abutment';
+export type InventoryCategory = 'implant' | 'abutment' | 'prosthetic' | 'material';
 export type TransactionType = 'add' | 'deduct';
+export type OperationType = 'add' | 'issue' | 'return' | 'adjust' | 'cross_branch';
+export type CrossBranchRequestStatus = 'pending' | 'approved' | 'rejected' | 'in_transit' | 'delivered' | 'completed';
+export type CrossBranchDeliveryStatus = 'preparing' | 'picked_up' | 'in_transit' | 'arrived' | 'completed';
+export type StockRequestStatus = 'pending' | 'approved' | 'rejected' | 'delivered' | 'completed';
 export type HealingStatus = 'OnTrack' | 'Healing' | 'Critical' | 'Failure' | 'Completed';
+export type ReturnReason = 'wrong_item' | 'damaged' | 'expired' | 'cancelled_procedure' | 'cross_branch_return' | 'supplier_return' | 'other';
+export type ReturnStatus = 'pending' | 'approved' | 'rejected';
+export type CountSessionStatus = 'draft' | 'in_progress' | 'completed' | 'approved';
+export interface ProductCatalogItem {
+  id: string;
+  category: InventoryCategory;
+  subcategory: string | null;
+  name: string | null;
+  brand: string | null;
+  size: string | null;
+  unit: string | null;
+}
+export type CommunicationType = 'call' | 'whatsapp' | 'sms' | 'email' | 'note' | 'clinic_note';
+export type CommunicationDirection = 'inbound' | 'outbound';
+export type ReminderType = 'birthday' | 'recall' | 'missed_appointment' | 'follow_up' | 'custom';
 
 export interface Patient {
   id: string;
@@ -63,6 +83,7 @@ export interface FinancialRecord {
   paid_so_far: number;
   remaining_amount: number;
   status: PaymentStatus;
+  payment_method?: PaymentMethod;
   notes?: string;
   created_at?: string;
 }
@@ -90,6 +111,8 @@ export interface Procedure {
   implant_decision?: 'Immediate' | 'Delayed' | 'Not Possible';
   extraction_needed?: boolean;
   abutment_type?: string;
+  kit_id?: string;
+  kit_snapshot?: Record<string, unknown>;
   created_at?: string;
 }
 
@@ -111,6 +134,7 @@ export interface AuthUser {
   full_name: string;
   username: string;
   is_active: boolean;
+  branch_id?: string;
 }
 
 export interface AppUser {
@@ -121,6 +145,7 @@ export interface AppUser {
   email?: string;
   role: UserRole;
   is_active: boolean;
+  branch_id?: string;
   created_at?: string;
 }
 
@@ -133,6 +158,12 @@ export interface AuditLog {
   record_id: string;
   old_data?: Record<string, unknown>;
   new_data?: Record<string, unknown>;
+  role?: string;
+  branch_id?: string;
+  ip_address?: string;
+  user_agent?: string;
+  os?: string;
+  session_id?: string;
   created_at?: string;
 }
 
@@ -141,7 +172,10 @@ export interface ImplantInventory {
   brand: string;
   size: string;
   quantity: number;
+  reserved?: number;
+  used?: number;
   minimum_stock?: number;
+  branch_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -150,7 +184,10 @@ export interface AbutmentInventory {
   id: string;
   type: string;
   quantity: number;
+  reserved?: number;
+  used?: number;
   minimum_stock?: number;
+  branch_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -160,11 +197,153 @@ export interface InventoryTransaction {
   item_type: InventoryItemType;
   item_id: string;
   type: TransactionType;
+  operation_type: OperationType;
   quantity: number;
+  item_category?: string;
+  item_name?: string;
   patient_id?: string;
   procedure_id?: string;
   notes?: string;
+  created_by?: string;
   created_at?: string;
+}
+
+export interface InventoryItem {
+  id: string;
+  branch_id?: string;
+  category: InventoryCategory;
+  subcategory?: string;
+  name?: string;
+  brand?: string;
+  size?: string;
+  unit: string;
+  quantity: number;
+  reserved: number;
+  used: number;
+  minimum_stock?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StockRequest {
+  id: string;
+  item_id?: string;
+  item_name: string;
+  item_category?: string;
+  quantity: number;
+  requested_by?: string;
+  requested_by_name?: string;
+  approved_by?: string;
+  approved_by_name?: string;
+  status: StockRequestStatus;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CrossBranchRequest {
+  id: string;
+  from_branch_id: string;
+  to_branch_id: string;
+  item_id?: string;
+  item_name: string;
+  item_category?: string;
+  quantity: number;
+  status: CrossBranchRequestStatus;
+  requested_by?: string;
+  responded_by?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Joined fields
+  from_branch_name?: string;
+  to_branch_name?: string;
+  requester_name?: string;
+  responder_name?: string;
+  // Delivery info (joined)
+  delivery_id?: string;
+  delivery_status?: CrossBranchDeliveryStatus;
+}
+
+export interface RequestableItem {
+  lookup_key: string;
+  category: string;
+  subcategory?: string;
+  name?: string;
+  brand?: string;
+  size?: string;
+  unit: string;
+  total_quantity: number;
+}
+
+export interface CrossBranchDelivery {
+  id: string;
+  request_id: string;
+  status: CrossBranchDeliveryStatus;
+  updated_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Joined
+  request?: CrossBranchRequest;
+}
+
+export interface Branch {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface BranchInventory {
+  id: string;
+  branch_id: string;
+  item_id: string;
+  quantity: number;
+  reserved: number;
+  updated_at?: string;
+  // Joined fields
+  branch_name?: string;
+  item_name?: string;
+  item_category?: string;
+}
+
+export interface InventoryDelivery {
+  id: string;
+  from_location: string;
+  to_type: 'warehouse' | 'branch';
+  to_branch_id?: string;
+  item_id?: string;
+  item_name: string;
+  quantity: number;
+  notes?: string;
+  received_by?: string;
+  created_by?: string;
+  created_at?: string;
+  // Joined fields
+  branch_name?: string;
+}
+
+export interface InventoryReturn {
+  id: string;
+  from_location: 'warehouse' | 'branch' | 'patient';
+  from_branch_id?: string;
+  item_id?: string;
+  item_name: string;
+  quantity: number;
+  reason: ReturnReason | string;
+  notes?: string;
+  status: ReturnStatus;
+  branch_id?: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Joined fields
+  branch_name?: string;
+  reviewer_name?: string;
 }
 
 export interface PatientFile {
@@ -178,4 +357,109 @@ export interface PatientFile {
   public_url?: string;
   uploaded_by?: string;
   created_at?: string;
+}
+
+// ── Phase 2: Procedure Kits ──
+export interface ProcedureKit {
+  id: string;
+  name: string;
+  description?: string;
+  branch_id?: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+  // Joined
+  items?: ProcedureKitItem[];
+}
+
+export interface ProcedureKitItem {
+  id: string;
+  kit_id: string;
+  category: InventoryCategory;
+  subcategory?: string;
+  brand?: string;
+  size?: string;
+  name?: string;
+  quantity: number;
+  created_at?: string;
+}
+
+// ── Phase 2: Inventory Count ──
+export interface InventoryCountSession {
+  id: string;
+  branch_id: string;
+  status: CountSessionStatus;
+  notes?: string;
+  created_by?: string;
+  approved_by?: string;
+  approved_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Joined
+  branch_name?: string;
+  creator_name?: string;
+  approver_name?: string;
+  items?: InventoryCountItem[];
+}
+
+export interface InventoryCountItem {
+  id: string;
+  session_id: string;
+  item_id: string;
+  system_quantity: number;
+  actual_quantity: number;
+  difference: number;
+  reason?: string;
+  created_at?: string;
+  // Joined
+  item_name?: string;
+  item_category?: string;
+}
+
+// ── Phase 2: CRM Communications ──
+export interface Communication {
+  id: string;
+  patient_id: string;
+  type: CommunicationType;
+  direction: CommunicationDirection;
+  subject?: string;
+  content?: string;
+  staff_id?: string;
+  created_at?: string;
+  // Joined
+  staff_name?: string;
+}
+
+// ── Phase 2: Patient Reminders ──
+export interface PatientReminder {
+  id: string;
+  patient_id: string;
+  reminder_type: ReminderType;
+  title: string;
+  message?: string;
+  scheduled_for: string;
+  sent_at?: string;
+  created_by?: string;
+  created_at?: string;
+}
+
+// ── Phase 2: Dashboard types ──
+export interface DashboardStats {
+  totalPatients: number;
+  newPatientsThisMonth: number;
+  totalProcedures: number;
+  todayAppointments: number;
+  todayProcedures: number;
+  pendingRequests: number;
+  lowStockItems: number;
+  criticalFollowUps: number;
+  totalRevenue: number;
+  pendingRevenue: number;
+}
+
+export interface ReportFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  branchId?: string;
+  doctorId?: string;
 }

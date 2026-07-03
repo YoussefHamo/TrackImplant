@@ -6,8 +6,10 @@ import {
   Search, ChevronLeft, ChevronRight, Plus, Calendar
 } from 'lucide-react';
 import AddPatientModal from '../components/AddPatientModal';
+import { useLanguage } from '../context/LanguageContext';
 
 export const Patients = () => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,9 +50,9 @@ export const Patients = () => {
       {/* ===== HEADER ===== */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Patient Directory</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-white">{t('patients.title')}</h1>
           <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
-            {isLoading ? 'Loading...' : `${patients.length} patients enrolled`}
+            {isLoading ? t('common.loading') : t('patients.subtitle', { count: patients.length })}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -58,7 +60,7 @@ export const Patients = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
             <input
               type="text" value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
-              placeholder="Search patients or phone..."
+              placeholder={t('patients.search_placeholder')}
               className="w-full h-10 pl-10 pr-4 rounded-xl text-sm outline-none transition-all duration-200 placeholder-gray-500"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)' }}
               dir="auto"
@@ -71,7 +73,7 @@ export const Patients = () => {
               color: '#050B14',
               boxShadow: '0 4px 20px rgba(69,214,255,0.25)',
             }}>
-            <Plus className="w-4 h-4" /> Add Patient
+            <Plus className="w-4 h-4" /> {t('patients.add_patient')}
           </button>
         </div>
       </div>
@@ -84,10 +86,10 @@ export const Patients = () => {
           style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
           <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
             style={{ color: 'rgba(255,255,255,0.25)' }}>
-            <div className="flex-[3]">Patient</div>
-            <div className="flex-[2]">Phone</div>
-            <div className="flex-[1.5]">ID</div>
-            <div className="flex-[1.5]">Created</div>
+            <div className="flex-[3]">{t('patients.table_patient')}</div>
+            <div className="flex-[2]">{t('patients.table_phone')}</div>
+            <div className="flex-[1.5]">{t('patients.table_id')}</div>
+            <div className="flex-[1.5]">{t('patients.table_created')}</div>
           </div>
 
           <div className="divide-y divide-[rgba(255,255,255,0.04)]">
@@ -97,7 +99,7 @@ export const Patients = () => {
               </div>
             ) : paged.length === 0 ? (
               <div className="py-16 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                {searchQuery ? 'No patients match your search' : 'No patients yet. Add one to get started.'}
+                {searchQuery ? t('patients.empty_search') : t('patients.empty_all')}
               </div>
               ) : paged.map(p => {
               return (
@@ -122,13 +124,13 @@ export const Patients = () => {
                     <span className="text-sm font-medium text-white">{p.full_name}</span>
                   </div>
                   <div className="flex-[2] text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                    {p.phone || '—'}
+                    {p.phone || t('common.dash')}
                   </div>
                   <div className="flex-[1.5] text-sm font-mono" style={{ color: 'rgba(255,255,255,0.4)' }}>
                     #{(p.id || '').slice(0, 6).toUpperCase()}
                   </div>
                   <div className="flex-[1.5] text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                    {p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}
+                    {p.created_at ? new Date(p.created_at).toLocaleDateString() : t('common.dash')}
                   </div>
                 </div>
               );
@@ -193,15 +195,15 @@ export const Patients = () => {
             {/* Quick Info */}
             <div className="space-y-0 divide-y divide-[rgba(255,255,255,0.04)] mb-5">
               <div className="flex items-center justify-between py-2.5">
-                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Phone</span>
-                <span className="text-xs font-medium text-white">{selectedPatient.phone || '—'}</span>
+                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('patients.phone_label')}</span>
+                <span className="text-xs font-medium text-white">{selectedPatient.phone || t('common.dash')}</span>
               </div>
             </div>
 
             {/* Medical History */}
             {selectedPatient.medical_history ? (
               <div className="mb-5 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Medical History</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('patients.medical_history')}</span>
                 <p className="text-sm mt-1 leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>{selectedPatient.medical_history}</p>
               </div>
             ) : null}
@@ -210,24 +212,24 @@ export const Patients = () => {
             <button onClick={() => navigate(`/dashboard/patients/${selectedPatient.id}/profile`)}
               className="w-full h-10 mb-4 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all active:scale-[0.98]"
               style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
-              View Full Profile
+              {t('patients.view_full_profile')}
             </button>
 
             {/* Created At */}
             <div className="rounded-xl p-4" style={{ background: 'rgba(79,209,255,0.04)', border: '1px solid rgba(79,209,255,0.1)' }}>
               <div className="flex items-center gap-2 mb-2">
                 <Calendar className="w-4 h-4 text-[#4FD1FF]" />
-                <span className="text-sm font-semibold text-white">Patient Since</span>
+                <span className="text-sm font-semibold text-white">{t('patients.patient_since')}</span>
               </div>
               <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                {selectedPatient.created_at ? new Date(selectedPatient.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}
+                {selectedPatient.created_at ? new Date(selectedPatient.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : t('common.dash')}
               </div>
             </div>
           </div>
         ) : (
           <div className="rounded-[22px] p-6 flex items-center justify-center h-64"
             style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <p style={{ color: 'rgba(255,255,255,0.2)' }} className="text-sm">Select a patient to view details</p>
+            <p style={{ color: 'rgba(255,255,255,0.2)' }} className="text-sm">{t('patients.select_hint')}</p>
           </div>
         )}
       </div>

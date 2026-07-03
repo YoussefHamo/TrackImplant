@@ -1,14 +1,17 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from "../integrations/supabase/client";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { useDebounce } from "../hooks/useDebounce";
 import { searchService, type SearchResult } from "../services/searchService";
+import { notificationService } from "../services/notificationService";
 import AddPatientModal from "../components/AddPatientModal";
 import {
   LayoutDashboard, Users, Activity, Calendar, CreditCard, Clock, Package,
   Bell, Search, Plus, Settings, LogOut, ChevronRight,
-  User, FileText
+  User, FileText, Info, AlertTriangle, CheckCircle
 } from "lucide-react";
 
 function ToothLogo({ className }: { className?: string }) {
@@ -20,16 +23,15 @@ function ToothLogo({ className }: { className?: string }) {
   );
 }
 
-const allNavItems = [
-  { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/dashboard/patients", label: "Patients", icon: Users },
-  { path: "/dashboard/cases", label: "Tracking", icon: Activity },
-  { path: "/dashboard/appointments", label: "Calendar", icon: Calendar },
-  { path: "/dashboard/payments", label: "Finances", icon: CreditCard },
-  { path: "/dashboard/follow-ups", label: "Follow-ups", icon: Clock },
-  { path: "/dashboard/inventory", label: "Inventory", icon: Package, adminOnly: true },
-  { path: "/dashboard/logs", label: "Logs", icon: FileText, adminOnly: true },
-  { path: "/dashboard/notifications", label: "Notifications", icon: Bell },
+const allNavItems: { path: string; labelKey: string; icon: React.ElementType; adminOnly?: boolean }[] = [
+  { path: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { path: "/dashboard/patients", labelKey: "nav.patients", icon: Users },
+  { path: "/dashboard/cases", labelKey: "nav.tracking", icon: Activity },
+  { path: "/dashboard/appointments", labelKey: "nav.appointments", icon: Calendar },
+  { path: "/dashboard/payments", labelKey: "nav.finances", icon: CreditCard },
+  { path: "/dashboard/follow-ups", labelKey: "nav.follow_ups", icon: Clock },
+  { path: "/dashboard/inventory", labelKey: "nav.inventory", icon: Package },
+  { path: "/dashboard/logs", labelKey: "nav.logs", icon: FileText, adminOnly: true },
 ];
 
 const resultIcons: Record<string, React.ElementType> = {
@@ -41,6 +43,7 @@ export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -48,6 +51,47 @@ export default function DashboardLayout() {
   const [addPatientOpen, setAddPatientOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const debouncedQuery = useDebounce(searchQuery, 250);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['notifications', user?.id],
+    queryFn: () => notificationService.getByUser(user!.id, 10),
+    enabled: !!user?.id,
+    refetchInterval: 30000,
+  });
+
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['notifications-unread', user?.id],
+    queryFn: () => notificationService.getUnreadCount(user!.id),
+    enabled: !!user?.id,
+    refetchInterval: 15000,
+  });
+
+  const markReadMut = useMutation({
+    mutationFn: (id: string) => notificationService.markRead(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['notifications'] }); queryClient.invalidateQueries({ queryKey: ['notifications-unread'] }); },
+  });
+
+  const markAllMut = useMutation({
+    mutationFn: () => notificationService.markAllRead(user!.id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['notifications'] }); queryClient.invalidateQueries({ queryKey: ['notifications-unread'] }); },
+  });
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    };
+    if (notifOpen) { document.addEventListener('mousedown', handler); return () => document.removeEventListener('mousedown', handler); }
+  }, [notifOpen]);
+
+  const notifColors: Record<string, { bg: string; icon: typeof Info; iconColor: string }> = {
+    info: { bg: 'rgba(79,209,255,0.1)', icon: Info, iconColor: '#4FD1FF' },
+    warning: { bg: 'rgba(255,193,7,0.1)', icon: AlertTriangle, iconColor: '#FFC107' },
+    critical: { bg: 'rgba(239,68,68,0.1)', icon: AlertTriangle, iconColor: '#ef4444' },
+    success: { bg: 'rgba(0,229,168,0.1)', icon: CheckCircle, iconColor: '#00E5A8' },
+  };
 
   useEffect(() => {
     if (!debouncedQuery.trim()) return;
@@ -80,7 +124,7 @@ export default function DashboardLayout() {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #050B14 0%, #08111F 50%, #0D1B2A 100%)' }}>
+    <div className="min-h-screen flex" style={{ background: 'var(--app-bg)' }}>
       {/* Background tech grid + glow */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute inset-0 opacity-[0.03]" style={{
@@ -91,8 +135,7 @@ export default function DashboardLayout() {
       </div>
 
       {/* ================= SIDEBAR ================= */}
-      <aside className="relative z-10 w-[240px] flex flex-col flex-shrink-0 border-r border-[rgba(255,255,255,0.05)]"
-        style={{ background: 'rgba(8,15,25,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+      <aside className="relative z-10 w-[240px] flex flex-col flex-shrink-0" style={{ borderRight: '1px solid var(--app-border)', background: 'var(--app-sidebar-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
         
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-6 border-b border-[rgba(255,255,255,0.04)]">
@@ -100,8 +143,8 @@ export default function DashboardLayout() {
             <ToothLogo className="w-5 h-5 text-[#4FD1FF]" />
           </div>
           <div>
-            <div className="text-sm font-semibold tracking-tight text-[#4FD1FF]" style={{ fontFamily: "'Inter','SF Pro Display',sans-serif" }}>TrackImplant</div>
-            <div className="text-[9px] tracking-[0.2em] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>DENTAL PRECISION</div>
+            <div className="text-sm font-semibold tracking-tight text-[#4FD1FF]" style={{ fontFamily: "'Inter','SF Pro Display',sans-serif" }}>{t('app.name')}</div>
+            <div className="text-[9px] tracking-[0.2em] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('app.tagline')}</div>
           </div>
         </div>
 
@@ -126,7 +169,7 @@ export default function DashboardLayout() {
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full" style={{ background: '#4FD1FF', boxShadow: '0 0 8px rgba(79,209,255,0.5)' }} />
                 )}
                 <Icon className="w-[18px] h-[18px]" style={{ opacity: isActive ? 1 : 0.6 }} />
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
                 {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-50" />}
               </Link>
             );
@@ -146,7 +189,7 @@ export default function DashboardLayout() {
             onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 4px 20px rgba(69,214,255,0.2)'}
           >
             <Plus className="w-4 h-4" />
-            New Procedure
+            {t('nav.new_procedure')}
           </button>
         </div>
 
@@ -159,7 +202,7 @@ export default function DashboardLayout() {
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
               <Settings className="w-[18px] h-[18px]" />
-              <span>Settings</span>
+              <span>{t('nav.settings')}</span>
             </Link>
           )}
           {user?.role === 'Admin' && (
@@ -169,7 +212,7 @@ export default function DashboardLayout() {
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
               <FileText className="w-[18px] h-[18px]" />
-              <span>Audit Logs</span>
+              <span>{t('nav.audit_logs')}</span>
             </Link>
           )}
           <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm w-full text-left transition-all duration-200"
@@ -178,7 +221,7 @@ export default function DashboardLayout() {
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
           >
             <LogOut className="w-[18px] h-[18px]" />
-            <span>Logout</span>
+            <span>{t('nav.logout')}</span>
           </button>
         </div>
       </aside>
@@ -187,8 +230,7 @@ export default function DashboardLayout() {
       <div className="relative z-10 flex-1 flex flex-col min-w-0">
 
         {/* Top Navbar */}
-        <header className="h-16 flex items-center gap-4 px-6 border-b border-[rgba(255,255,255,0.04)]"
-          style={{ background: 'rgba(8,15,25,0.6)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+        <header className="h-16 flex items-center gap-4 px-6" style={{ borderBottom: '1px solid var(--app-border)', background: 'var(--app-header-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
           
           {/* Search Bar with suggestions */}
           <div ref={searchRef} className="flex-1 max-w-lg relative">
@@ -196,7 +238,7 @@ export default function DashboardLayout() {
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: searchFocused ? '#4FD1FF' : 'rgba(255,255,255,0.25)' }} />
               <input
                 type="text"
-                placeholder="Search patients, ID, or phone..."
+                placeholder={t('nav.search_placeholder')}
                 value={searchQuery}
                 onChange={e => { setSearchQuery(e.target.value); if (!e.target.value) { setSearchResults([]); setShowResults(false); } if (e.target.value) setShowResults(true); }}
                 onFocus={() => { setSearchFocused(true); if (searchResults.length) setShowResults(true); }}
@@ -223,7 +265,7 @@ export default function DashboardLayout() {
                 }}>
                 {searchResults.length === 0 ? (
                   <div className="px-4 py-4 text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                    {searchQuery ? 'No results found' : 'Start typing to search'}
+                    {searchQuery ? t('nav.no_results') : t('nav.start_typing')}
                   </div>
                 ) : (
                   <div>
@@ -235,7 +277,7 @@ export default function DashboardLayout() {
                         <div key={type}>
                           <div className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b border-[rgba(255,255,255,0.04)]"
                             style={{ color: 'rgba(255,255,255,0.2)' }}>
-                            {type === 'patient' ? 'Patients' : 'Procedures'}
+                            {type === 'patient' ? t('nav.patients_group') : t('nav.procedures_group')}
                           </div>
                           {items.map(r => (
                             <button key={`${type}-${r.id}`}
@@ -259,15 +301,74 @@ export default function DashboardLayout() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-3">
-            {/* Notification */}
-            <Link to="/dashboard/notifications" className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-            >
-              <Bell className="w-[18px] h-[18px]" style={{ color: 'rgba(255,255,255,0.6)' }} />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full" style={{ background: '#4FD1FF', boxShadow: '0 0 6px rgba(79,209,255,0.6)' }} />
-            </Link>
+            {/* Notification Bell with Dropdown */}
+            <div ref={notifRef} className="relative">
+              <button onClick={() => setNotifOpen(o => !o)}
+                className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200"
+                style={{ background: notifOpen ? 'rgba(79,209,255,0.1)' : 'rgba(255,255,255,0.03)', border: notifOpen ? '1px solid rgba(79,209,255,0.2)' : '1px solid rgba(255,255,255,0.06)' }}>
+                <Bell className="w-[18px] h-[18px]" style={{ color: notifOpen ? '#4FD1FF' : 'rgba(255,255,255,0.6)' }} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-bold"
+                    style={{ background: '#4FD1FF', color: '#050B14', boxShadow: '0 0 8px rgba(79,209,255,0.6)' }}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Dropdown */}
+              {notifOpen && (
+                <div className="absolute top-full right-0 mt-2 w-[380px] rounded-2xl overflow-hidden z-50"
+                  style={{
+                    background: 'rgba(10,20,35,0.98)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(16px)',
+                  }}>
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-[rgba(255,255,255,0.05)]">
+                    <div>
+                      <span className="text-sm font-semibold text-white">{t('notifications.title')}</span>
+                      <span className="ml-2 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('notifications.subtitle', { unread: unreadCount, total: notifications.length })}</span>
+                    </div>
+                    {unreadCount > 0 && (
+                      <button onClick={() => markAllMut.mutate()} className="text-[11px] font-medium" style={{ color: '#4FD1FF' }}>
+                        {t('notifications.mark_all_read')}
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-[360px] overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="py-10 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('notifications.empty')}</div>
+                    ) : notifications.map(n => {
+                      const nc = notifColors[n.type] || notifColors.info;
+                      const NIcon = nc.icon;
+                      return (
+                        <div key={n.id}
+                          className="flex items-start gap-3 px-5 py-3.5 transition-all cursor-pointer hover:bg-[rgba(255,255,255,0.03)]"
+                          style={{ opacity: n.is_read ? 0.6 : 1 }}
+                          onClick={() => { if (!n.is_read) markReadMut.mutate(n.id); if (n.link) navigate(n.link); setNotifOpen(false); }}>
+                          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: nc.bg }}>
+                            <NIcon className="w-4 h-4" style={{ color: nc.iconColor }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-white truncate">{n.title}</div>
+                            <div className="text-[11px] mt-0.5 line-clamp-2" style={{ color: 'rgba(255,255,255,0.45)' }}>{n.message}</div>
+                            <div className="text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                              {n.created_at ? new Date(n.created_at).toLocaleDateString() + ' ' + new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </div>
+                          </div>
+                          {!n.is_read && <span className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: '#4FD1FF' }} />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <Link to="/dashboard/notifications" onClick={() => setNotifOpen(false)}
+                    className="flex items-center justify-center py-3 text-xs font-medium border-t border-[rgba(255,255,255,0.05)] transition-all hover:bg-[rgba(79,209,255,0.04)]"
+                    style={{ color: '#4FD1FF' }}>
+                    {t('notifications.view_all')}
+                  </Link>
+                </div>
+              )}
+            </div>
 
             {/* Add Patient */}
             <button
@@ -282,12 +383,12 @@ export default function DashboardLayout() {
               onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 4px 15px rgba(69,214,255,0.2)'}
             >
               <Plus className="w-4 h-4" />
-              Add Patient
+              {t('nav.add_patient')}
             </button>
 
             {/* Role Debug */}
             <div className="text-[10px] font-mono px-2.5 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
-              Role: <span className="text-[#4FD1FF] font-bold">{user?.role || 'N/A'}</span>
+              {t('nav.role')} <span className="text-[#4FD1FF] font-bold">{user?.role || t('nav.na')}</span>
             </div>
 
             {/* Profile */}

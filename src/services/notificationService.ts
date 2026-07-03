@@ -89,12 +89,12 @@ export const notificationService = {
   ): Promise<void> {
     const { data: users } = await supabase
       .from('users')
-      .select('id')
+      .select('auth_user_id')
       .eq('role', role)
       .eq('is_active', true);
     if (!users) return;
     for (const user of users) {
-      await this.create({ ...notification, user_id: user.id as string });
+      await this.create({ ...notification, user_id: user.auth_user_id as string });
     }
   },
 };

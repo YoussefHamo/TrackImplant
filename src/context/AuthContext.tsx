@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { auditLogService, getCurrentUserInfo } from '../services/auditLogService';
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const initialized = useRef(false);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const fetchProfile = useCallback(async (authUserId: string, _email: string) => {
     try {
       const profile = await userService.getByAuthId(authUserId);
@@ -33,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           full_name: profile.full_name,
           username: profile.username,
           is_active: profile.is_active,
+          branch_id: profile.branch_id,
         });
       } else {
         setUser({
@@ -45,9 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch {
       const metaRole = (await supabase.auth.getSession()).data.session?.user?.user_metadata?.role as string | undefined;
+      const validRoles: UserRole[] = ['Manager', 'Admin', 'Doctor', 'Assistant', 'Receptionist'];
       setUser({
         id: authUserId,
-        role: (['Admin', 'Doctor', 'Receptionist'].includes(metaRole || '') ? metaRole : 'Admin') as UserRole,
+        role: validRoles.includes(metaRole as UserRole) ? (metaRole as UserRole) : 'Admin',
         full_name: '',
         username: '',
         is_active: true,
@@ -88,11 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (identifier.includes('@')) {
         email = identifier;
       } else {
-        const userRecord = await userService.getByUsername(identifier);
-        if (!userRecord) return { error: 'Invalid username or password' };
-        if (!userRecord.is_active) return { error: 'Your account has been disabled. Contact administrator.' };
-        email = userRecord.email || identifier;
-        username = userRecord.username;
+        const { data: userRecord, error: lookupError } = await supabase
+          .rpc('get_user_email_by_username', { lookup_username: identifier })
+          .maybeSingle();
+        if (lookupError || !userRecord) return { error: 'Invalid username or password' };
+        const rec = userRecord as { is_active?: boolean; email?: string; username?: string };
+        if (!rec.is_active) return { error: 'Your account has been disabled. Contact administrator.' };
+        email = rec.email || identifier;
+        username = rec.username;
       }
 
       // Try the real email first. For legacy accounts created with a .local

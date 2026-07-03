@@ -8,6 +8,7 @@ import {
   Activity, AlertTriangle, Heart, Search, TrendingUp, AlertCircle, Plus, X, Edit2, Trash2, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLanguage } from '../../context/LanguageContext';
 
 const healingColors: Record<HealingStatus, { bg: string; text: string; glow: string }> = {
   OnTrack: { bg: 'rgba(0,229,168,0.12)', text: '#00E5A8', glow: 'rgba(0,229,168,0.3)' },
@@ -47,21 +48,11 @@ function PainMeter({ level }: { level: number }) {
   );
 }
 
-function HealingBadge({ status }: { status: HealingStatus }) {
-  const c = healingColors[status] || healingColors.OnTrack;
-  return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
-      style={{ background: c.bg, color: c.text }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: c.text, boxShadow: `0 0 6px ${c.glow}` }} />
-      {status === 'OnTrack' ? 'On Track' : status}
-    </span>
-  );
-}
-
 const inputCls = 'w-full h-10 px-3 rounded-xl text-sm outline-none bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500 transition-all';
 
 export default function FollowUps() {
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -138,10 +129,29 @@ export default function FollowUps() {
   const criticalCount = useMemo(() => followUps.filter(f => f.healing_status === 'Critical').length, [followUps]);
   const avgHealth = followUps.length ? Math.round(followUps.reduce((s, f) => s + (f.health_score ?? 100), 0) / followUps.length) : 0;
 
+  const statusLabels: Record<string, string> = {
+    OnTrack: t('follow_ups.status_on_track'),
+    Healing: t('follow_ups.status_healing'),
+    Critical: t('follow_ups.status_critical'),
+    Failure: t('follow_ups.status_failure'),
+    Completed: t('follow_ups.status_completed'),
+  };
+
+  function HealingBadge({ status }: { status: HealingStatus }) {
+    const c = healingColors[status] || healingColors.OnTrack;
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
+        style={{ background: c.bg, color: c.text }}>
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: c.text, boxShadow: `0 0 6px ${c.glow}` }} />
+        {statusLabels[status] || status}
+      </span>
+    );
+  }
+
   const createMut = useMutation({
     mutationFn: () => followUpService.create(form),
     onSuccess: () => {
-      toast.success('Follow-up created');
+      toast.success(t('follow_ups.toast_created'));
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] });
       queryClient.invalidateQueries({ queryKey: ['procedures'] });
       queryClient.invalidateQueries({ queryKey: ['patients'] });
@@ -154,7 +164,7 @@ export default function FollowUps() {
   const updateMut = useMutation({
     mutationFn: () => followUpService.update(editingId!, form),
     onSuccess: () => {
-      toast.success('Follow-up updated');
+      toast.success(t('follow_ups.toast_updated'));
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] });
       queryClient.invalidateQueries({ queryKey: ['procedures'] });
       queryClient.invalidateQueries({ queryKey: ['patients'] });
@@ -167,7 +177,7 @@ export default function FollowUps() {
   const deleteMut = useMutation({
     mutationFn: (id: string) => followUpService.delete(id),
     onSuccess: () => {
-      toast.success('Follow-up deleted');
+      toast.success(t('follow_ups.toast_deleted'));
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] });
       queryClient.invalidateQueries({ queryKey: ['procedures'] });
       queryClient.invalidateQueries({ queryKey: ['patients'] });
@@ -181,23 +191,23 @@ export default function FollowUps() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Follow-ups</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white">{t('follow_ups.title')}</h1>
           <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
-            {isLoading ? 'Loading...' : `${followUps.length} follow-ups recorded`}
+            {isLoading ? '...' : t('follow_ups.subtitle', { count: followUps.length })}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative max-w-xs w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
             <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search by patient or status..."
+              placeholder={t('follow_ups.search_placeholder')}
               className="w-full h-10 pl-10 pr-4 rounded-xl text-sm outline-none transition-all"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)' }} />
           </div>
           <button onClick={openCreateModal}
             className="h-10 px-4 rounded-xl flex items-center gap-2 text-sm font-bold transition-all active:scale-[0.98]"
             style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
-            <Plus className="w-4 h-4" /> Add
+            <Plus className="w-4 h-4" /> {t('follow_ups.add')}
           </button>
         </div>
       </div>
@@ -210,9 +220,9 @@ export default function FollowUps() {
             <AlertTriangle className="w-5 h-5 text-[#ef4444]" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-[#ef4444]">Implant Failure Detected</h3>
+            <h3 className="text-sm font-bold text-[#ef4444]">{t('follow_ups.failure_detected')}</h3>
             <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              {failureCount} follow-up(s) reported implant failure. Related procedures have been returned to Consultation stage.
+              {t('follow_ups.failure_desc', { count: failureCount })}
             </p>
           </div>
         </div>
@@ -227,7 +237,7 @@ export default function FollowUps() {
           </div>
           <div>
             <div className="text-2xl font-bold text-white">{followUps.length}</div>
-            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>TOTAL</div>
+            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('follow_ups.stat_total')}</div>
           </div>
         </div>
         <div className="rounded-[18px] p-5 flex items-center gap-4"
@@ -237,7 +247,7 @@ export default function FollowUps() {
           </div>
           <div>
             <div className="text-2xl font-bold text-white">{avgHealth}</div>
-            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>AVG HEALTH</div>
+            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('follow_ups.stat_avg_health')}</div>
           </div>
         </div>
         <div className="rounded-[18px] p-5 flex items-center gap-4"
@@ -247,7 +257,7 @@ export default function FollowUps() {
           </div>
           <div>
             <div className="text-2xl font-bold text-[#FFC107]">{criticalCount}</div>
-            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>CRITICAL</div>
+            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('follow_ups.stat_critical')}</div>
           </div>
         </div>
         <div className="rounded-[18px] p-5 flex items-center gap-4"
@@ -257,7 +267,7 @@ export default function FollowUps() {
           </div>
           <div>
             <div className="text-2xl font-bold text-[#ef4444]">{failureCount}</div>
-            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>FAILURES</div>
+            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('follow_ups.stat_failures')}</div>
           </div>
         </div>
       </div>
@@ -267,14 +277,14 @@ export default function FollowUps() {
         style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
         <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
           style={{ color: 'rgba(255,255,255,0.25)' }}>
-          <div className="flex-[2]">Patient</div>
-          <div className="flex-[1.5]">Procedure</div>
-          <div className="flex-[1.5]">Health</div>
-          <div className="flex-[1]">Pain</div>
-          <div className="flex-[1.5]">Healing Status</div>
-          <div className="flex-[1.5]">Notes</div>
-          <div className="flex-[1.5]">Date</div>
-          <div className="w-20">Actions</div>
+          <div className="flex-[2]">{t('follow_ups.table_patient')}</div>
+          <div className="flex-[1.5]">{t('follow_ups.table_procedure')}</div>
+          <div className="flex-[1.5]">{t('follow_ups.table_health')}</div>
+          <div className="flex-[1]">{t('follow_ups.table_pain')}</div>
+          <div className="flex-[1.5]">{t('follow_ups.table_healing')}</div>
+          <div className="flex-[1.5]">{t('follow_ups.table_notes')}</div>
+          <div className="flex-[1.5]">{t('follow_ups.table_date')}</div>
+          <div className="w-20">{t('follow_ups.table_actions')}</div>
         </div>
 
         <div className="divide-y divide-[rgba(255,255,255,0.04)]">
@@ -284,12 +294,12 @@ export default function FollowUps() {
             </div>
           ) : isError ? (
             <div className="py-16 text-center text-sm" style={{ color: '#FF6B6B' }}>
-              Failed to load follow-ups.{' '}
-              <button onClick={() => refetch()} className="underline" style={{ color: '#4FD1FF' }}>Retry</button>
+              {t('follow_ups.empty_failed')}{' '}
+              <button onClick={() => refetch()} className="underline" style={{ color: '#4FD1FF' }}>{t('common.retry')}</button>
             </div>
           ) : filtered.length === 0 ? (
             <div className="py-16 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              {searchQuery ? 'No follow-ups match your search' : 'No follow-ups recorded yet.'}
+              {searchQuery ? t('follow_ups.empty_search') : t('follow_ups.empty_all')}
             </div>
           ) : filtered.map(f => (
             <div key={f.id} className="flex items-center px-6 py-4 transition-all duration-150"
@@ -341,16 +351,16 @@ export default function FollowUps() {
           onClick={e => { if (e.target === e.currentTarget) { setShowModal(false); resetForm(); } }}>
           <div className="w-full max-w-lg rounded-[24px] flex flex-col max-h-[90vh]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.05)] flex-shrink-0">
-              <h2 className="text-lg font-bold text-white">{editingId ? 'Edit Follow-up' : 'New Follow-up'}</h2>
+              <h2 className="text-lg font-bold text-white">{editingId ? t('follow_ups.modal_edit') : t('follow_ups.modal_new')}</h2>
               <button onClick={() => { setShowModal(false); resetForm(); }} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
             </div>
             <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1 min-h-0">
               {/* Patient */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Patient *</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_patient')} *</label>
                 <select value={form.patient_id} onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))} disabled={!!editingId}
                   className={inputCls + ' cursor-pointer'}>
-                  <option value="" style={{ background: '#0D1B2A' }}>Select patient...</option>
+                  <option value="" style={{ background: '#0D1B2A' }}>{t('follow_ups.placeholder_patient')}</option>
                   {patients.map(p => (
                     <option key={p.id} value={p.id} style={{ background: '#0D1B2A' }}>{p.full_name}</option>
                   ))}
@@ -359,10 +369,10 @@ export default function FollowUps() {
 
               {/* Procedure */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Procedure *</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_procedure')} *</label>
                 <select value={form.procedure_id} onChange={e => setForm(f => ({ ...f, procedure_id: e.target.value }))} disabled={!form.patient_id || !!editingId}
                   className={inputCls + ' cursor-pointer'}>
-                  <option value="" style={{ background: '#0D1B2A' }}>{form.patient_id ? 'Select procedure...' : 'Select a patient first'}</option>
+                  <option value="" style={{ background: '#0D1B2A' }}>{form.patient_id ? t('follow_ups.placeholder_procedure') : t('follow_ups.placeholder_procedure_first')}</option>
                   {patientProcedures.map(p => (
                     <option key={p.id} value={p.id} style={{ background: '#0D1B2A' }}>{p.procedure_name} ({p.status})</option>
                   ))}
@@ -371,7 +381,7 @@ export default function FollowUps() {
 
               {/* Health Score */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Health Score: {form.health_score}</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_health', { value: form.health_score })}</label>
                 <input type="range" min="0" max="100" value={form.health_score} onChange={e => setForm(f => ({ ...f, health_score: Number(e.target.value) }))}
                   className="w-full h-2 rounded-full appearance-none cursor-pointer"
                   style={{ background: 'rgba(255,255,255,0.08)', accentColor: '#4FD1FF' }} />
@@ -382,7 +392,7 @@ export default function FollowUps() {
 
               {/* Pain Level */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Pain Level: {form.pain_level}/10</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_pain', { value: form.pain_level })}</label>
                 <input type="range" min="0" max="10" value={form.pain_level} onChange={e => setForm(f => ({ ...f, pain_level: Number(e.target.value) }))}
                   className="w-full h-2 rounded-full appearance-none cursor-pointer"
                   style={{ background: 'rgba(255,255,255,0.08)', accentColor: '#4FD1FF' }} />
@@ -393,7 +403,7 @@ export default function FollowUps() {
 
               {/* Healing Status — Normal Flow Stepper */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Healing Status</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_healing_status')}</label>
                 <div className="overflow-x-auto pb-2"
                   style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(79,209,255,0.25) rgba(255,255,255,0.04)' }}>
                   <style>{`div::-webkit-scrollbar { height: 4px; } div::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 4px; } div::-webkit-scrollbar-thumb { background: rgba(79,209,255,0.25); border-radius: 4px; } div::-webkit-scrollbar-thumb:hover { background: rgba(79,209,255,0.4); }`}</style>
@@ -424,7 +434,7 @@ export default function FollowUps() {
                             </button>
                             <span className="text-[9px] font-semibold text-center leading-tight transition-all"
                               style={{ color: isPast ? 'rgba(0,229,168,0.7)' : isActive ? '#4FD1FF' : 'rgba(255,255,255,0.25)' }}>
-                              {s === 'OnTrack' ? 'On Track' : s}
+                              {s === 'OnTrack' ? t('follow_ups.stepper_on_track') : s === 'Healing' ? t('follow_ups.stepper_healing') : t('follow_ups.stepper_completed')}
                             </span>
                           </div>
                           {idx < 2 && (
@@ -439,7 +449,7 @@ export default function FollowUps() {
 
               {/* Special Cases — Critical & Failure */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Special Cases</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>{t('follow_ups.modal_special_cases')}</label>
                 <div className="flex gap-2">
                   {(['Critical', 'Failure'] as HealingStatus[]).map(s => {
                     const isSelected = form.healing_status === s;
@@ -453,7 +463,7 @@ export default function FollowUps() {
                           boxShadow: isSelected ? `0 0 16px ${healingColors[s].glow}` : 'none',
                         }}>
                         <span className="w-2 h-2 rounded-full" style={{ background: isSelected ? healingColors[s].text : 'rgba(255,255,255,0.15)' }} />
-                        {s}
+                        {s === 'Critical' ? t('follow_ups.special_critical') : t('follow_ups.special_failure')}
                       </button>
                     );
                   })}
@@ -466,25 +476,25 @@ export default function FollowUps() {
                   style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
                   <AlertTriangle className="w-5 h-5 text-[#ef4444] flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-bold text-[#ef4444]">Implant failure detected</p>
-                    <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>Procedure will return to Consultation stage.</p>
+                    <p className="text-sm font-bold text-[#ef4444]">{t('follow_ups.failure_warning')}</p>
+                    <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>{t('follow_ups.failure_warning_desc')}</p>
                   </div>
                 </div>
               )}
 
               {/* Notes */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Notes</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_notes')}</label>
                 <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} className={inputCls + ' h-20 pt-2 resize-none'} />
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)] flex-shrink-0">
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Cancel</button>
+              <button onClick={() => { setShowModal(false); resetForm(); }} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('follow_ups.modal_cancel')}</button>
               <button onClick={() => editingId ? updateMut.mutate() : createMut.mutate()}
                 disabled={!form.patient_id || !form.procedure_id || createMut.isPending || updateMut.isPending}
                 className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
                 style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
-                {editingId ? (updateMut.isPending ? 'Saving...' : 'Save') : (createMut.isPending ? 'Creating...' : 'Create')}
+                {editingId ? (updateMut.isPending ? t('follow_ups.modal_saving') : t('follow_ups.modal_save')) : (createMut.isPending ? t('follow_ups.modal_creating') : t('follow_ups.modal_create'))}
               </button>
             </div>
           </div>
@@ -501,16 +511,16 @@ export default function FollowUps() {
                 <AlertTriangle className="w-5 h-5 text-[#ef4444]" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white">Delete follow-up?</h3>
-                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>This action cannot be undone.</p>
+                <h3 className="text-sm font-bold text-white">{t('follow_ups.delete_title')}</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>{t('follow_ups.delete_desc')}</p>
               </div>
             </div>
             <div className="flex items-center justify-end gap-3">
-              <button onClick={() => setDeleteConfirmId(null)} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Cancel</button>
+              <button onClick={() => setDeleteConfirmId(null)} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('follow_ups.delete_cancel')}</button>
               <button onClick={() => deleteMut.mutate(deleteConfirmId)} disabled={deleteMut.isPending}
                 className="h-10 px-5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
                 style={{ background: '#ef4444', color: '#fff' }}>
-                {deleteMut.isPending ? 'Deleting...' : 'Delete'}
+                {deleteMut.isPending ? t('follow_ups.delete_deleting') : t('follow_ups.delete_confirm')}
               </button>
             </div>
           </div>

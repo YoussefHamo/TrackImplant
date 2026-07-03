@@ -11,6 +11,7 @@ function rowToUser(row: Record<string, unknown>): AppUser {
     email: row.email as string | undefined,
     role: row.role as UserRole,
     is_active: row.is_active as boolean,
+    branch_id: row.branch_id as string | undefined,
     created_at: row.created_at as string | undefined,
   };
 }
@@ -23,26 +24,26 @@ export const userService = {
   },
 
   async getById(id: string): Promise<AppUser | null> {
-    const { data, error } = await supabase.from('users').select('*').eq('id', id).single();
+    const { data, error } = await supabase.from('users').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? rowToUser(data) : null;
   },
 
   async getByAuthId(authUserId: string): Promise<AppUser | null> {
-    const { data, error } = await supabase.from('users').select('*').eq('auth_user_id', authUserId).single();
-    if (error && error.code !== 'PGRST116') throw new Error(error.message);
+    const { data, error } = await supabase.from('users').select('*').eq('auth_user_id', authUserId).maybeSingle();
+    if (error) throw new Error(error.message);
     return data ? rowToUser(data) : null;
   },
 
   async getByUsername(username: string): Promise<AppUser | null> {
-    const { data, error } = await supabase.from('users').select('*').eq('username', username).single();
-    if (error && error.code !== 'PGRST116') throw new Error(error.message);
+    const { data, error } = await supabase.from('users').select('*').eq('username', username).maybeSingle();
+    if (error) throw new Error(error.message);
     return data ? rowToUser(data) : null;
   },
 
   async getByEmail(email: string): Promise<AppUser | null> {
-    const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
-    if (error && error.code !== 'PGRST116') throw new Error(error.message);
+    const { data, error } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
+    if (error) throw new Error(error.message);
     return data ? rowToUser(data) : null;
   },
 
@@ -52,48 +53,39 @@ export const userService = {
     email: string;
     password: string;
     role: UserRole;
+    branch_id?: string;
   }): Promise<AppUser> {
     const username = data.username.trim();
     const fullName = data.full_name.trim();
     const email = data.email.trim();
 
-    // Save admin token before signUp (signUp swaps the session)
-    const { data: { session: adminSession } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
 
-    // 1. Create the auth user via signUp using the real email
-    const { data: authResult, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password: data.password,
-      options: {
-        data: { full_name: fullName, username, role: data.role },
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          username,
+          full_name: fullName,
+          email,
+          password: data.password,
+          role: data.role,
+          branch_id: data.branch_id || null,
+        }),
       },
-    });
+    );
 
-    // Restore admin session immediately
-    if (adminSession) {
-      await supabase.auth.setSession(adminSession).catch(() => {});
+    const result = await res.json();
+
+    if (!res.ok) {
+      throw new Error(result.error || 'Failed to create user');
     }
-
-    if (signUpError) throw new Error(signUpError.message);
-    if (!authResult.user) throw new Error('Failed to create auth user');
-
-    const authUserId = authResult.user.id;
-
-    // 2. Upsert into public.users — guarantees the correct data regardless of trigger
-    const { data: inserted, error: upsertErr } = await supabase
-      .from('users')
-      .upsert({
-        auth_user_id: authUserId,
-        username,
-        full_name: fullName,
-        email,
-        role: data.role,
-        is_active: true,
-      }, { onConflict: 'auth_user_id' })
-      .select()
-      .single();
-
-    if (upsertErr) throw new Error('Failed to save user: ' + upsertErr.message);
 
     const actor = await getCurrentUserInfo();
     if (actor) {
@@ -102,18 +94,19 @@ export const userService = {
         user_name: actor.user_name,
         action: 'USER_CREATED',
         table_name: 'users',
-        record_id: inserted.id,
-        new_data: { username, full_name: fullName, email, role: data.role },
+        record_id: result.user.id,
+        new_data: { username, full_name: fullName, email, role: data.role, branch_id: data.branch_id },
       });
     }
 
-    return rowToUser(inserted);
+    return rowToUser(result.user);
   },
 
   async update(id: string, updates: {
     full_name?: string;
     role?: UserRole;
     is_active?: boolean;
+    branch_id?: string | null;
   }): Promise<void> {
     const { error } = await supabase.from('users').update(updates).eq('id', id);
     if (error) throw new Error(error.message);
@@ -135,6 +128,7 @@ export const userService = {
     full_name?: string;
     role?: UserRole;
     is_active?: boolean;
+    branch_id?: string | null;
   }): Promise<void> {
     const { error } = await supabase.from('users').update(updates).eq('auth_user_id', authUserId);
     if (error) throw new Error(error.message);
@@ -143,5 +137,16 @@ export const userService = {
   async resetPassword(email: string): Promise<void> {
     const { error } = await supabase.auth.resetPasswordForEmail(email);
     if (error) throw new Error(error.message);
+  },
+
+  async getCurrentBranchId(): Promise<string | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase
+      .from('users')
+      .select('branch_id')
+      .eq('auth_user_id', user.id)
+      .maybeSingle();
+    return (data?.branch_id as string) || null;
   },
 };

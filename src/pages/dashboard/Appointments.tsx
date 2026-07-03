@@ -5,9 +5,7 @@ import { toast } from 'sonner';
 import { appointmentService } from '../../services/appointmentService';
 import { patientService } from '../../services/patientService';
 import type { Appointment } from '../../types';
-
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+import { useLanguage } from '../../context/LanguageContext';
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -47,6 +45,9 @@ export default function Appointments() {
   const [selectedDate, setSelectedDate] = useState(today.getDate());
   const [view, setView] = useState<'Day' | 'Week' | 'Month'>('Month');
   const [form, setForm] = useState({ patient_id: '', appointment_date: '' });
+  const { t } = useLanguage();
+  const MONTHS_KEYS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  const DAYS_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
   const { data: appointments = [] } = useQuery<Appointment[]>({
     queryKey: ['appointments'],
@@ -72,7 +73,7 @@ export default function Appointments() {
       const patient = patients.find(p => p.id === apt.patient_id);
       events[d].push({
         id: apt.id,
-        label: patient?.full_name || 'Patient',
+        label: patient?.full_name || t('common.unknown'),
         status: apt.status,
       });
     }
@@ -89,7 +90,7 @@ export default function Appointments() {
       });
     },
     onSuccess: () => {
-      toast.success('Appointment booked');
+      toast.success(t('appointments.toast_booked'));
       setForm({ patient_id: '', appointment_date: '' });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
@@ -100,7 +101,7 @@ export default function Appointments() {
     mutationFn: (id: string) =>
       appointmentService.updateStatus(id, 'cancelled'),
     onSuccess: () => {
-      toast.success('Appointment cancelled');
+      toast.success(t('appointments.toast_cancelled'));
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
     onError: (err: Error) => toast.error(err.message),
@@ -108,7 +109,7 @@ export default function Appointments() {
 
   const handleBook = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.patient_id || !form.appointment_date) { toast.error('Patient and date are required'); return; }
+    if (!form.patient_id || !form.appointment_date) { toast.error(t('appointments.toast_required')); return; }
     createMutation.mutate();
   };
 
@@ -118,7 +119,7 @@ export default function Appointments() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <CalendarDays className="w-6 h-6 text-[#4FD1FF]" />
-            <h1 className="text-2xl font-bold text-white">{MONTHS[month]} {year}</h1>
+            <h1 className="text-2xl font-bold text-white">{t('appointments.month_' + MONTHS_KEYS[month])} {year}</h1>
           </div>
           <div className="flex rounded-xl p-0.5 gap-0.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
             {(['Day', 'Week', 'Month'] as const).map(v => (
@@ -129,7 +130,7 @@ export default function Appointments() {
                   border: view === v ? '1px solid rgba(79,209,255,0.2)' : '1px solid transparent',
                   color: view === v ? '#4FD1FF' : 'rgba(255,255,255,0.4)',
                 }}>
-                {v}
+                {t('appointments.' + v.toLowerCase())}
               </button>
             ))}
           </div>
@@ -143,7 +144,7 @@ export default function Appointments() {
           <button onClick={() => { const d = new Date(); setYear(d.getFullYear()); setMonth(d.getMonth()); setSelectedDate(d.getDate()); }}
             className="px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all"
             style={{ border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)' }}>
-            Today
+            {t('appointments.today')}
           </button>
           <button onClick={nextMonth}
             className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
@@ -157,9 +158,9 @@ export default function Appointments() {
         <div className="rounded-[24px] p-5"
           style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
           <div className="grid grid-cols-7 mb-3">
-            {DAYS.map(d => (
+            {DAYS_KEYS.map(d => (
               <div key={d} className="text-center text-[11px] font-semibold uppercase tracking-wider py-2"
-                style={{ color: 'rgba(255,255,255,0.25)' }}>{d}</div>
+                style={{ color: 'rgba(255,255,255,0.25)' }}>{t('appointments.' + d)}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-px">
@@ -198,7 +199,7 @@ export default function Appointments() {
                     })}
                     {dayEvents.length > 2 && (
                       <div className="text-[9px] font-medium text-center" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                        +{dayEvents.length - 2} more
+                        {t('appointments.more_count', { count: dayEvents.length - 2 })}
                       </div>
                     )}
                   </div>
@@ -213,13 +214,13 @@ export default function Appointments() {
             style={{ background: 'rgba(13,24,40,0.82)', borderTop: '2px solid rgba(79,209,255,0.3)', borderLeft: '1px solid rgba(255,255,255,0.05)', borderRight: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
             <div className="flex items-center gap-2 mb-5">
               <Plus className="w-4 h-4 text-[#4FD1FF]" />
-              <h3 className="text-sm font-semibold text-white">Quick Booking</h3>
+              <h3 className="text-sm font-semibold text-white">{t('appointments.quick_booking')}</h3>
             </div>
             <form onSubmit={handleBook} className="space-y-3.5">
               <select value={form.patient_id} onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))}
                 className="w-full h-[44px] px-4 rounded-xl text-sm outline-none cursor-pointer appearance-none"
                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: form.patient_id ? 'white' : 'rgba(255,255,255,0.4)' }}>
-                <option value="" style={{ background: '#0D1B2A' }}>Select Patient</option>
+                <option value="" style={{ background: '#0D1B2A' }}>{t('appointments.select_patient')}</option>
                 {patients.map(p => (
                   <option key={p.id} value={p.id} style={{ background: '#0D1B2A' }}>{p.full_name}</option>
                 ))}
@@ -231,7 +232,7 @@ export default function Appointments() {
               <button type="submit" disabled={createMutation.isPending}
                 className="w-full h-[44px] rounded-xl font-bold text-sm transition-all duration-300 active:scale-[0.98] disabled:opacity-50"
                 style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
-                {createMutation.isPending ? 'Booking...' : 'Book Appointment'}
+                {createMutation.isPending ? t('appointments.booking') : t('appointments.book_appointment')}
               </button>
             </form>
           </div>
@@ -241,11 +242,11 @@ export default function Appointments() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-[#4FD1FF]" />
-                <h3 className="text-sm font-semibold text-white">All Appointments</h3>
+                <h3 className="text-sm font-semibold text-white">{t('appointments.all_appointments')}</h3>
               </div>
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
                 style={{ background: 'rgba(79,209,255,0.1)', border: '1px solid rgba(79,209,255,0.12)', color: '#4FD1FF' }}>
-                {appointments.length} Total
+                {t('appointments.total_count', { count: appointments.length })}
               </span>
             </div>
             <div className="space-y-2">
@@ -259,7 +260,7 @@ export default function Appointments() {
                       boxShadow: `0 0 6px ${(statusStyles[apt.status] || statusStyles.scheduled).glow}`,
                     }} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white truncate">{patient?.full_name || 'Unknown'}</div>
+                      <div className="text-sm font-medium text-white truncate">{patient?.full_name || t('common.unknown')}</div>
                       <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
                         {new Date(apt.appointment_date).toLocaleDateString()} &bull; {new Date(apt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>

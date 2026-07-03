@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.106.2';
 
 interface CreateUserPayload {
+  branch_id?: string;
   full_name: string;
   username: string;
   email: string;
@@ -97,7 +98,7 @@ serve(async (req: Request) => {
       );
     }
 
-    const { full_name, username, email, password, role } = body;
+    const { full_name, username, email, password, role, branch_id } = body;
 
     const missingFields: string[] = [];
     if (!full_name?.trim()) missingFields.push('full_name');
@@ -120,7 +121,7 @@ serve(async (req: Request) => {
       );
     }
 
-    if (!['Doctor', 'Receptionist'].includes(role)) {
+    if (!['Manager', 'Admin', 'Doctor', 'Receptionist', 'Assistant'].includes(role)) {
       log(`Invalid role attempt: ${role}`);
       return new Response(
         JSON.stringify({ error: 'User not allowed' }),
@@ -192,18 +193,19 @@ serve(async (req: Request) => {
       );
     }
 
-    // 8. Insert into public.users table
-    log(`Inserting public user record for ${authData.user.id}`);
+    // 8. Upsert into public.users table (trigger may have already created record)
+    log(`Upserting public user record for ${authData.user.id}`);
     const { data: userRecord, error: insertError } = await supabaseAdmin
       .from('users')
-      .insert({
+      .upsert({
         auth_user_id: authData.user.id,
         username: username.trim(),
         full_name: full_name.trim(),
         email: email.trim().toLowerCase(),
         role,
+        branch_id: branch_id || null,
         is_active: true,
-      })
+      }, { onConflict: 'auth_user_id' })
       .select()
       .single();
 

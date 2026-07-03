@@ -91,7 +91,7 @@ export default function UpdatePassword() {
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
-      setErrorDetail(`Server said: ${error.message} (status: ${(error as any)?.status || 'N/A'})`);
+      setErrorDetail(`Server said: ${error.message} (status: ${(error as { status?: number })?.status || 'N/A'})`);
       toast.error(error.message);
       setLoading(false);
       return;

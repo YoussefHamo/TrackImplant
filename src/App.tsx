@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./context/AuthContext";
+import { LanguageProvider } from "./context/LanguageContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Toaster } from "sonner";
 
@@ -27,6 +29,8 @@ const queryClient = new QueryClient();
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+      <LanguageProvider>
       <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -46,11 +50,7 @@ export default function App() {
             <Route path="cases" element={<ImplantCases />} />
             <Route path="appointments" element={<Appointments />} />
             <Route path="follow-ups" element={<FollowUps />} />
-            <Route path="inventory" element={
-              <ProtectedRoute allowedRoles={['Admin']}>
-                <Inventory />
-              </ProtectedRoute>
-            } />
+            <Route path="inventory" element={<Inventory />} />
             <Route path="logs" element={
               <ProtectedRoute allowedRoles={['Admin']}>
                 <AuditLogs />
@@ -78,6 +78,8 @@ export default function App() {
         </Routes>
       </BrowserRouter>
       </AuthProvider>
+      </LanguageProvider>
+      </ThemeProvider>
       <Toaster position="top-right" richColors />
     </QueryClientProvider>
   );
