@@ -8,7 +8,7 @@ export function useAppointments() {
   // 1. جلب البيانات تلقائياً مع ميزة الـ Caching الكامل تحت مفتاح 'appointments'
   const { data: appointments = [], isLoading: loading, error } = useQuery<Appointment[]>({
     queryKey: ['appointments'],
-    queryFn: appointmentService.getAll
+    queryFn: () => appointmentService.getAll()
   });
 
   // 2. الـ Mutation الخاص بالإرسال مع ميزة الـ Cache Invalidation (تحديث الكاش فوراً)

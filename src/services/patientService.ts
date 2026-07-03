@@ -23,14 +23,17 @@ function patientFromRow(row: Record<string, unknown>): Patient {
     smoking_status: row.smoking_status as string | undefined,
     created_by: row.created_by as string | undefined,
     created_at: row.created_at as string | undefined,
+    branch_id: row.branch_id as string | undefined,
   };
 }
 
 const BUCKET = STORAGE_BUCKETS.PATIENT_PROFILES;
 
 export const patientService = {
-  async getAll(): Promise<Patient[]> {
-    const { data, error } = await supabase.from('patients').select('*').order('created_at', { ascending: false });
+  async getAll(branchId?: string | null): Promise<Patient[]> {
+    let q = supabase.from('patients').select('*').order('created_at', { ascending: false });
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data, error } = await q;
     if (error) throw new Error(error.message);
     return (data || []).map(patientFromRow);
   },
@@ -41,12 +44,14 @@ export const patientService = {
     return data ? patientFromRow(data) : null;
   },
 
-  async search(query: string): Promise<Patient[]> {
-    const { data, error } = await supabase
+  async search(query: string, branchId?: string | null): Promise<Patient[]> {
+    let q = supabase
       .from('patients')
       .select('*')
       .or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`)
       .limit(20);
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data, error } = await q;
     if (error) throw new Error(error.message);
     return (data || []).map(patientFromRow);
   },
@@ -122,10 +127,14 @@ export const patientService = {
     return publicUrl;
   },
 
-  async getStats(): Promise<{ total: number; newThisMonth: number }> {
-    const { count: total } = await supabase.from('patients').select('*', { count: 'exact', head: true });
+  async getStats(branchId?: string | null): Promise<{ total: number; newThisMonth: number }> {
+    let totalQ = supabase.from('patients').select('*', { count: 'exact', head: true });
+    if (branchId) totalQ = totalQ.eq('branch_id', branchId);
+    const { count: total } = await totalQ;
     const firstOfMonth = new Date(); firstOfMonth.setDate(1); firstOfMonth.setHours(0,0,0,0);
-    const { count: newThisMonth } = await supabase.from('patients').select('*', { count: 'exact', head: true }).gte('created_at', firstOfMonth.toISOString());
+    let monthQ = supabase.from('patients').select('*', { count: 'exact', head: true }).gte('created_at', firstOfMonth.toISOString());
+    if (branchId) monthQ = monthQ.eq('branch_id', branchId);
+    const { count: newThisMonth } = await monthQ;
     return { total: total || 0, newThisMonth: newThisMonth || 0 };
   },
 };

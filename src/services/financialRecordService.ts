@@ -32,12 +32,14 @@ export const financialRecordService = {
     return (data || []).map(rowToRecord);
   },
 
-  async getAllInvoices(): Promise<FinancialRecord[]> {
-    const { data, error } = await supabase
+  async getAllInvoices(branchId?: string | null): Promise<FinancialRecord[]> {
+    let q = supabase
       .from('financial_records')
       .select('*')
       .eq('record_type', 'invoice')
       .order('created_at', { ascending: false });
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data, error } = await q;
     if (error) throw new Error(error.message);
     return (data || []).map(rowToRecord);
   },
@@ -221,7 +223,7 @@ export const financialRecordService = {
     }
   },
 
-  async getAnalytics(): Promise<{
+  async getAnalytics(branchId?: string | null): Promise<{
     totalRevenue: number;
     totalPending: number;
     monthlyCollected: number;
@@ -231,10 +233,12 @@ export const financialRecordService = {
     partialCount: number;
     pendingCount: number;
   }> {
-    const { data: all } = await supabase
+    let q = supabase
       .from('financial_records')
       .select('record_type, amount, paid_so_far, remaining_amount, status, created_at')
       .eq('record_type', 'invoice');
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data: all } = await q;
 
     const invoices = (all || []) as {
       amount: number; paid_so_far: number; remaining_amount: number; status: string; created_at: string
@@ -268,14 +272,16 @@ export const financialRecordService = {
     };
   },
 
-  async getDailyRevenue(days = 7): Promise<{ day: string; revenue: number }[]> {
+  async getDailyRevenue(days = 7, branchId?: string | null): Promise<{ day: string; revenue: number }[]> {
     const since = new Date();
     since.setDate(since.getDate() - days);
-    const { data } = await supabase
+    let q = supabase
       .from('financial_records')
       .select('paid_so_far, created_at')
       .eq('record_type', 'invoice')
       .gte('created_at', since.toISOString());
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data } = await q;
 
     const rows = (data || []) as { paid_so_far: number; created_at: string }[];
     const daily: Record<string, number> = {};
@@ -291,11 +297,13 @@ export const financialRecordService = {
     return Object.entries(daily).map(([day, revenue]) => ({ day, revenue }));
   },
 
-  async getMonthlyBreakdown(): Promise<{ name: string; collected: number; pending: number }[]> {
-    const { data } = await supabase
+  async getMonthlyBreakdown(branchId?: string | null): Promise<{ name: string; collected: number; pending: number }[]> {
+    let q = supabase
       .from('financial_records')
       .select('paid_so_far, remaining_amount, status, created_at')
       .eq('record_type', 'invoice');
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data } = await q;
 
     const rows = (data || []) as {
       paid_so_far: number; remaining_amount: number; status: string; created_at: string

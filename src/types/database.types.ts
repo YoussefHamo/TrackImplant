@@ -47,6 +47,7 @@ export interface Patient {
   smoking_status?: string;
   created_at?: string;
   created_by?: string;
+  branch_id?: string;
 }
 
 export interface PatientDocument {

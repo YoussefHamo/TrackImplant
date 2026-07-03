@@ -16,8 +16,10 @@ function followUpFromRow(row: Record<string, unknown>): FollowUp {
 }
 
 export const followUpService = {
-  async getAll(): Promise<FollowUp[]> {
-    const { data, error } = await supabase.from('follow_ups').select('*').order('created_at', { ascending: false });
+  async getAll(branchId?: string | null): Promise<FollowUp[]> {
+    let q = supabase.from('follow_ups').select('*').order('created_at', { ascending: false });
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data, error } = await q;
     if (error) throw new Error(error.message);
     return (data || []).map(followUpFromRow);
   },
@@ -28,8 +30,10 @@ export const followUpService = {
     return (data || []).map(followUpFromRow);
   },
 
-  async getCritical(): Promise<FollowUp[]> {
-    const { data, error } = await supabase.from('follow_ups').select('*').in('healing_status', ['Critical', 'Failure']).order('created_at', { ascending: false });
+  async getCritical(branchId?: string | null): Promise<FollowUp[]> {
+    let q = supabase.from('follow_ups').select('*').in('healing_status', ['Critical', 'Failure']).order('created_at', { ascending: false });
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data, error } = await q;
     if (error) throw new Error(error.message);
     return (data || []).map(followUpFromRow);
   },
@@ -81,8 +85,10 @@ export const followUpService = {
     return followUpFromRow(data);
   },
 
-  async getStats(): Promise<{ total: number; critical: number; failure: number; avgPain: number; avgHealth: number }> {
-    const { data } = await supabase.from('follow_ups').select('healing_status, pain_level, health_score');
+  async getStats(branchId?: string | null): Promise<{ total: number; critical: number; failure: number; avgPain: number; avgHealth: number }> {
+    let q = supabase.from('follow_ups').select('healing_status, pain_level, health_score');
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data } = await q;
     const rows = (data || []) as { healing_status: string | null; pain_level: number | null; health_score: number | null }[];
     const total = rows.length;
     const critical = rows.filter(r => r.healing_status === 'Critical').length;

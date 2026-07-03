@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { patientService } from '../services/patientService';
+import { getBranchScope } from '../services/authScope';
+import { useAuth } from '../context/AuthContext';
 import {
   Search, ChevronLeft, ChevronRight, Plus, Calendar
 } from 'lucide-react';
@@ -11,6 +13,8 @@ import { useLanguage } from '../context/LanguageContext';
 export const Patients = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const scope = getBranchScope(user);
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -20,8 +24,8 @@ export const Patients = () => {
   const selectedId = searchParams.get('selected') || null;
 
   const { data: patients = [], isLoading } = useQuery({
-    queryKey: ['patients'],
-    queryFn: () => patientService.getAll(),
+    queryKey: ['patients', scope.branchId],
+    queryFn: () => patientService.getAll(scope.branchId),
   });
 
   const filtered = useMemo(() => {

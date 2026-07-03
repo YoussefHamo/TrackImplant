@@ -3,12 +3,13 @@ import { auditLogService, getCurrentUserInfo } from './auditLogService';
 import type { Appointment } from '../types';
 
 export const appointmentService = {
-  async getAll(): Promise<Appointment[]> {
-    const { data, error } = await supabase
+  async getAll(branchId?: string | null): Promise<Appointment[]> {
+    let q = supabase
       .from('appointments')
       .select('*')
       .order('appointment_date', { ascending: true });
-
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data, error } = await q;
     if (error) throw new Error(error.message);
     return data || [];
   },

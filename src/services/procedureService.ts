@@ -35,8 +35,10 @@ function procedureFromRow(row: Record<string, unknown>): Procedure {
 }
 
 export const procedureService = {
-  async getAll(): Promise<Procedure[]> {
-    const { data, error } = await supabase.from('procedures').select('*').order('procedure_date', { ascending: false });
+  async getAll(branchId?: string | null): Promise<Procedure[]> {
+    let q = supabase.from('procedures').select('*, patients(full_name)').order('procedure_date', { ascending: false });
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data, error } = await q;
     if (error) throw new Error(error.message);
     return (data || []).map(procedureFromRow);
   },
@@ -201,8 +203,10 @@ export const procedureService = {
     }
   },
 
-  async getStats(): Promise<{ total: number; byStatus: Record<string, number> }> {
-    const { data } = await supabase.from('procedures').select('status');
+  async getStats(branchId?: string | null): Promise<{ total: number; byStatus: Record<string, number> }> {
+    let q = supabase.from('procedures').select('status');
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data } = await q;
     const rows = (data || []) as { status: string }[];
     const byStatus: Record<string, number> = {};
     rows.forEach(r => { byStatus[r.status] = (byStatus[r.status] || 0) + 1; });
