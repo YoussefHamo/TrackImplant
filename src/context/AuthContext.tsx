@@ -64,20 +64,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initialized.current = true;
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        await fetchProfile(session.user.id, session.user.email || '');
+      try {
+        if (session?.user) {
+          await fetchProfile(session.user.id, session.user.email || '');
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        if (session?.user) {
-          await fetchProfile(session.user.id, session.user.email || '');
-        } else {
-          setUser(null);
+        try {
+          if (session?.user) {
+            await fetchProfile(session.user.id, session.user.email || '');
+          } else {
+            setUser(null);
+          }
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
@@ -128,17 +134,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await fetchProfile(data.user.id, data.user.email || '');
       }
 
-      // Log the login event
-      const actor = await getCurrentUserInfo();
-      if (actor) {
-        auditLogService.log({
-          user_id: actor.user_id,
-          user_name: actor.user_name,
-          action: 'LOGIN',
-          table_name: 'users',
-          record_id: actor.user_id,
-        });
-      }
+      // Log the login event (fire-and-forget — must not block login)
+      getCurrentUserInfo().then(actor => {
+        if (actor) {
+          auditLogService.log({
+            user_id: actor.user_id,
+            user_name: actor.user_name,
+            action: 'LOGIN',
+            table_name: 'users',
+            record_id: actor.user_id,
+          });
+        }
+      }).catch(() => {});
 
       return {};
     } catch (err) {
