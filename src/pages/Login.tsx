@@ -25,9 +25,15 @@ function MedicalCrossIcon({ className }: { className?: string }) {
 
 export const Login = () => {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, isAuthenticated, loading: authLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('remembered_identifier'));
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, authLoading, navigate]);
 
   const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<AuthForm>({
     resolver: zodResolver(authSchema)

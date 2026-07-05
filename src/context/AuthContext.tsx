@@ -64,14 +64,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initialized.current = true;
 
     console.log('[AUTH] Initializing — calling getSession()');
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      try {
-        console.log('[AUTH] getSession resolved, session:', !!session?.user);
-        if (session?.user) {
-          await fetchProfile(session.user.id, session.user.email || '');
-        }
-      } finally {
-        console.log('[AUTH] Initialization complete — setLoading(false)');
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[AUTH] getSession resolved, session:', !!session?.user);
+      if (session?.user) {
+        // Safety timeout: if fetchProfile hangs (e.g. stale session token),
+        // resolve loading after 5s so the app doesn't stay stuck.
+        const safetyTimer = setTimeout(() => {
+          console.log('[AUTH] Safety timeout — forcing setLoading(false)');
+          setLoading(false);
+        }, 5000);
+        fetchProfile(session.user.id, session.user.email || '').finally(() => {
+          clearTimeout(safetyTimer);
+          console.log('[AUTH] fetchProfile done — setLoading(false)');
+          setLoading(false);
+        });
+      } else {
+        console.log('[AUTH] No session — setLoading(false)');
         setLoading(false);
       }
     }).catch(err => {
@@ -80,17 +88,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        try {
-          console.log('[AUTH] onAuthStateChange event:', _event, 'user:', !!session?.user);
-          if (session?.user) {
-            await fetchProfile(session.user.id, session.user.email || '');
-          } else {
-            setUser(null);
-          }
-        } finally {
-          setLoading(false);
+      (_event, session) => {
+        console.log('[AUTH] onAuthStateChange event:', _event, 'user:', !!session?.user);
+        if (session?.user) {
+          // Don't await — must not block setLoading(false)
+          fetchProfile(session.user.id, session.user.email || '');
+        } else {
+          setUser(null);
         }
+        setLoading(false);
       }
     );
 
