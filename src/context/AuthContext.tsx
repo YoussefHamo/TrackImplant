@@ -63,19 +63,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (initialized.current) return;
     initialized.current = true;
 
+    console.log('[AUTH] Initializing — calling getSession()');
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       try {
+        console.log('[AUTH] getSession resolved, session:', !!session?.user);
         if (session?.user) {
           await fetchProfile(session.user.id, session.user.email || '');
         }
       } finally {
+        console.log('[AUTH] Initialization complete — setLoading(false)');
         setLoading(false);
       }
+    }).catch(err => {
+      console.error('[AUTH] getSession failed:', err);
+      setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         try {
+          console.log('[AUTH] onAuthStateChange event:', _event, 'user:', !!session?.user);
           if (session?.user) {
             await fetchProfile(session.user.id, session.user.email || '');
           } else {
@@ -118,11 +125,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let data: { user: import('@supabase/supabase-js').User; session: import('@supabase/supabase-js').Session } | null = null;
 
       for (const tryEmail of emailsToTry) {
+        console.log('[AUTH] Trying signInWithPassword for:', tryEmail);
         const result = await supabase.auth.signInWithPassword({ email: tryEmail, password });
         if (!result.error) {
           data = result.data;
+          console.log('[AUTH] signInWithPassword SUCCESS');
           break;
         }
+        console.log('[AUTH] signInWithPassword failed:', result.error.message);
         if (result.error.message !== 'Invalid login credentials') {
           return { error: result.error.message };
         }
@@ -131,12 +141,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!data) return { error: 'Invalid username or password' };
 
       if (data.user) {
+        console.log('[AUTH] Calling fetchProfile after login');
         await fetchProfile(data.user.id, data.user.email || '');
+        console.log('[AUTH] fetchProfile done');
       }
 
       // Log the login event (fire-and-forget — must not block login)
       getCurrentUserInfo().then(actor => {
         if (actor) {
+          console.log('[AUTH] Logging login audit');
           auditLogService.log({
             user_id: actor.user_id,
             user_name: actor.user_name,
@@ -147,8 +160,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }).catch(() => {});
 
+      console.log('[AUTH] signIn returning success');
       return {};
     } catch (err) {
+      console.error('[AUTH] signIn caught error:', err);
       return { error: err instanceof Error ? err.message : 'Login failed' };
     }
   };
