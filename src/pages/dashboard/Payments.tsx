@@ -6,11 +6,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import {
   DollarSign, TrendingUp, FileText, PieChart,
   Plus, Search, ChevronLeft, ChevronRight,
-  X, Clock, CreditCard, User, Pencil, Trash2
+  X, Clock, CreditCard, User, Pencil, Trash2, Heart
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { FinancialRecord, PaymentMethod } from '../../types';
+import type { FinancialRecord, PaymentMethod, ChangeReason } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
+import ReasonDialog from '../../components/ReasonDialog';
+import FixedOverlay from '../../components/ui/FixedOverlay';
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   Paid: { bg: 'rgba(0,229,168,0.12)', text: '#00E5A8' },
@@ -56,6 +58,12 @@ export default function Payments() {
   const [payMethod, setPayMethod] = useState<PaymentMethod>('cash');
   const [payNotes, setPayNotes] = useState('');
 
+  const [reasonDialog, setReasonDialog] = useState<{
+    open: boolean;
+    title: string;
+    onConfirm: (r: ChangeReason) => void;
+  }>({ open: false, title: '', onConfirm: () => {} });
+
   const { data: analytics } = useQuery({
     queryKey: ['financial-analytics'],
     queryFn: () => financialRecordService.getAnalytics(),
@@ -64,6 +72,11 @@ export default function Payments() {
   const { data: monthlyData = [] } = useQuery({
     queryKey: ['financial-monthly'],
     queryFn: () => financialRecordService.getMonthlyBreakdown(),
+  });
+
+  const { data: insuranceRevenue = 0 } = useQuery({
+    queryKey: ['insurance-revenue'],
+    queryFn: () => financialRecordService.getInsuranceRevenue(),
   });
 
   const { data: patients = [] } = useQuery({
@@ -84,7 +97,7 @@ export default function Payments() {
   };
 
   const createInvoiceMut = useMutation({
-    mutationFn: (data: { patient_id: string; patient_name: string; invoice_name: string; total_amount: number; notes?: string }) =>
+    mutationFn: (data: { patient_id: string; patient_name: string; invoice_name: string; total_amount: number; notes?: string; change_reason?: string; reason_category?: string }) =>
       financialRecordService.createInvoice(data),
     onSuccess: () => {
       toast.success(t('payments.toast_invoice_created'));
@@ -96,7 +109,7 @@ export default function Payments() {
   });
 
   const updateInvoiceMut = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { invoice_name?: string; total_amount?: number; notes?: string } }) =>
+    mutationFn: ({ id, data }: { id: string; data: { invoice_name?: string; total_amount?: number; notes?: string; change_reason?: string; reason_category?: string } }) =>
       financialRecordService.updateInvoice(id, data),
     onSuccess: () => {
       toast.success(t('payments.toast_invoice_updated'));
@@ -107,7 +120,8 @@ export default function Payments() {
   });
 
   const deleteRecordMut = useMutation({
-    mutationFn: (id: string) => financialRecordService.deleteRecord(id),
+    mutationFn: ({ id, reason }: { id: string; reason?: { change_reason?: string; reason_category?: string } }) =>
+      financialRecordService.deleteRecord(id, reason),
     onSuccess: () => {
       toast.success(t('payments.toast_record_deleted'));
       inval();
@@ -117,7 +131,7 @@ export default function Payments() {
   });
 
   const addPaymentMut = useMutation({
-    mutationFn: (data: { invoice_id: string; patient_id: string; patient_name: string; amount: number; payment_method?: PaymentMethod; notes?: string }) =>
+    mutationFn: (data: { invoice_id: string; patient_id: string; patient_name: string; amount: number; payment_method?: PaymentMethod; notes?: string; change_reason?: string; reason_category?: string }) =>
       financialRecordService.addPayment(data),
     onSuccess: () => {
       toast.success(t('payments.toast_payment_recorded'));
@@ -196,7 +210,7 @@ export default function Payments() {
   };
 
   return (
-    <div className="font-sans select-none space-y-6">
+    <div className="font-sans select-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -221,6 +235,7 @@ export default function Payments() {
           { icon: TrendingUp, label: t('payments.kpi_monthly_growth'), value: `${a.monthlyGrowth >= 0 ? '+' : ''}${a.monthlyGrowth}%`, color: a.monthlyGrowth >= 0 ? '#00E5A8' : '#ef4444', bg: a.monthlyGrowth >= 0 ? 'rgba(0,229,168,0.1)' : 'rgba(239,68,68,0.1)' },
           { icon: FileText, label: t('payments.kpi_total_invoices'), value: a.invoiceCount.toLocaleString(), color: '#7C5CFF', bg: 'rgba(124,92,255,0.1)' },
           { icon: PieChart, label: t('payments.kpi_status_format', { paid: a.paidCount, partial: a.partialCount, pending: a.pendingCount }), value: `${a.paidCount} / ${a.partialCount} / ${a.pendingCount}`, color: '#4FD1FF', bg: 'rgba(79,209,255,0.1)' },
+          { icon: Heart, label: t('payments.kpi_insurance_revenue'), value: `$${insuranceRevenue.toLocaleString()}`, color: '#ff6b9d', bg: 'rgba(255,107,157,0.1)' },
         ].map((card, i) => (
           <div key={i} className="rounded-[18px] p-5 transition-all duration-300 hover:-translate-y-0.5"
             style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
@@ -288,6 +303,7 @@ export default function Payments() {
           <div className="flex-[1]">{t('payments.table_total')}</div>
           <div className="flex-[1]">{t('payments.table_paid')}</div>
           <div className="flex-[1]">{t('payments.table_remaining')}</div>
+          <div className="flex-[0.8]">{t('payments.table_branch')}</div>
           <div className="flex-[1]">{t('payments.table_status')}</div>
           <div className="flex-[1]">{t('payments.table_date')}</div>
           <div className="w-28 text-right">{t('payments.table_actions')}</div>
@@ -311,6 +327,9 @@ export default function Payments() {
               <div className="flex-[1] text-sm" style={{ color: '#00E5A8' }}>${Number(inv.paid_so_far).toLocaleString()}</div>
               <div className="flex-[1] text-sm" style={{ color: Number(inv.remaining_amount) > 0 ? '#FFC107' : 'rgba(255,255,255,0.45)' }}>
                 ${Number(inv.remaining_amount).toLocaleString()}
+              </div>
+              <div className="flex-[0.8] text-[10px] truncate" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                {inv.branch_name || '—'}
               </div>
               <div className="flex-[1]"><Badge status={inv.status} /></div>
               <div className="flex-[1] text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
@@ -380,8 +399,7 @@ export default function Payments() {
 
       {/* ===== VIEW PAYMENTS DRAWER ===== */}
       {viewingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-20" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setViewingInvoice(null); }}>
+        <FixedOverlay className="flex items-start justify-center p-4 pt-20" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setViewingInvoice(null)}>
           <div className="w-full max-w-lg rounded-[24px] max-h-[70vh] overflow-y-auto" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
               <div>
@@ -436,13 +454,12 @@ export default function Payments() {
               </div>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ===== ADD INVOICE MODAL ===== */}
       {showAddInvoiceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) { setShowAddInvoiceModal(false); setAddForm({ patient_id: '', patient_name: '', invoice_name: '', total_amount: '', notes: '' }); } }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowAddInvoiceModal(false); setAddForm({ patient_id: '', patient_name: '', invoice_name: '', total_amount: '', notes: '' }); }}>
           <div className="w-full max-w-lg rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white">{t('payments.modal_new_invoice')}</h2>
@@ -492,13 +509,12 @@ export default function Payments() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ===== ADD PAYMENT MODAL ===== */}
       {showPayModal && payingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) { setShowPayModal(false); setPayingInvoice(null); } }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowPayModal(false); setPayingInvoice(null); }}>
           <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
               <div>
@@ -543,13 +559,12 @@ export default function Payments() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ===== EDIT INVOICE MODAL ===== */}
       {editingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setEditingInvoice(null); }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setEditingInvoice(null)}>
           <div className="w-full max-w-lg rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white">{t('payments.modal_edit_title')}</h2>
@@ -590,13 +605,12 @@ export default function Payments() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ===== DELETE CONFIRMATION MODAL ===== */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setDeleteConfirmId(null); }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setDeleteConfirmId(null)}>
           <div className="w-full max-w-sm rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="p-6">
               <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(239,68,68,0.1)' }}>
@@ -614,15 +628,33 @@ export default function Payments() {
                 className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>
                 {t('payments.modal_delete_cancel')}
               </button>
-              <button onClick={() => deleteRecordMut.mutate(deleteConfirmId)} disabled={deleteRecordMut.isPending}
+              <button onClick={() => {
+                setReasonDialog({
+                  open: true,
+                  title: t(deleteType === 'invoice' ? 'payments.modal_delete_invoice_title' : 'payments.modal_delete_payment_title'),
+                  onConfirm: (r) => {
+                    deleteRecordMut.mutate({ id: deleteConfirmId, reason: { change_reason: r.reason, reason_category: r.category } });
+                  },
+                });
+              }} disabled={deleteRecordMut.isPending}
                 className="h-10 px-5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
                 style={{ background: '#ef4444', color: 'white' }}>
                 {deleteRecordMut.isPending ? t('payments.modal_delete_deleting') : t('payments.modal_delete_confirm')}
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
+
+      <ReasonDialog
+        open={reasonDialog.open}
+        title={reasonDialog.title}
+        onConfirm={(r) => {
+          reasonDialog.onConfirm(r);
+          setReasonDialog(f => ({ ...f, open: false }));
+        }}
+        onCancel={() => setReasonDialog(f => ({ ...f, open: false }))}
+      />
     </div>
   );
 }

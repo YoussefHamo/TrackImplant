@@ -221,7 +221,7 @@ export const crossBranchRequestService = {
     return { sufficient: available >= quantity, available };
   },
 
-  async approveRequest(requestId: string, respondedBy?: string): Promise<void> {
+  async approveRequest(requestId: string, respondedBy?: string, change_reason?: string, reason_category?: string): Promise<void> {
     const { data: req, error: fetchErr } = await supabase
       .from('cross_branch_requests')
       .select('*')
@@ -237,13 +237,15 @@ export const crossBranchRequestService = {
       }
     }
 
-    await this.updateStatus(requestId, 'approved', respondedBy);
+    await this.updateStatus(requestId, 'approved', respondedBy, change_reason, reason_category);
     await this.createDelivery(requestId);
   },
 
-  async updateStatus(id: string, status: CrossBranchRequest['status'], respondedBy?: string): Promise<void> {
+  async updateStatus(id: string, status: CrossBranchRequest['status'], respondedBy?: string, change_reason?: string, reason_category?: string): Promise<void> {
     const updates: Record<string, unknown> = { status };
     if (respondedBy) updates.responded_by = respondedBy;
+    if (change_reason !== undefined) updates.change_reason = change_reason;
+    if (reason_category !== undefined) updates.reason_category = reason_category;
     updates.updated_at = new Date().toISOString();
     const { error } = await supabase.from('cross_branch_requests').update(updates).eq('id', id);
     if (error) throw new Error(error.message);
@@ -259,11 +261,14 @@ export const crossBranchRequestService = {
     if (error) throw new Error(error.message);
   },
 
-  async updateDeliveryStatus(deliveryId: string, status: CrossBranchDeliveryStatus): Promise<void> {
+  async updateDeliveryStatus(deliveryId: string, status: CrossBranchDeliveryStatus, change_reason?: string, reason_category?: string): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
+    const updates: Record<string, unknown> = { status, updated_by: user?.id || null, updated_at: new Date().toISOString() };
+    if (change_reason !== undefined) updates.change_reason = change_reason;
+    if (reason_category !== undefined) updates.reason_category = reason_category;
     const { error } = await supabase
       .from('cross_branch_deliveries')
-      .update({ status, updated_by: user?.id || null, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', deliveryId);
     if (error) throw new Error(error.message);
   },

@@ -75,6 +75,22 @@
 
 /* Runtime theme CSS variables for components */
 :root {
+  /* Z-Index Hierarchy — single source of truth for all layering */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-nav: 20;
+  --z-sidebar: 10;
+  --z-content: 10;
+  --z-header: 40;
+  --z-dropdown: 100;
+  --z-popover: 110;
+  --z-tooltip: 120;
+  --z-notification: 130;
+  --z-dialog-overlay: 140;
+  --z-dialog: 150;
+  --z-toast: 180;
+  --z-max: 9999;
+
   --app-bg: linear-gradient(135deg, #050B14 0%, #08111F 50%, #0D1B2A 100%);
   --app-surface: rgba(13,24,40,0.82);
   --app-surface-modal: rgba(13,24,40,0.95);

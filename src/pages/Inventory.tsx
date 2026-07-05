@@ -8,6 +8,7 @@ import { inventoryCountService } from '../services/inventoryCountService';
 import { useAuth } from '../context/AuthContext';
 import { getItemDisplayName } from '../utils/inventory';
 import type { ImplantInventory, AbutmentInventory, InventoryItem, CrossBranchRequest, CrossBranchDeliveryStatus } from '../types';
+import FixedOverlay from '../components/ui/FixedOverlay';
 import {
   Package, Layers, Plus, X, AlertTriangle,
   Edit2, Trash2, ChevronLeft, ChevronRight,
@@ -98,7 +99,13 @@ export default function Inventory() {
   const { data: allItemsUnfiltered = [] } = useQuery({
     queryKey: ['inventory-items-all'],
     queryFn: () => implantInventoryService.getInventoryItems(),
-    enabled: showRequestModal || showAddStock,
+    enabled: showAddStock,
+  });
+
+  const { data: requestableItems = [] } = useQuery({
+    queryKey: ['requestable-items', requestCategory, userBranchId],
+    queryFn: () => crossBranchRequestService.getRequestableItems(userBranchId!, requestCategory || undefined),
+    enabled: showRequestModal && !!userBranchId,
   });
   const { data: productCatalog = [] } = useQuery({
     queryKey: ['product-catalog'],
@@ -203,7 +210,8 @@ export default function Inventory() {
   });
 
   const approveSessionMut = useMutation({
-    mutationFn: (id: string) => inventoryCountService.updateSessionStatus(id, 'approved'),
+    mutationFn: ({ id, change_reason, reason_category }: { id: string; change_reason?: string; reason_category?: string }) =>
+      inventoryCountService.updateSessionStatus(id, 'approved', change_reason, reason_category),
     onSuccess: () => {
       toast.success('Session approved — stock adjusted');
       queryClient.invalidateQueries({ queryKey: ['inventory-count-sessions'] });
@@ -297,11 +305,11 @@ export default function Inventory() {
     onError: (e: Error) => toast.error(e.message),
   });
   const adjustMut = useMutation({
-    mutationFn: () => {
+    mutationFn: ({ change_reason, reason_category }: { change_reason?: string; reason_category?: string } = {}) => {
       if (!adjustModal) throw new Error('No item');
       return adjustModal.type === 'implant'
-        ? implantInventoryService.adjustImplantStock(adjustModal.id, adjustQty, adjustNotes || undefined)
-        : implantInventoryService.adjustAbutmentStock(adjustModal.id, adjustQty, adjustNotes || undefined);
+        ? implantInventoryService.adjustImplantStock(adjustModal.id, adjustQty, adjustNotes || undefined, change_reason, reason_category)
+        : implantInventoryService.adjustAbutmentStock(adjustModal.id, adjustQty, adjustNotes || undefined, change_reason, reason_category);
     },
     onSuccess: () => { toast.success(t('inventory.toast_stock_adjusted')); setAdjustModal(null); setAdjustQty(0); setAdjustNotes(''); inval(); },
     onError: (e: Error) => toast.error(e.message),
@@ -309,32 +317,32 @@ export default function Inventory() {
 
   // Item action mutations (issue/return/adjust for new items)
   const issueMut = useMutation({
-    mutationFn: () => {
+    mutationFn: ({ change_reason, reason_category }: { change_reason?: string; reason_category?: string } = {}) => {
       if (!itemActionModal) throw new Error('No item');
-      return implantInventoryService.issueStock(itemActionModal.item.id, actionQty, { notes: actionNotes || undefined });
+      return implantInventoryService.issueStock(itemActionModal.item.id, actionQty, { notes: actionNotes || undefined, change_reason, reason_category });
     },
     onSuccess: () => { toast.success(t('inventory.toast_item_issued')); setItemActionModal(null); setActionQty(0); setActionNotes(''); inval(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const returnMut = useMutation({
-    mutationFn: () => {
+    mutationFn: ({ change_reason, reason_category }: { change_reason?: string; reason_category?: string } = {}) => {
       if (!itemActionModal) throw new Error('No item');
-      return implantInventoryService.returnStock(itemActionModal.item.id, actionQty, { notes: actionNotes || undefined });
+      return implantInventoryService.returnStock(itemActionModal.item.id, actionQty, { notes: actionNotes || undefined, change_reason, reason_category });
     },
     onSuccess: () => { toast.success(t('inventory.toast_item_returned')); setItemActionModal(null); setActionQty(0); setActionNotes(''); inval(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const adjustItemMut = useMutation({
-    mutationFn: () => {
+    mutationFn: ({ change_reason, reason_category }: { change_reason?: string; reason_category?: string } = {}) => {
       if (!itemActionModal) throw new Error('No item');
-      return implantInventoryService.adjustStock(itemActionModal.item.id, actionQty, actionNotes || undefined);
+      return implantInventoryService.adjustStock(itemActionModal.item.id, actionQty, actionNotes || undefined, change_reason, reason_category);
     },
     onSuccess: () => { toast.success(t('inventory.toast_stock_adjusted')); setItemActionModal(null); setActionQty(0); setActionNotes(''); inval(); },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const addStockMut = useMutation({
-    mutationFn: () => {
+    mutationFn: ({ change_reason, reason_category }: { change_reason?: string; reason_category?: string } = {}) => {
       const item = allItemsUnfiltered.find(i => i.id === addStockForm.add_item_id);
       if (!item) throw new Error('Item not found');
       return implantInventoryService.addStockToBranch({
@@ -347,6 +355,8 @@ export default function Inventory() {
         branch_id: addStockForm.add_branch_id,
         quantity: addStockForm.add_quantity,
         notes: addStockForm.add_notes || undefined,
+        change_reason,
+        reason_category,
       });
     },
     onSuccess: () => { toast.success('Stock added'); setShowAddStock(false); setAddStockForm({ add_item_id: '', add_category: '', add_branch_id: '', add_quantity: 0, add_notes: '' }); inval(); },
@@ -392,11 +402,11 @@ export default function Inventory() {
   });
 
   const updateWHMut = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: CrossBranchRequest['status'] }) => {
+    mutationFn: async ({ id, status, change_reason, reason_category }: { id: string; status: CrossBranchRequest['status']; change_reason?: string; reason_category?: string }) => {
       if (status === 'approved') {
-        await crossBranchRequestService.approveRequest(id, user?.id);
+        await crossBranchRequestService.approveRequest(id, user?.id, change_reason, reason_category);
       } else {
-        await crossBranchRequestService.updateStatus(id, status, user?.id);
+        await crossBranchRequestService.updateStatus(id, status, user?.id, change_reason, reason_category);
       }
     },
     onSuccess: () => {
@@ -408,8 +418,8 @@ export default function Inventory() {
   });
 
   const updateDeliveryMut = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: CrossBranchDeliveryStatus }) =>
-      crossBranchRequestService.updateDeliveryStatus(id, status),
+    mutationFn: ({ id, status, change_reason, reason_category }: { id: string; status: CrossBranchDeliveryStatus; change_reason?: string; reason_category?: string }) =>
+      crossBranchRequestService.updateDeliveryStatus(id, status, change_reason, reason_category),
     onSuccess: () => {
       toast.success('Delivery updated');
       queryClient.invalidateQueries({ queryKey: ['cross-branch-deliveries'] });
@@ -431,10 +441,9 @@ export default function Inventory() {
     if (!requestForm.item_id) return [];
     const catalogItem = productCatalog.find(i => i.id === requestForm.item_id);
     if (!catalogItem) return [];
-    return allItemsUnfiltered
+    return requestableItems
       .filter(i =>
         i.quantity > 0 &&
-        i.branch_id !== userBranchId &&
         i.category === catalogItem.category &&
         i.subcategory === catalogItem.subcategory &&
         i.name === catalogItem.name &&
@@ -442,11 +451,11 @@ export default function Inventory() {
         i.size === catalogItem.size
       )
       .map(i => ({
-        branch_id: i.branch_id!,
+        branch_id: i.branch_id,
         branch_name: allBranches.find(b => b.id === i.branch_id)?.name || 'Unknown',
         qty: i.quantity,
       }));
-  }, [requestForm.item_id, productCatalog, allItemsUnfiltered, userBranchId, allBranches]);
+  }, [requestForm.item_id, productCatalog, requestableItems, allBranches]);
 
   const resetModal = () => { setEditId(null); setModalForm({ brand: '', size: '', type: '', quantity: 0 }); setCustomBrand(false); setCustomSize(false); setCustomType(false); };
 
@@ -511,7 +520,7 @@ export default function Inventory() {
   }), [t]);
 
   return (
-    <div className="font-sans select-none space-y-5">
+    <div className="font-sans select-auto space-y-5">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1185,7 +1194,7 @@ export default function Inventory() {
                     <div className="w-28 flex items-center justify-end gap-1">
                       {s.status !== 'approved' && (isAdmin || isManager) && (
                         <>
-                          <button onClick={(e) => { e.stopPropagation(); approveSessionMut.mutate(s.id); }}
+                          <button onClick={(e) => { e.stopPropagation(); approveSessionMut.mutate({ id: s.id }); }}
                             className="w-7 h-7 rounded-lg flex items-center justify-center text-[#00E5A8] hover:bg-[rgba(0,229,168,0.1)]"
                             title="Approve"><Check className="w-3.5 h-3.5" /></button>
                           <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this session?')) deleteSessionMut.mutate(s.id); }}
@@ -1250,10 +1259,10 @@ export default function Inventory() {
 
       {/* ─── DELIVERY FORM MODAL ─── */}
       {showDeliveryForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowDeliveryForm(false); }}>
-          <div className="w-full max-w-lg rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+<FixedOverlay className="flex items-center justify-center p-4"
+  style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
+  onClose={() => setShowDeliveryForm(false)}>
+  <div className="w-full max-w-lg rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white"><Truck className="w-4 h-4 inline mr-2 text-[#4FD1FF]" />{t('delivery.form_title')}</h2>
               <button onClick={() => setShowDeliveryForm(false)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
@@ -1309,15 +1318,15 @@ export default function Inventory() {
                 <Truck className="w-3.5 h-3.5 inline mr-1.5" />{t('delivery.form_submit')}</button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ─── RETURN FORM MODAL ─── */}
       {showReturnForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowReturnForm(false); }}>
-          <div className="w-full max-w-lg rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+<FixedOverlay className="flex items-center justify-center p-4"
+  style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
+  onClose={() => setShowReturnForm(false)}>
+  <div className="w-full max-w-lg rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white"><RotateCcw className="w-4 h-4 inline mr-2 text-[#4FD1FF]" />{t('returns.form_title')}</h2>
               <button onClick={() => setShowReturnForm(false)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
@@ -1373,15 +1382,15 @@ export default function Inventory() {
                 <RotateCcw className="w-3.5 h-3.5 inline mr-1.5" />{t('returns.form_submit')}</button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ─── CREATE/EDIT IMPLANT/ABUTMENT MODAL ─── */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) { setShowModal(false); resetModal(); } }}>
-          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+<FixedOverlay className="flex items-center justify-center p-4"
+  style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
+  onClose={() => { setShowModal(false); resetModal(); }}>
+  <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white">
                 {editId
@@ -1487,15 +1496,15 @@ export default function Inventory() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ─── STOCK ADJUST MODAL (old tables) ─── */}
       {adjustModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) { setAdjustModal(null); setAdjustQty(0); setAdjustNotes(''); } }}>
-          <div className="w-full max-w-sm rounded-[24px] p-6" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+<FixedOverlay className="flex items-center justify-center p-4"
+  style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
+  onClose={() => { setAdjustModal(null); setAdjustQty(0); setAdjustNotes(''); }}>
+  <div className="w-full max-w-sm rounded-[24px] p-6" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <h3 className="text-sm font-bold text-white mb-1">{t('inventory.modal_adjust_title')}</h3>
             <p className="text-xs mb-4" style={{ color: 'rgba(255,255,255,0.4)' }}>{adjustModal.label}</p>
             <div className="space-y-3">
@@ -1511,22 +1520,22 @@ export default function Inventory() {
             </div>
             <div className="flex items-center justify-end gap-3 mt-5">
               <button onClick={() => { setAdjustModal(null); setAdjustQty(0); setAdjustNotes(''); }} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('inventory.modal_cancel')}</button>
-              <button onClick={() => adjustMut.mutate()} disabled={adjustQty === 0 || adjustMut.isPending}
+              <button onClick={() => adjustMut.mutate({})} disabled={adjustQty === 0 || adjustMut.isPending}
                 className="h-10 px-5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
                 style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
                 {adjustMut.isPending ? t('inventory.modal_adjusting') : t('inventory.modal_apply')}
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ─── ITEM ACTION MODAL (issue/return/adjust for new items) ─── */}
       {itemActionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) { setItemActionModal(null); setActionQty(0); setActionNotes(''); } }}>
-          <div className="w-full max-w-sm rounded-[24px] p-6" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+<FixedOverlay className="flex items-center justify-center p-4"
+  style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
+  onClose={() => { setItemActionModal(null); setActionQty(0); setActionNotes(''); }}>
+  <div className="w-full max-w-sm rounded-[24px] p-6" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <h3 className="text-sm font-bold text-white mb-1">
               {itemActionModal.action === 'issue' ? t('inventory.modal_issue_title') : itemActionModal.action === 'return' ? t('inventory.modal_return_title') : t('inventory.modal_adjust_item_title')}
             </h3>
@@ -1552,25 +1561,25 @@ export default function Inventory() {
             <div className="flex items-center justify-end gap-3 mt-5">
               <button onClick={() => { setItemActionModal(null); setActionQty(0); setActionNotes(''); }} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('inventory.modal_cancel')}</button>
               <button onClick={() => {
-                if (itemActionModal.action === 'issue') issueMut.mutate();
-                else if (itemActionModal.action === 'return') returnMut.mutate();
-                else adjustItemMut.mutate();
-              }} disabled={actionQty <= 0 || issueMut.isPending || returnMut.isPending || adjustItemMut.isPending}
+                  if (itemActionModal.action === 'issue') issueMut.mutate({});
+                  else if (itemActionModal.action === 'return') returnMut.mutate({});
+                  else adjustItemMut.mutate({});
+                }} disabled={actionQty <= 0 || issueMut.isPending || returnMut.isPending || adjustItemMut.isPending}
                 className="h-10 px-5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
                 style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
                 {itemActionModal.action === 'issue' ? t('inventory.modal_issue') : itemActionModal.action === 'return' ? t('inventory.modal_return') : t('inventory.modal_adjust')}
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ─── CREATE COUNT SESSION MODAL ─── */}
       {showCountForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowCountForm(false); }}>
-          <div className="w-full max-w-md rounded-[24px] p-6" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+<FixedOverlay className="flex items-center justify-center p-4"
+  style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
+  onClose={() => setShowCountForm(false)}>
+  <div className="w-full max-w-md rounded-[24px] p-6" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <h3 className="text-base font-bold text-white mb-1"><ClipboardList className="w-4 h-4 inline mr-2 text-[#4FD1FF]" />New Inventory Count</h3>
             <p className="text-xs mb-4" style={{ color: 'rgba(255,255,255,0.4)' }}>Creates a snapshot of all current inventory quantities. You can adjust actual counts after creation.</p>
             <div className="space-y-4 mb-4">
@@ -1601,15 +1610,15 @@ export default function Inventory() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ─── STOCK REQUEST MODAL ─── */}
       {showRequestModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) { setShowRequestModal(false); setRequestForm({ from_branch_id: '', item_id: '', item_name: '', item_category: '', quantity: 0, notes: '' }); setRequestCategory(''); } }}>
-          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+<FixedOverlay className="flex items-center justify-center p-4"
+  style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
+  onClose={() => { setShowRequestModal(false); setRequestForm({ from_branch_id: '', item_id: '', item_name: '', item_category: '', quantity: 0, notes: '' }); setRequestCategory(''); }}>
+  <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white"><Send className="w-4 h-4 inline mr-2 text-[#4FD1FF]" />New Request</h2>
               <button onClick={() => { setShowRequestModal(false); setRequestForm({ from_branch_id: '', item_id: '', item_name: '', item_category: '', quantity: 0, notes: '' }); setRequestCategory(''); }}
@@ -1684,15 +1693,15 @@ export default function Inventory() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ─── ADD STOCK MODAL ─── */}
       {showAddStock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowAddStock(false); }}>
-          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+<FixedOverlay className="flex items-center justify-center p-4"
+  style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
+  onClose={() => setShowAddStock(false)}>
+  <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white"><Plus className="w-4 h-4 inline mr-2 text-[#4FD1FF]" />Add Stock to Branch</h2>
               <button onClick={() => setShowAddStock(false)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
@@ -1747,15 +1756,16 @@ export default function Inventory() {
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
               <button onClick={() => setShowAddStock(false)}
                 className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Cancel</button>
-              <button onClick={() => addStockMut.mutate()} disabled={!addStockForm.add_item_id || !addStockForm.add_branch_id || addStockForm.add_quantity <= 0 || addStockMut.isPending}
+              <button onClick={() => addStockMut.mutate({})} disabled={!addStockForm.add_item_id || !addStockForm.add_branch_id || addStockForm.add_quantity <= 0 || addStockMut.isPending}
                 className="h-10 px-6 rounded-xl text-sm font-bold"
                 style={{ background: addStockMut.isPending ? 'rgba(0,229,168,0.2)' : 'linear-gradient(135deg, #00E5A8, #00C99D)', color: '#050B14' }}>
                 {addStockMut.isPending ? 'Adding...' : 'Add Stock'}
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
+
     </div>
   );
 }

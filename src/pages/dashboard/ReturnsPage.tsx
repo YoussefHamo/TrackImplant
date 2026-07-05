@@ -8,6 +8,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { getItemDisplayName } from '../../utils/inventory';
 import { RotateCcw, Building2, Package, User, Plus, X, Check, Ban } from 'lucide-react';
 import { toast } from 'sonner';
+import FixedOverlay from '../../components/ui/FixedOverlay';
 
 const inputCls = 'w-full h-10 px-3 rounded-xl text-sm outline-none bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500 transition-all';
 const labelCls = 'text-[11px] font-semibold uppercase tracking-wider block mb-1.5';
@@ -63,7 +64,8 @@ export default function ReturnsPage() {
   });
 
   const approveMut = useMutation({
-    mutationFn: (id: string) => deliveryService.updateReturnStatus(id, 'approved'),
+    mutationFn: ({ id, change_reason, reason_category }: { id: string; change_reason?: string; reason_category?: string }) =>
+      deliveryService.updateReturnStatus(id, 'approved', change_reason, reason_category),
     onSuccess: () => {
       toast.success('Return approved — stock adjusted');
       queryClient.invalidateQueries({ queryKey: ['inventory-returns'] });
@@ -74,7 +76,8 @@ export default function ReturnsPage() {
   });
 
   const rejectMut = useMutation({
-    mutationFn: (id: string) => deliveryService.updateReturnStatus(id, 'rejected'),
+    mutationFn: ({ id, change_reason, reason_category }: { id: string; change_reason?: string; reason_category?: string }) =>
+      deliveryService.updateReturnStatus(id, 'rejected', change_reason, reason_category),
     onSuccess: () => {
       toast.success('Return rejected');
       queryClient.invalidateQueries({ queryKey: ['inventory-returns'] });
@@ -89,7 +92,7 @@ export default function ReturnsPage() {
   };
 
   return (
-    <div className="font-sans select-none space-y-5">
+    <div className="font-sans select-auto space-y-5">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">{t('returns.title')}</h1>
@@ -143,10 +146,10 @@ export default function ReturnsPage() {
                   <div className="w-20 flex items-center justify-end gap-1">
                     {r.status === 'pending' && (
                       <>
-                        <button onClick={() => approveMut.mutate(r.id)}
+                        <button onClick={() => approveMut.mutate({ id: r.id })}
                           className="w-7 h-7 rounded-lg flex items-center justify-center text-[#00E5A8] hover:bg-[rgba(0,229,168,0.1)]"
                           title="Approve"><Check className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => rejectMut.mutate(r.id)}
+                        <button onClick={() => rejectMut.mutate({ id: r.id })}
                           className="w-7 h-7 rounded-lg flex items-center justify-center text-[#ef4444] hover:bg-[rgba(239,68,68,0.1)]"
                           title="Reject"><Ban className="w-3.5 h-3.5" /></button>
                       </>
@@ -161,9 +164,7 @@ export default function ReturnsPage() {
 
       {/* Create form modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) { setShowForm(false); } }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowForm(false)}>
           <div className="w-full max-w-lg rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white"><RotateCcw className="w-4 h-4 inline mr-2 text-[#4FD1FF]" />{t('returns.form_title')}</h2>
@@ -240,8 +241,9 @@ export default function ReturnsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
+
     </div>
   );
 }

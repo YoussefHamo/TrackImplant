@@ -3,6 +3,7 @@ import { auditLogService, getCurrentUserInfo } from './auditLogService';
 import type { FinancialRecord, PaymentStatus, PaymentMethod } from '../types';
 
 function rowToRecord(row: Record<string, unknown>): FinancialRecord {
+  const branchObj = row.branches as { name?: string } | null | undefined;
   return {
     id: row.id as string,
     patient_id: row.patient_id as string,
@@ -18,6 +19,8 @@ function rowToRecord(row: Record<string, unknown>): FinancialRecord {
     payment_method: row.payment_method as PaymentMethod | undefined,
     notes: row.notes as string | undefined,
     created_at: row.created_at as string | undefined,
+    branch_id: row.branch_id as string | null | undefined,
+    branch_name: branchObj?.name ?? null,
   };
 }
 
@@ -25,21 +28,19 @@ export const financialRecordService = {
   async getByPatient(patientId: string): Promise<FinancialRecord[]> {
     const { data, error } = await supabase
       .from('financial_records')
-      .select('*')
+      .select('*, branches:branch_id(name)')
       .eq('patient_id', patientId)
       .order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return (data || []).map(rowToRecord);
   },
 
-  async getAllInvoices(branchId?: string | null): Promise<FinancialRecord[]> {
-    let q = supabase
+  async getAllInvoices(): Promise<FinancialRecord[]> {
+    const { data, error } = await supabase
       .from('financial_records')
-      .select('*')
+      .select('*, branches:branch_id(name)')
       .eq('record_type', 'invoice')
       .order('created_at', { ascending: false });
-    if (branchId) q = q.eq('branch_id', branchId);
-    const { data, error } = await q;
     if (error) throw new Error(error.message);
     return (data || []).map(rowToRecord);
   },
@@ -102,6 +103,8 @@ export const financialRecordService = {
     invoice_name: string;
     total_amount: number;
     notes?: string;
+    change_reason?: string;
+    reason_category?: string;
   }): Promise<FinancialRecord> {
     const record = {
       patient_id: data.patient_id,
@@ -114,6 +117,8 @@ export const financialRecordService = {
       remaining_amount: data.total_amount,
       status: 'Pending' as PaymentStatus,
       notes: data.notes || null,
+      change_reason: data.change_reason || null,
+      reason_category: data.reason_category || null,
     };
     const { data: inserted, error } = await supabase
       .from('financial_records')
@@ -131,6 +136,8 @@ export const financialRecordService = {
         table_name: 'financial_records',
         record_id: inserted.id,
         new_data: inserted as Record<string, unknown>,
+        reason_category: data.reason_category || null,
+        change_reason: data.change_reason || null,
       });
     }
 
@@ -144,6 +151,8 @@ export const financialRecordService = {
     amount: number;
     payment_method?: PaymentMethod;
     notes?: string;
+    change_reason?: string;
+    reason_category?: string;
   }): Promise<FinancialRecord> {
     const record = {
       patient_id: data.patient_id,
@@ -155,7 +164,10 @@ export const financialRecordService = {
       paid_so_far: 0,
       remaining_amount: 0,
       status: 'Paid' as PaymentStatus,
+      payment_method: data.payment_method || 'cash',
       notes: data.notes || null,
+      change_reason: data.change_reason || null,
+      reason_category: data.reason_category || null,
     };
     const { data: inserted, error } = await supabase
       .from('financial_records')
@@ -175,18 +187,101 @@ export const financialRecordService = {
         table_name: 'financial_records',
         record_id: inserted.id,
         new_data: data as unknown as Record<string, unknown>,
+        reason_category: data.reason_category || null,
+        change_reason: data.change_reason || null,
       });
     }
 
     return rowToRecord(inserted);
   },
 
+  async createRefund(data: {
+    invoice_id: string;
+    patient_id: string;
+    patient_name: string;
+    amount: number;
+    payment_method?: string;
+    refund_type?: 'insurance' | 'cash';
+    notes?: string;
+    change_reason?: string;
+    reason_category?: string;
+  }): Promise<FinancialRecord> {
+    const { data: invoice, error: invErr } = await supabase
+      .from('financial_records')
+      .select('*')
+      .eq('id', data.invoice_id)
+      .single();
+    if (invErr || !invoice) throw new Error('Invoice not found');
+
+    const paidSoFar = Number(invoice.paid_so_far);
+    if (paidSoFar <= 0) throw new Error('No payments to refund');
+    if (data.amount > paidSoFar) throw new Error('Refund amount exceeds paid amount');
+
+    const refundType = data.refund_type || 'cash';
+    const refundNotes = refundType === 'insurance'
+      ? `[Insurance Refund] ${data.notes || ''}`
+      : `[Cash Refund] ${data.notes || ''}`;
+
+    const { data: refund, error } = await supabase
+      .from('financial_records')
+      .insert({
+        patient_id: data.patient_id,
+        patient_name: data.patient_name,
+        record_type: 'payment',
+        parent_invoice_id: data.invoice_id,
+        amount: -Math.abs(data.amount),
+        total_amount: 0,
+        paid_so_far: 0,
+        remaining_amount: 0,
+        status: 'Paid',
+        payment_method: data.payment_method || 'cash',
+        notes: refundNotes.trim(),
+        change_reason: data.change_reason || 'Refund processed',
+        reason_category: data.reason_category || 'Refund Correction',
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    // Update paid_so_far without changing invoice status
+    const newPaidSoFar = Math.max(0, paidSoFar - data.amount);
+    const { error: updateErr } = await supabase
+      .from('financial_records')
+      .update({ paid_so_far: newPaidSoFar, remaining_amount: Math.max(0, Number(invoice.total_amount) - newPaidSoFar) })
+      .eq('id', data.invoice_id);
+    if (updateErr) throw updateErr;
+
+    const actor = await getCurrentUserInfo();
+    if (actor) {
+      await auditLogService.log({
+        user_id: actor.user_id,
+        user_name: actor.user_name,
+        action: 'PAYMENT_CHANGE',
+        table_name: 'financial_records',
+        record_id: refund.id,
+        new_data: refund,
+        reason_category: data.reason_category || 'Refund Correction',
+        change_reason: data.change_reason || 'Refund processed',
+      });
+    }
+
+    return refund;
+  },
+
   async updateInvoice(id: string, data: {
     invoice_name?: string;
     total_amount?: number;
     notes?: string;
+    change_reason?: string;
+    reason_category?: string;
   }): Promise<void> {
-    const { error } = await supabase.from('financial_records').update(data).eq('id', id).eq('record_type', 'invoice');
+    const updateData: Record<string, unknown> = {};
+    if (data.invoice_name !== undefined) updateData.invoice_name = data.invoice_name;
+    if (data.total_amount !== undefined) updateData.total_amount = data.total_amount;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.change_reason !== undefined) updateData.change_reason = data.change_reason;
+    if (data.reason_category !== undefined) updateData.reason_category = data.reason_category;
+    const { error } = await supabase.from('financial_records').update(updateData).eq('id', id).eq('record_type', 'invoice');
     if (error) throw new Error(error.message);
     if (data.total_amount !== undefined) await this.syncInvoice(id);
 
@@ -199,11 +294,13 @@ export const financialRecordService = {
         table_name: 'financial_records',
         record_id: id,
         new_data: data as unknown as Record<string, unknown>,
+        reason_category: data.reason_category || null,
+        change_reason: data.change_reason || null,
       });
     }
   },
 
-  async deleteRecord(id: string): Promise<void> {
+  async deleteRecord(id: string, reason?: { change_reason?: string; reason_category?: string }): Promise<void> {
     const { data: rec } = await supabase.from('financial_records').select('record_type, parent_invoice_id').eq('id', id).single();
     const { error } = await supabase.from('financial_records').delete().eq('id', id);
     if (error) throw new Error(error.message);
@@ -219,6 +316,8 @@ export const financialRecordService = {
         action: 'DELETE',
         table_name: 'financial_records',
         record_id: id,
+        reason_category: reason?.reason_category || null,
+        change_reason: reason?.change_reason || null,
       });
     }
   },
@@ -319,5 +418,48 @@ export const financialRecordService = {
     });
 
     return Object.entries(months).map(([name, val]) => ({ name, ...val }));
+  },
+
+  async getInsuranceRevenue(): Promise<number> {
+    const { data: payments } = await supabase
+      .from('financial_records')
+      .select('amount')
+      .eq('record_type', 'payment')
+      .eq('payment_method', 'insurance')
+      .gt('amount', 0);
+    const { data: insuranceRefunds } = await supabase
+      .from('financial_records')
+      .select('amount')
+      .eq('record_type', 'payment')
+      .lt('amount', 0)
+      .ilike('notes', '[Insurance Refund]%');
+    const pos = (payments || []).reduce((s, r) => s + Number(r.amount), 0);
+    const refundTotal = (insuranceRefunds || []).reduce((s, r) => s + Math.abs(Number(r.amount)), 0);
+    return pos + refundTotal;
+  },
+
+  async getCashRevenue(): Promise<number> {
+    const { data: payments } = await supabase
+      .from('financial_records')
+      .select('amount')
+      .eq('record_type', 'payment')
+      .in('payment_method', ['cash', 'card', 'bank_transfer'])
+      .gt('amount', 0);
+    const { data: cashRefunds } = await supabase
+      .from('financial_records')
+      .select('amount')
+      .eq('record_type', 'payment')
+      .lt('amount', 0)
+      .ilike('notes', '[Cash Refund]%');
+    const { data: insuranceRefunds } = await supabase
+      .from('financial_records')
+      .select('amount')
+      .eq('record_type', 'payment')
+      .lt('amount', 0)
+      .ilike('notes', '[Insurance Refund]%');
+    const pos = (payments || []).reduce((s, r) => s + Number(r.amount), 0);
+    const cashRefundTotal = (cashRefunds || []).reduce((s, r) => s + Math.abs(Number(r.amount)), 0);
+    const insuranceRefundTotal = (insuranceRefunds || []).reduce((s, r) => s + Math.abs(Number(r.amount)), 0);
+    return Math.max(0, pos - cashRefundTotal - insuranceRefundTotal);
   },
 };

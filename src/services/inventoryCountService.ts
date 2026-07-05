@@ -70,13 +70,15 @@ export const inventoryCountService = {
     return sessionFromRow(inserted);
   },
 
-  async updateSessionStatus(id: string, status: CountSessionStatus): Promise<void> {
+  async updateSessionStatus(id: string, status: CountSessionStatus, change_reason?: string, reason_category?: string): Promise<void> {
     const updates: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
     if (status === 'approved') {
       const { data: { user } } = await supabase.auth.getUser();
       updates.approved_by = user?.id;
       updates.approved_at = new Date().toISOString();
     }
+    if (change_reason !== undefined) updates.change_reason = change_reason;
+    if (reason_category !== undefined) updates.reason_category = reason_category;
     const { error } = await supabase.from('inventory_count_sessions').update(updates).eq('id', id);
     if (error) throw new Error(error.message);
   },

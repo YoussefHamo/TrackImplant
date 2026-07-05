@@ -38,8 +38,11 @@ export const followUpService = {
     return (data || []).map(followUpFromRow);
   },
 
-  async update(id: string, updates: Partial<FollowUp>): Promise<void> {
-    const { error } = await supabase.from('follow_ups').update(updates).eq('id', id);
+  async update(id: string, updates: Partial<FollowUp>, change_reason?: string, reason_category?: string): Promise<void> {
+    const payload: Record<string, unknown> = { ...updates };
+    if (change_reason !== undefined) payload.change_reason = change_reason;
+    if (reason_category !== undefined) payload.reason_category = reason_category;
+    const { error } = await supabase.from('follow_ups').update(payload).eq('id', id);
     if (error) throw new Error(error.message);
     if (updates.healing_status === 'Failure' && updates.procedure_id) {
       const { error: procErr } = await supabase.from('procedures').update({ status: 'Consultation' }).eq('id', updates.procedure_id);
@@ -51,11 +54,13 @@ export const followUpService = {
         user_id: actor.user_id, user_name: actor.user_name,
         action: 'UPDATE', table_name: 'follow_ups', record_id: id,
         new_data: updates as Record<string, unknown>,
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
       });
     }
   },
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, change_reason?: string, reason_category?: string): Promise<void> {
     const { error } = await supabase.from('follow_ups').delete().eq('id', id);
     if (error) throw new Error(error.message);
     const actor = await getCurrentUserInfo();
@@ -63,12 +68,17 @@ export const followUpService = {
       auditLogService.log({
         user_id: actor.user_id, user_name: actor.user_name,
         action: 'DELETE', table_name: 'follow_ups', record_id: id,
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
       });
     }
   },
 
-  async create(followUp: Omit<FollowUp, 'id' | 'created_at'>): Promise<FollowUp> {
-    const { data, error } = await supabase.from('follow_ups').insert([followUp]).select().single();
+  async create(followUp: Omit<FollowUp, 'id' | 'created_at'>, change_reason?: string, reason_category?: string): Promise<FollowUp> {
+    const payload = { ...followUp };
+    if (change_reason !== undefined) (payload as Record<string, unknown>).change_reason = change_reason;
+    if (reason_category !== undefined) (payload as Record<string, unknown>).reason_category = reason_category;
+    const { data, error } = await supabase.from('follow_ups').insert([payload]).select().single();
     if (error) throw new Error(error.message);
     if (followUp.healing_status === 'Failure' && followUp.procedure_id) {
       const { error: procErr } = await supabase.from('procedures').update({ status: 'Consultation' }).eq('id', followUp.procedure_id);
@@ -80,6 +90,8 @@ export const followUpService = {
         user_id: actor.user_id, user_name: actor.user_name,
         action: 'INSERT', table_name: 'follow_ups', record_id: data.id,
         new_data: data as Record<string, unknown>,
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
       });
     }
     return followUpFromRow(data);

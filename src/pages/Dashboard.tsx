@@ -15,7 +15,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import {
-  TrendingUp, DollarSign, Activity, Calendar, Clock, Users,
+  TrendingUp, DollarSign, Heart, Activity, Calendar, Clock, Users,
   ChevronRight, Plus, User, Package, AlertTriangle, Truck
 } from 'lucide-react';
 
@@ -88,7 +88,7 @@ function ReceptionDashboard() {
   }, [analytics]);
 
   return (
-    <div className="space-y-6 font-sans select-none">
+    <div className="space-y-6 font-sans select-auto">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -310,7 +310,7 @@ function ClinicalDashboard() {
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard-analytics'],
     queryFn: async () => {
-      const [invStats, patientStats, procStats, followStats, revenueData, procedures, appointments] = await Promise.all([
+      const [invStats, patientStats, procStats, followStats, revenueData, procedures, appointments, insuranceRevenue, cashRevenue] = await Promise.all([
         financialRecordService.getAnalytics().catch(() => ({ totalRevenue: 0, totalPending: 0, monthlyCollected: 0, invoiceCount: 0, paidCount: 0, pendingCount: 0, partialCount: 0, monthlyGrowth: 0 })),
         patientService.getStats().catch(() => ({ total: 0, newThisMonth: 0 })),
         procedureService.getStats().catch(() => ({ total: 0, byStatus: {} })),
@@ -318,6 +318,8 @@ function ClinicalDashboard() {
         financialRecordService.getDailyRevenue(7).catch(() => []),
         procedureService.getAll().catch(() => []),
         appointmentService.getAll().catch(() => []),
+        financialRecordService.getInsuranceRevenue().catch(() => 0),
+        financialRecordService.getCashRevenue().catch(() => 0),
       ]);
       const now = new Date();
       const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -325,7 +327,7 @@ function ClinicalDashboard() {
         const d = new Date(a.appointment_date);
         return d >= now && d <= tomorrow;
       });
-      return { invStats, patientStats, procStats, followStats, revenueData, procedures, next24h };
+      return { invStats, patientStats, procStats, followStats, revenueData, procedures, next24h, insuranceRevenue, cashRevenue };
     },
     refetchInterval: 1000 * 30,
   });
@@ -342,7 +344,7 @@ function ClinicalDashboard() {
     );
   }
 
-  const { invStats, patientStats, procStats, followStats, revenueData, procedures, next24h } = data!;
+  const { invStats, patientStats, procStats, followStats, revenueData, procedures, next24h, insuranceRevenue = 0, cashRevenue = 0 } = data!;
 
   const procStatusColors: Record<string, { bg: string; text: string; dot: string }> = {
     Surgery: { bg: 'rgba(79,209,255,0.12)', text: '#4FD1FF', dot: '#4FD1FF' },
@@ -373,7 +375,7 @@ function ClinicalDashboard() {
   }
 
   return (
-    <div className="space-y-6 font-sans select-none">
+    <div className="space-y-6 font-sans select-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">{t('dashboard.clinical_title')}</h1>
@@ -395,7 +397,7 @@ function ClinicalDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="group rounded-[22px] p-5 transition-all duration-300 hover:-translate-y-0.5"
           style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
           <div className="flex items-start justify-between mb-3">
@@ -453,6 +455,22 @@ function ClinicalDashboard() {
           ) : (
             <div className="mt-3 text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>{t('dashboard.no_payments_yet')}</div>
           )}
+        </div>
+
+        {/* Insurance Revenue Card */}
+        <div className="group rounded-[22px] p-5 transition-all duration-300 hover:-translate-y-0.5"
+          style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
+          <div className="flex items-start justify-between mb-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,107,157,0.1)', border: '1px solid rgba(255,107,157,0.12)' }}>
+              <Heart className="w-5 h-5" style={{ color: '#ff6b9d' }} />
+            </div>
+            <span className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('dashboard.total')}</span>
+          </div>
+          <div className="text-2xl font-bold" style={{ color: '#ff6b9d' }}>${insuranceRevenue.toLocaleString()}</div>
+          <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Insurance Revenue</div>
+          <div className="mt-3 flex items-center text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            Cash: <span className="text-[#00E5A8] font-semibold ml-1">${cashRevenue.toLocaleString()}</span>
+          </div>
         </div>
 
         <div className="group rounded-[22px] p-5 transition-all duration-300 hover:-translate-y-0.5"
@@ -634,7 +652,7 @@ function ManagerDashboard() {
   const todayAppts = appointments.filter(a => new Date(a.appointment_date).toISOString().split('T')[0] === today);
 
   return (
-    <div className="space-y-6 font-sans select-none">
+    <div className="space-y-6 font-sans select-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Manager Dashboard</h1>

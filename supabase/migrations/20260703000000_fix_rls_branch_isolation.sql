@@ -118,16 +118,12 @@ create policy "InventoryTransactions select"
     )
   );
 
--- 5. stock_requests — Manager sees requests for/to their branch; Admin sees all
+-- 5. stock_requests (deprecated — replaced by cross_branch_requests)
 drop policy if exists "StockRequests select" on public.stock_requests;
 create policy "StockRequests select"
   on public.stock_requests for select
   to authenticated
-  using (
-    get_current_user_role() = 'Admin'
-    or (select branch_id from public.users where auth_user_id = auth.uid()) in (from_branch_id, to_branch_id)
-    or requested_by = auth.uid()
-  );
+  using (get_current_user_role() = 'Admin');
 
 -- 6. cross_branch_requests — same branch isolation
 drop policy if exists "CrossBranchRequests select" on public.cross_branch_requests;
@@ -140,14 +136,19 @@ create policy "CrossBranchRequests select"
     or requested_by = auth.uid()
   );
 
--- 7. cross_branch_deliveries — branch isolation
+-- 7. cross_branch_deliveries — branch isolation via join to cross_branch_requests
 drop policy if exists "CrossBranchDeliveries select" on public.cross_branch_deliveries;
 create policy "CrossBranchDeliveries select"
   on public.cross_branch_deliveries for select
   to authenticated
   using (
     get_current_user_role() = 'Admin'
-    or (select branch_id from public.users where auth_user_id = auth.uid()) in (from_branch_id, to_branch_id)
+    or exists (
+      select 1 from public.cross_branch_requests r
+      where r.id = cross_branch_deliveries.request_id
+        and (r.from_branch_id = (select branch_id from public.users where auth_user_id = auth.uid())
+          or r.to_branch_id = (select branch_id from public.users where auth_user_id = auth.uid()))
+    )
   );
 
 -- 8. patients — branch isolation (patients have branch_id)

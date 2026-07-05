@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AppUser, UserRole } from '../../types';
+import FixedOverlay from '../../components/ui/FixedOverlay';
 
 const inputCls = 'w-full h-10 px-3 rounded-xl text-sm outline-none transition-all bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500';
 
@@ -153,7 +154,7 @@ export default function Settings() {
   const paged = filtered.slice((page - 1) * perPage, page * perPage);
 
   return (
-    <div className="font-sans select-none space-y-6">
+    <div className="font-sans select-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -506,8 +507,7 @@ export default function Settings() {
 
       {/* ===== CREATE USER MODAL ===== */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowCreate(false); }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowCreate(false)}>
           <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white">{t('settings.modal_create_title')}</h2>
@@ -578,13 +578,12 @@ export default function Settings() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ===== EDIT USER MODAL ===== */}
       {showEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowEdit(null); }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowEdit(null)}>
           <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white">{t('settings.modal_edit_title')}</h2>
@@ -658,13 +657,12 @@ export default function Settings() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ===== PASSWORD RESET CONFIRMATION ===== */}
       {showPasswordReset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowPasswordReset(null); }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowPasswordReset(null)}>
           <div className="w-full max-w-sm rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="p-6">
               <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(255,193,7,0.1)' }}>
@@ -687,7 +685,7 @@ export default function Settings() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
     </div>
   );

@@ -48,7 +48,7 @@ export default function Notifications() {
   const unread = notifications.filter(n => !n.is_read);
 
   return (
-    <div className="font-sans select-none space-y-6">
+    <div className="font-sans select-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">{t('notifications.title')}</h1>

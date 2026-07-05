@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '../../context/LanguageContext';
+import FixedOverlay from '../../components/ui/FixedOverlay';
 
 const healingColors: Record<HealingStatus, { bg: string; text: string; glow: string }> = {
   OnTrack: { bg: 'rgba(0,229,168,0.12)', text: '#00E5A8', glow: 'rgba(0,229,168,0.3)' },
@@ -175,7 +176,8 @@ export default function FollowUps() {
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: string) => followUpService.delete(id),
+    mutationFn: ({ id, change_reason, reason_category }: { id: string; change_reason?: string; reason_category?: string }) =>
+      followUpService.delete(id, change_reason, reason_category),
     onSuccess: () => {
       toast.success(t('follow_ups.toast_deleted'));
       queryClient.invalidateQueries({ queryKey: ['follow-ups'] });
@@ -187,7 +189,7 @@ export default function FollowUps() {
   });
 
   return (
-    <div className="font-sans select-none space-y-5">
+    <div className="font-sans select-auto space-y-5">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -347,8 +349,7 @@ export default function FollowUps() {
 
       {/* Follow-up Modal (Create / Edit) */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) { setShowModal(false); resetForm(); } }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowModal(false); resetForm(); }}>
           <div className="w-full max-w-lg rounded-[24px] flex flex-col max-h-[90vh]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.05)] flex-shrink-0">
               <h2 className="text-lg font-bold text-white">{editingId ? t('follow_ups.modal_edit') : t('follow_ups.modal_new')}</h2>
@@ -498,13 +499,12 @@ export default function FollowUps() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* Delete Confirmation */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setDeleteConfirmId(null); }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setDeleteConfirmId(null)}>
           <div className="w-full max-w-sm rounded-[24px] p-6" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}>
@@ -517,15 +517,16 @@ export default function FollowUps() {
             </div>
             <div className="flex items-center justify-end gap-3">
               <button onClick={() => setDeleteConfirmId(null)} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('follow_ups.delete_cancel')}</button>
-              <button onClick={() => deleteMut.mutate(deleteConfirmId)} disabled={deleteMut.isPending}
+              <button onClick={() => deleteMut.mutate({ id: deleteConfirmId })} disabled={deleteMut.isPending}
                 className="h-10 px-5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
                 style={{ background: '#ef4444', color: '#fff' }}>
                 {deleteMut.isPending ? t('follow_ups.delete_deleting') : t('follow_ups.delete_confirm')}
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
+
     </div>
   );
 }

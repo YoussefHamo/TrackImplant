@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import { patientService } from '../services/patientService';
 import type { Patient } from '../types';
+import Portal from './ui/Portal';
 
 interface AddPatientModalProps {
   isOpen: boolean;
@@ -14,16 +15,20 @@ const emptyForm = {
   full_name: '',
   phone: '',
   medical_history: '',
+  external_medical_code: '',
+  insurance_company: '',
 };
 
 export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProps) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ ...emptyForm });
+  const [hasInsurance, setHasInsurance] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const resetForm = () => {
     setForm({ ...emptyForm });
+    setHasInsurance(false);
     setErrors({});
   };
 
@@ -44,12 +49,15 @@ export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProp
         full_name: form.full_name,
         phone: form.phone,
         medical_history: form.medical_history || undefined,
+        external_medical_code: form.external_medical_code || undefined,
+        insurance_company: hasInsurance ? form.insurance_company : undefined,
       };
       return patientService.create(payload);
     },
     onSuccess: () => {
       toast.success('Patient added successfully');
       queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-search'] });
       handleClose();
     },
     onError: (err: Error) => {
@@ -62,6 +70,7 @@ export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProp
     if (!form.full_name.trim()) errs.full_name = 'Full name is required';
     if (!form.phone.trim()) errs.phone = 'Phone number is required';
     else if (!/^[\d\s\-+()]{7,20}$/.test(form.phone)) errs.phone = 'Invalid phone number';
+    if (hasInsurance && !form.insurance_company.trim()) errs.insurance_company = 'Insurance company is required';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -87,7 +96,8 @@ export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProp
   const labelColor = { color: 'rgba(255,255,255,0.3)' };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
+    <Portal>
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 'var(--z-dialog-overlay)', background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div ref={dialogRef} className="w-full max-w-lg rounded-[24px] max-h-[90vh] overflow-y-auto"
         style={{
@@ -128,6 +138,34 @@ export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProp
               <textarea value={form.medical_history} onChange={e => update('medical_history', e.target.value)}
                 placeholder="التاريخ الطبي / Medical history" className={inputClass('medical_history') + ' h-24 pt-2 resize-none'} dir="auto" rows={3} />
             </div>
+            <div>
+              <label style={labelColor} className={labelClass}>External Medical Code</label>
+              <input value={form.external_medical_code} onChange={e => update('external_medical_code', e.target.value)}
+                placeholder="الكود الطبي الخارجي" className={inputClass('external_medical_code')} dir="auto" />
+            </div>
+            <div>
+              <label style={labelColor} className={labelClass}>Payment Type</label>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setHasInsurance(false)}
+                  className="flex-1 h-10 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: !hasInsurance ? 'rgba(0,229,168,0.15)' : 'rgba(255,255,255,0.04)', border: !hasInsurance ? '1px solid rgba(0,229,168,0.3)' : '1px solid rgba(255,255,255,0.06)', color: !hasInsurance ? '#00E5A8' : 'rgba(255,255,255,0.5)' }}>
+                  Cash
+                </button>
+                <button type="button" onClick={() => setHasInsurance(true)}
+                  className="flex-1 h-10 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: hasInsurance ? 'rgba(79,209,255,0.15)' : 'rgba(255,255,255,0.04)', border: hasInsurance ? '1px solid rgba(79,209,255,0.3)' : '1px solid rgba(255,255,255,0.06)', color: hasInsurance ? '#4FD1FF' : 'rgba(255,255,255,0.5)' }}>
+                  Insurance
+                </button>
+              </div>
+            </div>
+            {hasInsurance && (
+              <div>
+                <label style={labelColor} className={labelClass}>Insurance Company *</label>
+                <input value={form.insurance_company} onChange={e => update('insurance_company', e.target.value)}
+                  placeholder="اسم شركة التأمين" className={inputClass('insurance_company')} dir="auto" />
+                {errors.insurance_company && <p className="text-[11px] mt-1 text-red-400">{errors.insurance_company}</p>}
+              </div>
+            )}
           </div>
 
           {/* Footer */}
@@ -154,5 +192,6 @@ export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProp
         </form>
       </div>
     </div>
+    </Portal>
   );
 }

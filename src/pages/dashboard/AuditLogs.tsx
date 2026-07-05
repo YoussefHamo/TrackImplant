@@ -78,7 +78,7 @@ export default function AuditLogs() {
   const roleOptions = ['Admin', 'Manager', 'Doctor', 'Receptionist', 'Assistant'];
 
   return (
-    <div className="font-sans select-none space-y-6">
+    <div className="font-sans select-auto space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">{t('logs.title')}</h1>
@@ -210,6 +210,14 @@ export default function AuditLogs() {
                     {log.branch_id && <div>
                       <span className="font-semibold uppercase tracking-wider text-[10px] block mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Branch</span>
                       <span className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{log.branch_id}</span>
+                    </div>}
+                    {log.reason_category && <div>
+                      <span className="font-semibold uppercase tracking-wider text-[10px] block mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Reason Category</span>
+                      <span className="text-xs inline-flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(255,193,7,0.1)', color: '#FFC107' }}>{log.reason_category}</span>
+                    </div>}
+                    {log.change_reason && <div>
+                      <span className="font-semibold uppercase tracking-wider text-[10px] block mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Reason</span>
+                      <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>{log.change_reason}</p>
                     </div>}
                     {log.ip_address && <div>
                       <span className="font-semibold uppercase tracking-wider text-[10px] block mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>IP</span>

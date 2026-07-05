@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -27,13 +27,23 @@ export const Login = () => {
   const navigate = useNavigate();
   const { signIn } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('remembered_identifier'));
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<AuthForm>({
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<AuthForm>({
     resolver: zodResolver(authSchema)
   });
 
+  useEffect(() => {
+    const stored = localStorage.getItem('remembered_identifier');
+    if (stored) setValue('identifier', stored);
+  }, [setValue]);
+
   const onSubmit = async (data: AuthForm) => {
+    if (rememberMe) {
+      localStorage.setItem('remembered_identifier', data.identifier);
+    } else {
+      localStorage.removeItem('remembered_identifier');
+    }
     const { error } = await signIn(data.identifier, data.password);
     if (error) {
       toast.error(error);

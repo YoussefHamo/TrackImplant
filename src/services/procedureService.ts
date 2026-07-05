@@ -55,7 +55,7 @@ export const procedureService = {
     return data ? procedureFromRow(data) : null;
   },
 
-  async create(procedure: Omit<Procedure, 'id' | 'created_at'>, branchId?: string, kitItems?: ProcedureKitItem[]): Promise<Procedure> {
+  async create(procedure: Omit<Procedure, 'id' | 'created_at'>, branchId?: string, kitItems?: ProcedureKitItem[], change_reason?: string, reason_category?: string): Promise<Procedure> {
     // If using a kit, check ALL items first
     if (kitItems && kitItems.length > 0 && branchId) {
       const missingItems: string[] = [];
@@ -147,30 +147,18 @@ export const procedureService = {
         table_name: 'procedures',
         record_id: data.id,
         new_data: data as Record<string, unknown>,
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
       });
     }
 
     return procedureFromRow(data);
   },
 
-  async updateStatus(id: string, status: string): Promise<void> {
-    const { error } = await supabase.from('procedures').update({ status }).eq('id', id);
-    if (error) throw new Error(error.message);
-
-    const actor = await getCurrentUserInfo();
-    if (actor) {
-      auditLogService.log({
-        user_id: actor.user_id,
-        user_name: actor.user_name,
-        action: 'UPDATE',
-        table_name: 'procedures',
-        record_id: id,
-        new_data: { status },
-      });
-    }
-  },
-
-  async update(id: string, updates: Partial<Procedure>): Promise<void> {
+  async updateStatus(id: string, status: string, change_reason?: string, reason_category?: string): Promise<void> {
+    const updates: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+    if (change_reason !== undefined) updates.change_reason = change_reason;
+    if (reason_category !== undefined) updates.reason_category = reason_category;
     const { error } = await supabase.from('procedures').update(updates).eq('id', id);
     if (error) throw new Error(error.message);
 
@@ -182,12 +170,36 @@ export const procedureService = {
         action: 'UPDATE',
         table_name: 'procedures',
         record_id: id,
-        new_data: updates as Record<string, unknown>,
+        new_data: { status },
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
       });
     }
   },
 
-  async delete(id: string): Promise<void> {
+  async update(id: string, updates: Partial<Procedure>, change_reason?: string, reason_category?: string): Promise<void> {
+    const payload: Record<string, unknown> = { ...updates, updated_at: new Date().toISOString() };
+    if (change_reason !== undefined) payload.change_reason = change_reason;
+    if (reason_category !== undefined) payload.reason_category = reason_category;
+    const { error } = await supabase.from('procedures').update(payload).eq('id', id);
+    if (error) throw new Error(error.message);
+
+    const actor = await getCurrentUserInfo();
+    if (actor) {
+      auditLogService.log({
+        user_id: actor.user_id,
+        user_name: actor.user_name,
+        action: 'UPDATE',
+        table_name: 'procedures',
+        record_id: id,
+        new_data: updates as Record<string, unknown>,
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
+      });
+    }
+  },
+
+  async delete(id: string, change_reason?: string, reason_category?: string): Promise<void> {
     const { error } = await supabase.from('procedures').delete().eq('id', id);
     if (error) throw new Error(error.message);
 
@@ -199,6 +211,8 @@ export const procedureService = {
         action: 'DELETE',
         table_name: 'procedures',
         record_id: id,
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
       });
     }
   },

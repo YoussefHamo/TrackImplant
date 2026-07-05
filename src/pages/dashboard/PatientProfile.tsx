@@ -8,14 +8,21 @@ import { appointmentService } from '../../services/appointmentService';
 import { followUpService } from '../../services/followUpService';
 import { patientFileService, type DocumentCategory } from '../../services/patientFileService';
 import { communicationService } from '../../services/communicationService';
-import type { Patient, FinancialRecord, PatientFile, Communication } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import { implantFormService } from '../../services/implantFormService';
+import ImplantFormDialog from '../../components/implantForm/ImplantFormDialog';
+import ImplantFormViewer from '../../components/implantForm/ImplantFormViewer';
+import Copyable from '../../components/ui/Copyable';
+import type { Patient, FinancialRecord, PatientFile, Communication, ChangeReason, ImplantForm } from '../../types';
+import ReasonDialog from '../../components/ReasonDialog';
 import { toast } from 'sonner';
 import { useLanguage } from '../../context/LanguageContext';
+import FixedOverlay from '../../components/ui/FixedOverlay';
 import {
   ArrowLeft, Camera, Edit3, Save, X, Calendar, Phone, Mail, User, Activity,
   FileText, DollarSign, Clock, CreditCard, Plus,
   Upload, Download, Trash2, Image, File, Search,
-  AlertCircle, Check, Eye, Pill, AlertTriangle, Printer, ScrollText
+  AlertCircle, Check, Eye, Pill, AlertTriangle, Printer, ScrollText, Undo2
 } from 'lucide-react';
 
 /* ─── Constants ─── */
@@ -90,6 +97,7 @@ export default function PatientProfile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docUploadRef = useRef<HTMLInputElement>(null);
 
@@ -101,6 +109,19 @@ export default function PatientProfile() {
   const [showPayModal, setShowPayModal] = useState(false);
   const [payingInvoice, setPayingInvoice] = useState<FinancialRecord | null>(null);
   const [payAmount, setPayAmount] = useState('');
+
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundingInvoice, setRefundingInvoice] = useState<FinancialRecord | null>(null);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundType, setRefundType] = useState<'insurance' | 'cash'>('cash');
+  const [refundMethod, setRefundMethod] = useState('cash');
+
+  const [reasonDialog, setReasonDialog] = useState<{
+    open: boolean;
+    title: string;
+    onConfirm: (r: ChangeReason) => void;
+  }>({ open: false, title: '', onConfirm: () => {} });
+
   const [payMethod, setPayMethod] = useState('cash');
   const [showAddAppt, setShowAddAppt] = useState(false);
   const [apptForm, setApptForm] = useState({ appointment_date: '', status: 'scheduled' });
@@ -111,6 +132,10 @@ export default function PatientProfile() {
   const [editDocName, setEditDocName] = useState('');
   const [showStatement, setShowStatement] = useState(false);
   const [, setPrintInvoice] = useState<FinancialRecord | null>(null);
+  const [showImplantFormDialog, setShowImplantFormDialog] = useState(false);
+  const [showImplantFormViewer, setShowImplantFormViewer] = useState(false);
+  const [editingImplantForm, setEditingImplantForm] = useState<ImplantForm | null>(null);
+  const [viewingImplantForm, setViewingImplantForm] = useState<ImplantForm | null>(null);
 
   /* ── Queries ── */
   const { data: patient, isLoading: patientLoading } = useQuery({
@@ -138,6 +163,10 @@ export default function PatientProfile() {
 
   const { data: documents = [], isError: docsError, refetch: refetchDocs } = useQuery({
     queryKey: ['patient-documents', id], queryFn: () => patientFileService.getByPatient(id!), enabled: !!id,
+  });
+
+  const { data: implantForms = [] } = useQuery({
+    queryKey: ['patient-implant-forms', id], queryFn: () => implantFormService.getByPatient(id!), enabled: !!id,
   });
 
   const { data: communications = [] } = useQuery({
@@ -190,16 +219,23 @@ export default function PatientProfile() {
   });
 
   const createInvoiceMut = useMutation({
-    mutationFn: (data: { patient_name: string; invoice_name: string; total_amount: number; notes?: string }) =>
+    mutationFn: (data: { patient_name: string; invoice_name: string; total_amount: number; notes?: string; change_reason?: string; reason_category?: string }) =>
       financialRecordService.createInvoice({ patient_id: id!, ...data }),
     onSuccess: () => { toast.success(t('profile.toast_invoice_created')); invalFinancial(); setShowAddInvoice(false); setInvForm({ invoice_name: '', total_amount: '', notes: '' }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const addPayMut = useMutation({
-    mutationFn: (data: { invoice_id: string; patient_name: string; amount: number; payment_method?: string }) =>
-      financialRecordService.addPayment({ patient_id: id!, invoice_id: data.invoice_id, patient_name: data.patient_name, amount: data.amount, payment_method: data.payment_method as import('../../types').PaymentMethod | undefined }),
+    mutationFn: (data: { invoice_id: string; patient_name: string; amount: number; payment_method?: string; change_reason?: string; reason_category?: string }) =>
+      financialRecordService.addPayment({ patient_id: id!, invoice_id: data.invoice_id, patient_name: data.patient_name, amount: data.amount, payment_method: data.payment_method as import('../../types').PaymentMethod | undefined, change_reason: data.change_reason, reason_category: data.reason_category }),
     onSuccess: () => { toast.success(t('profile.toast_payment_recorded')); invalFinancial(); setShowPayModal(false); setPayingInvoice(null); setPayAmount(''); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const refundMut = useMutation({
+    mutationFn: (data: { invoice_id: string; amount: number; refund_type?: 'insurance' | 'cash'; payment_method?: string; change_reason?: string; reason_category?: string }) =>
+      financialRecordService.createRefund({ invoice_id: data.invoice_id, patient_id: id!, patient_name: patient?.full_name || '', amount: data.amount, refund_type: data.refund_type, payment_method: data.payment_method, change_reason: data.change_reason, reason_category: data.reason_category }),
+    onSuccess: () => { toast.success(t('profile.toast_refund_processed', 'Refund processed')); invalFinancial(); setShowRefundModal(false); setRefundingInvoice(null); setRefundAmount(''); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -215,6 +251,17 @@ export default function PatientProfile() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const deleteImplantFormMut = useMutation({
+    mutationFn: (formId: string) => implantFormService.delete(formId),
+    onSuccess: () => {
+      toast.success('Implant form deleted');
+      queryClient.invalidateQueries({ queryKey: ['patient-implant-forms', id] });
+      setShowImplantFormViewer(false);
+      setViewingImplantForm(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   /* ── Edit handlers ── */
   const startEditing = useCallback(() => {
     if (!patient) return;
@@ -224,7 +271,7 @@ export default function PatientProfile() {
       medical_history: patient.medical_history || '',
       chronic_disease: patient.chronic_disease || '', medication: patient.medication || '',
       allergies: patient.allergies || '', smoking_status: patient.smoking_status || '',
-
+      external_medical_code: patient.external_medical_code || '', insurance_company: patient.insurance_company || '',
     });
     setEditing(true);
   }, [patient]);
@@ -284,10 +331,19 @@ export default function PatientProfile() {
   };
 
   const filteredDocs = useMemo(() => {
-    if (!docSearch) return documents;
-    const q = docSearch.toLowerCase();
-    return documents.filter(d => d.file_name.toLowerCase().includes(q) || d.category.toLowerCase().includes(q));
-  }, [documents, docSearch]);
+    const fileItems = documents.map(d => ({ type: 'file' as const, data: d, date: d.created_at || '' }));
+    const formItems = implantForms.map(f => ({ type: 'form' as const, data: f, date: f.created_at || '' }));
+    let all = [...fileItems, ...formItems];
+    if (docSearch) {
+      const q = docSearch.toLowerCase();
+      all = all.filter(item => {
+        if (item.type === 'file') return (item.data as PatientFile).file_name.toLowerCase().includes(q) || (item.data as PatientFile).category.toLowerCase().includes(q);
+        const f = item.data as ImplantForm;
+        return f.implant_type.toLowerCase().includes(q) || f.tooth_number.toLowerCase().includes(q) || f.manufacturer.toLowerCase().includes(q);
+      });
+    }
+    return all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [documents, implantForms, docSearch]);
 
   /* ── Invoice / Payment handlers ── */
   const handleCreateInvoice = () => {
@@ -298,6 +354,19 @@ export default function PatientProfile() {
   const handlePay = () => {
     if (!payingInvoice || !payAmount || Number(payAmount) <= 0) { toast.error(t('profile.toast_amount_positive')); return; }
     addPayMut.mutate({ invoice_id: payingInvoice.id, patient_name: patient?.full_name || '', amount: Number(payAmount), payment_method: payMethod });
+  };
+
+  const handleRefund = () => {
+    if (!refundingInvoice || !refundAmount || Number(refundAmount) <= 0) { toast.error(t('profile.toast_amount_positive')); return; }
+    const amt = Number(refundAmount);
+    if (amt > Number(refundingInvoice.paid_so_far)) { toast.error('Refund amount exceeds paid amount'); return; }
+    setReasonDialog({
+      open: true,
+      title: refundType === 'insurance' ? 'Reason for Insurance Refund' : 'Reason for Cash Refund',
+      onConfirm: (r) => {
+        refundMut.mutate({ invoice_id: refundingInvoice.id, amount: amt, refund_type: refundType, payment_method: refundMethod, change_reason: r.reason, reason_category: r.category });
+      },
+    });
   };
 
   /* ── Print Receipt ── */
@@ -402,7 +471,7 @@ export default function PatientProfile() {
   if (!patient) return <div className="text-center py-16" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.patient_not_found')}</div>;
 
   return (
-    <div className="font-sans select-none space-y-6">
+    <div className="font-sans select-auto space-y-6">
       {/* ── Back Button ── */}
       <button onClick={() => navigate('/dashboard/patients')} className="flex items-center gap-2 text-xs font-medium transition-all hover:gap-3" style={{ color: '#4FD1FF' }}>
         <ArrowLeft className="w-4 h-4" /> {t('profile.back_to_patients')}
@@ -436,14 +505,20 @@ export default function PatientProfile() {
               <div>
                 <h1 className="text-xl font-bold text-white">{patient.full_name}</h1>
                 <div className="flex flex-wrap items-center gap-3 mt-1.5">
-                  <span className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}><Phone className="w-3 h-3" />{patient.phone || t('common.dash')}</span>
-                  {patient.email && <span className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}><Mail className="w-3 h-3" />{patient.email}</span>}
+                  <span className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}><Phone className="w-3 h-3" />{patient.phone ? <Copyable text={patient.phone}>{patient.phone}</Copyable> : t('common.dash')}</span>
+                  {patient.email && <span className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}><Mail className="w-3 h-3" />{patient.email ? <Copyable text={patient.email}>{patient.email}</Copyable> : patient.email}</span>}
                   {patient.gender && <span className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}><User className="w-3 h-3" />{patient.gender}</span>}
                   {patient.date_of_birth && <span className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}><Calendar className="w-3 h-3" />{new Date(patient.date_of_birth).toLocaleDateString()}</span>}
                 </div>
                 <div className="flex items-center gap-3 mt-2">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md" style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.3)' }}>{t('profile.id_prefix')} #{patient.id.slice(0, 8).toUpperCase()}</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md cursor-pointer" style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.3)' }}>
+                    <Copyable text={patient.id}>{t('profile.id_prefix')} #{patient.id.slice(0, 8).toUpperCase()}</Copyable>
+                  </span>
                   <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{t('profile.registered_prefix')} {patient.created_at ? new Date(patient.created_at).toLocaleDateString() : t('common.dash')}</span>
+                  {patient.external_medical_code && <span className="text-[10px] font-mono px-2 py-0.5 rounded-md" style={{ background: 'rgba(79,209,255,0.08)', color: '#4FD1FF' }}>
+                    <Copyable text={patient.external_medical_code}>{patient.external_medical_code}</Copyable>
+                  </span>}
+                  <span className="text-[10px] px-2 py-0.5 rounded-md" style={{ background: patient.insurance_company ? 'rgba(79,209,255,0.08)' : 'rgba(0,229,168,0.08)', color: patient.insurance_company ? '#4FD1FF' : '#00E5A8' }}>{patient.insurance_company || 'Cash'}</span>
                 </div>
               </div>
               <button onClick={editing ? handleSaveProfile : startEditing} disabled={updatePatientMut.isPending}
@@ -492,12 +567,14 @@ export default function PatientProfile() {
           {/* Quick Info */}
           <Section title={t('profile.patient_summary')}>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.name_label')}: </span><span className="text-white">{patient.full_name}</span></div>
-              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.phone_label')}: </span><span className="text-white">{patient.phone || t('common.dash')}</span></div>
-              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.email_label')}: </span><span className="text-white">{patient.email || t('common.dash')}</span></div>
+              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.name_label')}: </span><span className="text-white"><Copyable text={patient.full_name}>{patient.full_name}</Copyable></span></div>
+              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.phone_label')}: </span><span className="text-white">{patient.phone ? <Copyable text={patient.phone}>{patient.phone}</Copyable> : t('common.dash')}</span></div>
+              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.email_label')}: </span><span className="text-white">{patient.email ? <Copyable text={patient.email}>{patient.email}</Copyable> : t('common.dash')}</span></div>
               <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.gender_label')}: </span><span className="text-white">{patient.gender || t('common.dash')}</span></div>
               <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.dob_label')}: </span><span className="text-white">{patient.date_of_birth ? new Date(patient.date_of_birth).toLocaleDateString() : t('common.dash')}</span></div>
               {patient.smoking_status && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.smoking_label')}: </span><span className="text-white">{patient.smoking_status}</span></div>}
+              {patient.external_medical_code && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>External Code: </span><span className="text-[#4FD1FF] font-mono">{patient.external_medical_code}</span></div>}
+              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Payment: </span><span className="text-white" style={{ color: patient.insurance_company ? '#4FD1FF' : '#00E5A8' }}>{patient.insurance_company || 'Cash'}</span></div>
             </div>
           </Section>
 
@@ -575,6 +652,8 @@ export default function PatientProfile() {
                 { key: 'medication', label: 'edit_mode_medications' },
                 { key: 'allergies', label: 'edit_mode_allergies' },
                 { key: 'smoking_status', label: 'edit_mode_smoking' },
+                { key: 'external_medical_code', label: 'External Medical Code' },
+                { key: 'insurance_company', label: 'Insurance Company' },
               ].map(f => (
                 <div key={f.key} className={f.full ? 'col-span-2' : ''}>
                   <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.' + f.label)}</label>
@@ -714,6 +793,13 @@ export default function PatientProfile() {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h4 className="text-sm font-semibold text-white">{inv.invoice_name}</h4>
+                    {inv.branch_name && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }}>
+                          {inv.branch_name}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.total_label')}: ${Number(inv.total_amount).toLocaleString()}</span>
                       <span className="text-xs text-[#00E5A8]">{t('profile.paid_label')}: ${Number(inv.paid_so_far).toLocaleString()}</span>
@@ -732,6 +818,12 @@ export default function PatientProfile() {
                         <CreditCard className="w-3.5 h-3.5" />
                       </button>
                     )}
+                    {Number(inv.paid_so_far) > 0 && (
+                      <button onClick={() => { setRefundingInvoice(inv); setRefundAmount(''); setShowRefundModal(true); }}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}>
+                        <Undo2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
                 {/* Payment Timeline */}
@@ -739,17 +831,26 @@ export default function PatientProfile() {
                   <div className="mt-3 pt-3 border-t border-[rgba(255,255,255,0.04)]">
                     <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.25)' }}>{t('profile.payment_history')}</span>
                     <div className="mt-2 space-y-1.5">
-                      {invPayments.map(p => (
-                        <div key={p.id} className="flex items-center justify-between text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(0,229,168,0.03)', border: '1px solid rgba(0,229,168,0.06)' }}>
+                      {invPayments.map(p => {
+                        const isRefund = Number(p.amount) < 0;
+                        const refundTypeLabel = isRefund && p.notes?.startsWith('[Insurance Refund]') ? 'Insurance' : isRefund ? 'Cash' : null;
+                        return (
+                        <div key={p.id} className="flex items-center justify-between text-xs px-3 py-2 rounded-lg" style={{ background: isRefund ? 'rgba(239,68,68,0.03)' : 'rgba(0,229,168,0.03)', border: `1px solid ${isRefund ? 'rgba(239,68,68,0.06)' : 'rgba(0,229,168,0.06)'}` }}>
                           <div className="flex items-center gap-2">
-                            <span className="text-white font-medium">${Number(p.amount).toLocaleString()}</span>
+                            <span className={`font-medium ${isRefund ? 'text-[#ef4444]' : 'text-white'}`}>${isRefund ? '-' : ''}${Math.abs(Number(p.amount)).toLocaleString()}</span>
                             {p.payment_method && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>{t('profile.payment_method_' + p.payment_method) || p.payment_method.replace('_', ' ')}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: isRefund ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.06)', color: isRefund ? '#ef4444' : 'rgba(255,255,255,0.4)' }}>{t('profile.payment_method_' + p.payment_method) || p.payment_method.replace('_', ' ')}</span>
+                            )}
+                            {isRefund && refundTypeLabel && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: refundTypeLabel === 'Insurance' ? 'rgba(79,209,255,0.1)' : 'rgba(0,229,168,0.1)', color: refundTypeLabel === 'Insurance' ? '#4FD1FF' : '#00E5A8' }}>
+                                {refundTypeLabel}
+                              </span>
                             )}
                           </div>
                           <span style={{ color: 'rgba(255,255,255,0.35)' }}>{p.created_at ? new Date(p.created_at).toLocaleDateString() : t('common.dash')}</span>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -812,6 +913,11 @@ export default function PatientProfile() {
                   <Upload className="w-4 h-4" /> {uploadingDocs ? t('profile.documents_uploading') : t('profile.documents_upload')}
                 </button>
                 <input ref={docUploadRef} type="file" multiple className="hidden" onChange={handleDocUpload} />
+                <button onClick={() => { setEditingImplantForm(null); setShowImplantFormDialog(true); }}
+                  className="h-10 px-5 rounded-xl flex items-center gap-2 text-sm font-bold transition-all active:scale-[0.98]"
+                  style={{ background: 'rgba(124,92,255,0.1)', border: '1px solid rgba(124,92,255,0.15)', color: '#7C5CFF' }}>
+                  <FileText className="w-4 h-4" /> Implant Form
+                </button>
               </div>
               <div className="relative w-full md:w-48">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.25)' }} />
@@ -831,52 +937,81 @@ export default function PatientProfile() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {filteredDocs.map(doc => (
-                <div key={doc.id} className="rounded-[16px] p-4 transition-all hover:-translate-y-0.5 group" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  {/* Preview */}
-                  {doc.file_type.startsWith('image/') ? (
+              {filteredDocs.map(item => item.type === 'file' ? (
+                <div key={item.data.id} className="rounded-[16px] p-4 transition-all hover:-translate-y-0.5 group" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  {(item.data as PatientFile).file_type.startsWith('image/') ? (
                     <div className="w-full h-32 rounded-xl overflow-hidden mb-3 bg-[rgba(0,0,0,0.3)] flex items-center justify-center">
-                      <img src={doc.public_url} alt="" className="w-full h-full object-cover" />
+                      <img src={(item.data as PatientFile).public_url} alt="" className="w-full h-full object-cover" />
                     </div>
                   ) : (
                     <div className="w-full h-32 rounded-xl mb-3 flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                      {fileExtIcon(doc.file_type)}
+                      {fileExtIcon((item.data as PatientFile).file_type)}
                     </div>
                   )}
-                  {/* Info */}
-                  {editDocId === doc.id ? (
+                  {editDocId === item.data.id ? (
                     <div className="flex items-center gap-1">
                       <input value={editDocName} onChange={e => setEditDocName(e.target.value)} className="flex-1 h-7 px-2 rounded-lg text-xs outline-none bg-[rgba(255,255,255,0.06)] text-white" autoFocus />
-                      <button onClick={() => handleRenameDoc(doc.id)} className="w-6 h-6 rounded flex items-center justify-center" style={{ color: '#00E5A8' }}><Check className="w-3 h-3" /></button>
+                      <button onClick={() => handleRenameDoc(item.data.id)} className="w-6 h-6 rounded flex items-center justify-center" style={{ color: '#00E5A8' }}><Check className="w-3 h-3" /></button>
                       <button onClick={() => setEditDocId(null)} className="w-6 h-6 rounded flex items-center justify-center" style={{ color: '#FF6B6B' }}><X className="w-3 h-3" /></button>
                     </div>
                   ) : (
-                    <p className="text-xs font-medium text-white truncate">{doc.file_name}</p>
+                    <p className="text-xs font-medium text-white truncate">{(item.data as PatientFile).file_name}</p>
                   )}
                   <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(79,209,255,0.08)', color: '#4FD1FF' }}>{doc.category}</span>
-                    <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{doc.file_size ? t('profile.documents_file_size', { size: (doc.file_size / 1024).toFixed(0) }) : ''}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(79,209,255,0.08)', color: '#4FD1FF' }}>{(item.data as PatientFile).category}</span>
+                    <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{(item.data as PatientFile).file_size ? t('profile.documents_file_size', { size: ((item.data as PatientFile).file_size! / 1024).toFixed(0) }) : ''}</span>
                   </div>
-                  {/* Actions */}
                   <div className="flex items-center gap-1 mt-3 pt-2 border-t border-[rgba(255,255,255,0.04)]">
-                    {doc.public_url && (
-                      <a href={doc.public_url} target="_blank" rel="noopener noreferrer"
+                    {(item.data as PatientFile).public_url && (
+                      <a href={(item.data as PatientFile).public_url} target="_blank" rel="noopener noreferrer"
                         className="flex-1 h-7 rounded-lg flex items-center justify-center gap-1 text-[10px] font-medium transition-all"
                         style={{ background: 'rgba(79,209,255,0.08)', color: '#4FD1FF' }}>
                         <Eye className="w-3 h-3" /> {t('profile.documents_view')}
                       </a>
                     )}
-                    {doc.public_url && (
-                      <a href={doc.public_url} download={doc.file_name}
+                    {(item.data as PatientFile).public_url && (
+                      <a href={(item.data as PatientFile).public_url} download={(item.data as PatientFile).file_name}
                         className="w-7 h-7 rounded-lg flex items-center justify-center transition-all" style={{ color: 'rgba(255,255,255,0.3)' }}>
                         <Download className="w-3.5 h-3.5" />
                       </a>
                     )}
-                    <button onClick={() => { setEditDocId(doc.id); setEditDocName(doc.file_name); }}
+                    <button onClick={() => { setEditDocId(item.data.id); setEditDocName((item.data as PatientFile).file_name); }}
                       className="w-7 h-7 rounded-lg flex items-center justify-center transition-all" style={{ color: 'rgba(255,255,255,0.3)' }}>
                       <Edit3 className="w-3 h-3" />
                     </button>
-                    <button onClick={() => handleDeleteDoc(doc)}
+                    <button onClick={() => handleDeleteDoc(item.data)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-[rgba(255,107,107,0.1)]" style={{ color: '#FF6B6B' }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div key={item.data.id} className="rounded-[16px] p-4 transition-all hover:-translate-y-0.5 group" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(124,92,255,0.15)' }}>
+                  <div className="w-full h-32 rounded-xl mb-3 flex items-center justify-center" style={{ background: 'rgba(124,92,255,0.06)' }}>
+                    <FileText className="w-10 h-10" style={{ color: '#7C5CFF' }} />
+                  </div>
+                  <p className="text-xs font-medium text-white truncate">Implant Form — {(item.data as ImplantForm).tooth_number}</p>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                      style={{
+                        background: (item.data as ImplantForm).status === 'Completed' ? 'rgba(0,229,168,0.12)' : 'rgba(255,193,7,0.12)',
+                        color: (item.data as ImplantForm).status === 'Completed' ? '#00E5A8' : '#FFC107',
+                      }}>
+                      {(item.data as ImplantForm).status}
+                    </span>
+                    <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{(item.data as ImplantForm).implant_type}</span>
+                  </div>
+                  <div className="flex items-center gap-1 mt-3 pt-2 border-t border-[rgba(255,255,255,0.04)]">
+                    <button onClick={() => { setViewingImplantForm(item.data as ImplantForm); setShowImplantFormViewer(true); }}
+                      className="flex-1 h-7 rounded-lg flex items-center justify-center gap-1 text-[10px] font-medium transition-all"
+                      style={{ background: 'rgba(124,92,255,0.08)', color: '#7C5CFF' }}>
+                      <Eye className="w-3 h-3" /> View
+                    </button>
+                    <button onClick={() => { setEditingImplantForm(item.data as ImplantForm); setShowImplantFormDialog(true); }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all" style={{ color: '#4FD1FF' }}>
+                      <Edit3 className="w-3 h-3" />
+                    </button>
+                    <button onClick={() => deleteImplantFormMut.mutate(item.data.id)}
                       className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-[rgba(255,107,107,0.1)]" style={{ color: '#FF6B6B' }}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -997,8 +1132,7 @@ export default function PatientProfile() {
 
       {/* ─── Add Communication Modal ─── */}
       {showCommForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowCommForm(false); }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowCommForm(false)}>
           <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white">Record Communication</h2>
@@ -1038,15 +1172,14 @@ export default function PatientProfile() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ═══ MODALS ═══ */}
 
       {/* Add Invoice Modal */}
       {showAddInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowAddInvoice(false); }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowAddInvoice(false)}>
           <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white">{t('profile.modal_new_invoice')}</h2>
@@ -1075,13 +1208,12 @@ export default function PatientProfile() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* Record Payment Modal */}
       {showPayModal && payingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) { setShowPayModal(false); setPayingInvoice(null); } }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowPayModal(false); setPayingInvoice(null); }}>
           <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
               <div>
@@ -1119,13 +1251,69 @@ export default function PatientProfile() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
+      )}
+
+      {/* Refund Modal */}
+      {showRefundModal && refundingInvoice && (
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowRefundModal(false); setRefundingInvoice(null); setRefundAmount(''); }}>
+          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
+              <div>
+                <h2 className="text-lg font-bold text-white">Process Refund</h2>
+                <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{refundingInvoice.invoice_name}</p>
+              </div>
+              <button onClick={() => { setShowRefundModal(false); setRefundingInvoice(null); setRefundAmount(''); }} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Total: ${Number(refundingInvoice.total_amount).toLocaleString()}</span>
+                <span className="text-xs text-[#00E5A8]">Paid: ${Number(refundingInvoice.paid_so_far).toLocaleString()}</span>
+                <span className="text-xs text-[#ef4444]">Refundable: ${Number(refundingInvoice.paid_so_far).toLocaleString()}</span>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Refund Amount</label>
+                <input type="number" min="0" max={Number(refundingInvoice.paid_so_far)} step="0.01" value={refundAmount} onChange={e => setRefundAmount(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Refund Method</label>
+                <select value={refundMethod} onChange={e => setRefundMethod(e.target.value)} className={inputCls + ' cursor-pointer'}>
+                  <option value="cash" style={{ background: '#0D1B2A' }}>Cash</option>
+                  <option value="card" style={{ background: '#0D1B2A' }}>Card</option>
+                  <option value="bank_transfer" style={{ background: '#0D1B2A' }}>Bank Transfer</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Refund Type</label>
+                <div className="flex gap-2">
+                  <button onClick={() => setRefundType('cash')}
+                    className="flex-1 h-10 rounded-xl text-sm font-medium transition-all"
+                    style={{ background: refundType === 'cash' ? 'rgba(0,229,168,0.15)' : 'rgba(255,255,255,0.04)', border: refundType === 'cash' ? '1px solid rgba(0,229,168,0.3)' : '1px solid rgba(255,255,255,0.06)', color: refundType === 'cash' ? '#00E5A8' : 'rgba(255,255,255,0.5)' }}>
+                    Cash Refund
+                  </button>
+                  <button onClick={() => setRefundType('insurance')}
+                    className="flex-1 h-10 rounded-xl text-sm font-medium transition-all"
+                    style={{ background: refundType === 'insurance' ? 'rgba(79,209,255,0.15)' : 'rgba(255,255,255,0.04)', border: refundType === 'insurance' ? '1px solid rgba(79,209,255,0.3)' : '1px solid rgba(255,255,255,0.06)', color: refundType === 'insurance' ? '#4FD1FF' : 'rgba(255,255,255,0.5)' }}>
+                    Insurance Refund
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
+              <button onClick={() => { setShowRefundModal(false); setRefundingInvoice(null); setRefundAmount(''); }} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Cancel</button>
+              <button onClick={handleRefund} disabled={refundMut.isPending}
+                className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
+                style={{ background: '#ef4444', color: 'white' }}>
+                {refundMut.isPending ? 'Processing...' : 'Process Refund'}
+              </button>
+            </div>
+          </div>
+        </FixedOverlay>
       )}
 
       {/* Account Statement Modal */}
       {showStatement && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowStatement(false); }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowStatement(false)}>
           <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)] sticky top-0" style={{ background: 'rgba(13,24,40,0.98)' }}>
               <div>
@@ -1208,13 +1396,12 @@ export default function PatientProfile() {
               })()}
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* New Appointment Modal */}
       {showAddAppt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowAddAppt(false); }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowAddAppt(false)}>
           <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
               <h2 className="text-lg font-bold text-white">{t('profile.modal_new_appointment')}</h2>
@@ -1242,8 +1429,46 @@ export default function PatientProfile() {
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
+
+      {/* Implant Form Dialog */}
+      <ImplantFormDialog
+        open={showImplantFormDialog}
+        patient={patient}
+        editForm={editingImplantForm}
+        onClose={() => { setShowImplantFormDialog(false); setEditingImplantForm(null); }}
+        onSaved={() => { queryClient.invalidateQueries({ queryKey: ['patient-implant-forms', id] }); }}
+      />
+
+      {/* Implant Form Viewer */}
+      <ImplantFormViewer
+        open={showImplantFormViewer}
+        form={viewingImplantForm!}
+        patient={patient}
+        onClose={() => { setShowImplantFormViewer(false); setViewingImplantForm(null); }}
+        onEdit={() => {
+          setShowImplantFormViewer(false);
+          setEditingImplantForm(viewingImplantForm);
+          setShowImplantFormDialog(true);
+        }}
+        onDelete={() => {
+          if (viewingImplantForm) deleteImplantFormMut.mutate(viewingImplantForm.id);
+        }}
+        canEdit={user?.role === 'Admin' || user?.role === 'Doctor' || user?.role === 'Receptionist'}
+        canDelete={user?.role === 'Admin'}
+      />
+
+      <ReasonDialog
+        open={reasonDialog.open}
+        title={reasonDialog.title}
+        onConfirm={(r) => {
+          reasonDialog.onConfirm(r);
+          setReasonDialog(f => ({ ...f, open: false }));
+        }}
+        onCancel={() => setReasonDialog(f => ({ ...f, open: false }))}
+      />
+
     </div>
   );
 }

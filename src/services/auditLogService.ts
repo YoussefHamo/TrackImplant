@@ -18,6 +18,8 @@ function rowToLog(row: Record<string, unknown>): AuditLog {
     os: row.os as string | undefined,
     session_id: row.session_id as string | undefined,
     created_at: row.created_at as string | undefined,
+    reason_category: row.reason_category as string | null | undefined,
+    change_reason: row.change_reason as string | null | undefined,
   };
 }
 
@@ -112,6 +114,8 @@ export const auditLogService = {
     new_data?: Record<string, unknown> | null;
     role?: string;
     branch_id?: string;
+    reason_category?: string | null;
+    change_reason?: string | null;
   }): Promise<void> {
     const { user_agent, os } = getBrowserInfo();
     const { error } = await supabase.from('audit_logs').insert([{
@@ -128,6 +132,8 @@ export const auditLogService = {
       user_agent,
       os,
       session_id: null,
+      reason_category: entry.reason_category ?? null,
+      change_reason: entry.change_reason ?? null,
     }]);
     if (error) console.error('Audit log insert error:', error.message);
   },

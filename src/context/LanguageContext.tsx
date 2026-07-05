@@ -9,7 +9,7 @@ interface LanguageContextType {
   lang: Lang;
   dir: 'ltr' | 'rtl';
   setLang: (l: Lang) => void;
-  t: (key: string, vars?: Record<string, string | number>) => string;
+  t: (key: string, vars?: Record<string, string | number> | string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | null>(null);
@@ -52,12 +52,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLang = (l: Lang) => setLangState(l);
 
-  const t = (key: string, vars?: Record<string, string | number>): string => {
+  const t = (key: string, vars?: Record<string, string | number> | string): string => {
+    const defaultText = typeof vars === 'string' ? vars : undefined;
+    const interpolateVars = typeof vars === 'string' ? undefined : vars;
     const val = getNestedValue(translations[lang], key);
-    if (typeof val === 'string') return interpolate(val, vars);
+    if (typeof val === 'string') return interpolate(val, interpolateVars);
     const fallback = getNestedValue(translations.en, key);
-    if (typeof fallback === 'string') return interpolate(fallback, vars);
-    return key;
+    if (typeof fallback === 'string') return interpolate(fallback, interpolateVars);
+    return defaultText ?? key;
   };
 
   return (

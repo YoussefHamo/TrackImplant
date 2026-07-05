@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { Send, Check, XCircle, Ban, Truck, CheckCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import FixedOverlay from '../../components/ui/FixedOverlay';
 
 const inputCls = 'w-full h-10 px-3 rounded-xl text-sm outline-none bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500 transition-all';
 
@@ -44,7 +45,7 @@ export default function StockRequestsPage() {
   });
 
   return (
-    <div className="font-sans select-none space-y-5">
+    <div className="font-sans select-auto space-y-5">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">{t('requests.title')}</h1>
@@ -135,9 +136,7 @@ export default function StockRequestsPage() {
 
       {/* Create modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) { setShowCreate(false); } }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowCreate(false)}>
           <div className="w-full max-w-sm rounded-[24px] p-6" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <h3 className="text-lg font-bold text-white mb-4">{t('requests.modal_title')}</h3>
             <div className="space-y-3">
@@ -165,7 +164,7 @@ export default function StockRequestsPage() {
                 style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>{t('requests.modal_submit')}</button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
     </div>
   );

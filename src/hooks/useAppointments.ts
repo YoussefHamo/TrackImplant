@@ -5,19 +5,34 @@ import type { Appointment } from '../types';
 export function useAppointments() {
   const queryClient = useQueryClient();
 
-  // 1. جلب البيانات تلقائياً مع ميزة الـ Caching الكامل تحت مفتاح 'appointments'
   const { data: appointments = [], isLoading: loading, error } = useQuery<Appointment[]>({
     queryKey: ['appointments'],
     queryFn: () => appointmentService.getAll()
   });
 
-  // 2. الـ Mutation الخاص بالإرسال مع ميزة الـ Cache Invalidation (تحديث الكاش فوراً)
   const createMutation = useMutation({
-    mutationFn: appointmentService.create,
+    mutationFn: (appointmentOrReason?: Omit<Appointment, 'id'> | { change_reason?: string; reason_category?: string }) => {
+      if (typeof appointmentOrReason === 'object' && 'change_reason' in appointmentOrReason) {
+        // Check if it's reason info
+        return appointmentService.create(
+          { patient_id: (appointmentOrReason as any).patient_id || undefined,
+            appointment_date: (appointmentOrReason as any).appointment_date
+              ? (appointmentOrReason as any).appointment_date
+              : new Date().toISOString(),
+            status: 'scheduled',
+          },
+          (appointmentOrReason as any).change_reason,
+          (appointmentOrReason as any).reason_category,
+        );
+      } else {
+        // Check if it's an appointment
+        return appointmentService.create(appointmentOrReason as Omit<Appointment, 'id'>);
+      }
+    },
     onSuccess: () => {
-      // ⚡ السحر هنا: بنقول للسيستم إن الكاش القديم انتهت صلاحيته، فيعيد الجلب في الخلفية فوراً بدون ريفريش!
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
+    onError: (err: Error) => console.error('Appointment creation error:', err.message),
   });
 
   const addAppointment = async (newApp: Omit<Appointment, 'id'>) => {
@@ -29,6 +44,6 @@ export function useAppointments() {
     loading,
     error: error ? (error as Error).message : null,
     addAppointment,
-    isSubmitting: createMutation.isPending // شغال حالياً في الإرسال للـ Database
+    isSubmitting: createMutation.isPending
   };
 }

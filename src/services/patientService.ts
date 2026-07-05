@@ -21,6 +21,8 @@ function patientFromRow(row: Record<string, unknown>): Patient {
     medication: row.medication as string | undefined,
     allergies: row.allergies as string | undefined,
     smoking_status: row.smoking_status as string | undefined,
+    external_medical_code: row.external_medical_code as string | undefined,
+    insurance_company: row.insurance_company as string | undefined,
     created_by: row.created_by as string | undefined,
     created_at: row.created_at as string | undefined,
     branch_id: row.branch_id as string | undefined,
@@ -30,38 +32,48 @@ function patientFromRow(row: Record<string, unknown>): Patient {
 const BUCKET = STORAGE_BUCKETS.PATIENT_PROFILES;
 
 export const patientService = {
-  async getAll(branchId?: string | null): Promise<Patient[]> {
-    let q = supabase.from('patients').select('*').order('created_at', { ascending: false });
-    if (branchId) q = q.eq('branch_id', branchId);
-    const { data, error } = await q;
+  async getAll(): Promise<Patient[]> {
+    const { data, error } = await supabase.from('patients').select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id').order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return (data || []).map(patientFromRow);
   },
 
   async getById(id: string): Promise<Patient | null> {
-    const { data, error } = await supabase.from('patients').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('patients').select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id').eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? patientFromRow(data) : null;
   },
 
-  async search(query: string, branchId?: string | null): Promise<Patient[]> {
-    let q = supabase
+  async search(query: string): Promise<Patient[]> {
+    const q = query.trim();
+    const { data, error } = await supabase
       .from('patients')
-      .select('*')
-      .or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`)
+      .select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id')
+      .or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,external_medical_code.ilike.%${q}%`)
       .limit(20);
-    if (branchId) q = q.eq('branch_id', branchId);
-    const { data, error } = await q;
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error('patientService.search error:', error);
+      throw new Error(error.message);
+    }
     return (data || []).map(patientFromRow);
   },
 
   async create(patient: Omit<Patient, 'id' | 'created_at'>): Promise<Patient> {
+    if (patient.external_medical_code) {
+      const { data: existing } = await supabase
+        .from('patients')
+        .select('id, full_name, external_medical_code')
+        .eq('external_medical_code', patient.external_medical_code)
+        .maybeSingle();
+      if (existing) throw new Error(`External code "${patient.external_medical_code}" already belongs to patient ${existing.full_name}`);
+    }
     const { data, error } = await supabase.from('patients').insert([{
       full_name: patient.full_name,
       phone: patient.phone,
       medical_history: patient.medical_history,
-    }]).select().single();
+      external_medical_code: patient.external_medical_code,
+      insurance_company: patient.insurance_company,
+    }]).select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id').single();
     if (error) throw new Error(error.message);
 
     const actor = await getCurrentUserInfo();
@@ -127,14 +139,10 @@ export const patientService = {
     return publicUrl;
   },
 
-  async getStats(branchId?: string | null): Promise<{ total: number; newThisMonth: number }> {
-    let totalQ = supabase.from('patients').select('*', { count: 'exact', head: true });
-    if (branchId) totalQ = totalQ.eq('branch_id', branchId);
-    const { count: total } = await totalQ;
+  async getStats(): Promise<{ total: number; newThisMonth: number }> {
+    const { count: total } = await supabase.from('patients').select('*', { count: 'exact', head: true });
     const firstOfMonth = new Date(); firstOfMonth.setDate(1); firstOfMonth.setHours(0,0,0,0);
-    let monthQ = supabase.from('patients').select('*', { count: 'exact', head: true }).gte('created_at', firstOfMonth.toISOString());
-    if (branchId) monthQ = monthQ.eq('branch_id', branchId);
-    const { count: newThisMonth } = await monthQ;
+    const { count: newThisMonth } = await supabase.from('patients').select('*', { count: 'exact', head: true }).gte('created_at', firstOfMonth.toISOString());
     return { total: total || 0, newThisMonth: newThisMonth || 0 };
   },
 };

@@ -14,10 +14,13 @@ export const appointmentService = {
     return data || [];
   },
 
-  async create(appointment: Omit<Appointment, 'id'>): Promise<void> {
+  async create(appointment: Omit<Appointment, 'id'>, change_reason?: string, reason_category?: string): Promise<void> {
+    const payload = { ...appointment };
+    if (change_reason !== undefined) (payload as Record<string, unknown>).change_reason = change_reason;
+    if (reason_category !== undefined) (payload as Record<string, unknown>).reason_category = reason_category;
     const { data, error } = await supabase
       .from('appointments')
-      .insert([appointment])
+      .insert([payload])
       .select()
       .single();
 
@@ -32,14 +35,19 @@ export const appointmentService = {
         table_name: 'appointments',
         record_id: data.id,
         new_data: data as Record<string, unknown>,
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
       });
     }
   },
 
-  async updateStatus(id: string, status: string): Promise<void> {
+  async updateStatus(id: string, status: string, change_reason?: string, reason_category?: string): Promise<void> {
+    const updates: Record<string, unknown> = { status };
+    if (change_reason !== undefined) updates.change_reason = change_reason;
+    if (reason_category !== undefined) updates.reason_category = reason_category;
     const { error } = await supabase
       .from('appointments')
-      .update({ status })
+      .update(updates)
       .eq('id', id);
 
     if (error) throw new Error(error.message);
@@ -53,6 +61,8 @@ export const appointmentService = {
         table_name: 'appointments',
         record_id: id,
         new_data: { status },
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
       });
     }
   },

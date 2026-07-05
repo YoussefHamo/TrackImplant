@@ -112,6 +112,8 @@ export const deliveryService = {
     reason: string;
     notes?: string;
     branch_id?: string;
+    change_reason?: string;
+    reason_category?: string;
   }): Promise<InventoryReturn> {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: inserted, error } = await supabase
@@ -127,6 +129,8 @@ export const deliveryService = {
         branch_id: ret.branch_id || ret.from_branch_id || null,
         created_by: user?.id,
         status: 'pending',
+        change_reason: ret.change_reason || null,
+        reason_category: ret.reason_category || null,
       }])
       .select()
       .single();
@@ -134,11 +138,14 @@ export const deliveryService = {
     return returnFromRow(inserted as Record<string, unknown>);
   },
 
-  async updateReturnStatus(id: string, status: 'approved' | 'rejected'): Promise<void> {
+  async updateReturnStatus(id: string, status: 'approved' | 'rejected', change_reason?: string, reason_category?: string): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
+    const updates: Record<string, unknown> = { status, reviewed_by: user?.id, reviewed_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    if (change_reason !== undefined) updates.change_reason = change_reason;
+    if (reason_category !== undefined) updates.reason_category = reason_category;
     const { error } = await supabase
       .from('inventory_returns')
-      .update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', id);
     if (error) throw new Error(error.message);
   },

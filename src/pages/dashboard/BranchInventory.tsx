@@ -38,7 +38,7 @@ export default function BranchInventory() {
   }, [branchInventory, selectedBranch, search]);
 
   return (
-    <div className="font-sans select-none space-y-5">
+    <div className="font-sans select-auto space-y-5">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">{t('branches.title')}</h1>

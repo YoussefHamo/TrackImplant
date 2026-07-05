@@ -98,8 +98,8 @@ export default function Appointments() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) =>
-      appointmentService.updateStatus(id, 'cancelled'),
+    mutationFn: ({ id, change_reason, reason_category }: { id: string; change_reason?: string; reason_category?: string }) =>
+      appointmentService.updateStatus(id, 'cancelled', change_reason, reason_category),
     onSuccess: () => {
       toast.success(t('appointments.toast_cancelled'));
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
@@ -114,7 +114,7 @@ export default function Appointments() {
   };
 
   return (
-    <div className="font-sans select-none">
+    <div className="font-sans select-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
@@ -190,7 +190,7 @@ export default function Appointments() {
                           className="group/event flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-[4px] truncate leading-tight"
                           style={{ background: s.bg, color: s.text, boxShadow: `0 0 6px ${s.glow}` }}>
                           <span className="flex-1 truncate">{ev.label}</span>
-                          <button onClick={(e) => { e.stopPropagation(); cancelMutation.mutate(ev.id); }}
+                          <button onClick={(e) => { e.stopPropagation(); cancelMutation.mutate({ id: ev.id }); }}
                             className="hidden group-hover/event:block text-[#ef4444] hover:text-red-300 transition-colors flex-shrink-0">
                             <Trash2 className="w-2.5 h-2.5" />
                           </button>

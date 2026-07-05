@@ -385,7 +385,7 @@ export const implantInventoryService = {
   },
 
   // ── Stock Adjustments ──
-  async adjustImplantStock(id: string, quantityChange: number, notes?: string): Promise<void> {
+  async adjustImplantStock(id: string, quantityChange: number, notes?: string, change_reason?: string, reason_category?: string): Promise<void> {
     const { data: item } = await supabase.from('implant_inventory').select('*').eq('id', id).single();
     if (!item) throw new Error('Implant not found');
     const newQty = (item.quantity as number) + quantityChange;
@@ -410,11 +410,13 @@ export const implantInventoryService = {
         table_name: 'implant_inventory',
         record_id: id,
         new_data: { quantity: newQty, change: quantityChange, notes },
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
       });
     }
   },
 
-  async adjustAbutmentStock(id: string, quantityChange: number, notes?: string): Promise<void> {
+  async adjustAbutmentStock(id: string, quantityChange: number, notes?: string, change_reason?: string, reason_category?: string): Promise<void> {
     const { data: item } = await supabase.from('abutment_inventory').select('*').eq('id', id).single();
     if (!item) throw new Error('Abutment not found');
     const newQty = (item.quantity as number) + quantityChange;
@@ -439,6 +441,8 @@ export const implantInventoryService = {
         table_name: 'abutment_inventory',
         record_id: id,
         new_data: { quantity: newQty, change: quantityChange, notes },
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
       });
     }
   },
@@ -503,6 +507,8 @@ export const implantInventoryService = {
     patient_id?: string;
     procedure_id?: string;
     notes?: string;
+    change_reason?: string;
+    reason_category?: string;
   }): Promise<void> {
     if (quantity <= 0) throw new Error('Quantity must be positive');
     const { data: item, error: fetchErr } = await supabase
@@ -605,6 +611,8 @@ export const implantInventoryService = {
 
   async returnStock(id: string, quantity: number, opts?: {
     notes?: string;
+    change_reason?: string;
+    reason_category?: string;
   }): Promise<void> {
     if (quantity <= 0) throw new Error('Quantity must be positive');
     const { data: item, error: fetchErr } = await supabase
@@ -634,7 +642,7 @@ export const implantInventoryService = {
     });
   },
 
-  async adjustStock(id: string, quantityChange: number, notes?: string): Promise<void> {
+  async adjustStock(id: string, quantityChange: number, notes?: string, change_reason?: string, reason_category?: string): Promise<void> {
     const { data: item, error: fetchErr } = await supabase
       .from('inventory_items')
       .select('*')
@@ -658,7 +666,23 @@ export const implantInventoryService = {
       item_category: item.category as string,
       item_name: getItemDisplayName(item),
       notes: notes || undefined,
+      change_reason: change_reason || null,
+      reason_category: reason_category || null,
     });
+
+    const actorAdjust = await getCurrentUserInfo();
+    if (actorAdjust) {
+      auditLogService.log({
+        user_id: actorAdjust.user_id,
+        user_name: actorAdjust.user_name,
+        action: 'INVENTORY_CHANGE',
+        table_name: 'inventory_items',
+        record_id: id,
+        new_data: { quantity: (item.quantity as number) + quantityChange, change: quantityChange, notes },
+        reason_category: reason_category || null,
+        change_reason: change_reason || null,
+      });
+    }
   },
 
   async addStockToBranch(params: {
@@ -671,6 +695,8 @@ export const implantInventoryService = {
     branch_id: string;
     quantity: number;
     notes?: string;
+    change_reason?: string;
+    reason_category?: string;
   }): Promise<void> {
     // Find existing item for this branch + product variant
     let query = supabase

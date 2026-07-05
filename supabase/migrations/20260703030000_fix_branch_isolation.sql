@@ -40,13 +40,20 @@ do $$ begin
 
   -- appointments
   drop policy if exists "Appointments select" on public.appointments;
+  drop policy if exists "Appointments insert" on public.appointments;
+  drop policy if exists "Appointments update" on public.appointments;
+  drop policy if exists "Appointments delete" on public.appointments;
   drop policy if exists "Authenticated users can manage appointments" on public.appointments;
 
   -- financial_records
   drop policy if exists "FinancialRecords select" on public.financial_records;
+  drop policy if exists "FinancialRecords insert" on public.financial_records;
+  drop policy if exists "FinancialRecords update" on public.financial_records;
 
   -- follow_ups
   drop policy if exists "FollowUps select" on public.follow_ups;
+  drop policy if exists "FollowUps insert" on public.follow_ups;
+  drop policy if exists "FollowUps update" on public.follow_ups;
 
   -- stock_requests
   drop policy if exists "StockRequests select" on public.stock_requests;
@@ -70,6 +77,10 @@ do $$ begin
   drop policy if exists "Authenticated users can insert patient_files" on public.patient_files;
   drop policy if exists "Authenticated users can update patient_files" on public.patient_files;
   drop policy if exists "Authenticated users can delete patient_files" on public.patient_files;
+  drop policy if exists "patient_files_select" on public.patient_files;
+  drop policy if exists "patient_files_insert" on public.patient_files;
+  drop policy if exists "patient_files_update" on public.patient_files;
+  drop policy if exists "patient_files_delete" on public.patient_files;
 
   -- patient_reminders
   drop policy if exists "reminders_select" on public.patient_reminders;
@@ -244,116 +255,4 @@ create policy "InventoryTransactions select" on public.inventory_transactions fo
     )
   );
 
--- ── 3. Fix SECURITY DEFINER RPCs: add role checks ──
-
--- get_branch_inventory_items: only allow if user belongs to that branch or is Admin
-create or replace function public.get_branch_inventory_items(p_branch_id uuid)
-returns table(
-  id uuid, branch_id uuid, category text, subcategory text, name text,
-  brand text, size text, unit text, quantity numeric, reserved numeric,
-  used numeric, minimum_stock numeric, created_at timestamptz, updated_at timestamptz
-)
-language sql
-security definer
-set search_path = public
-as $$
-  select * from public.inventory_items
-  where branch_id = p_branch_id
-    and (
-      get_current_user_role() = 'Admin'
-      or p_branch_id = (select branch_id from public.users where auth_user_id = auth.uid())
-    );
-$$;
-
--- get_requestable_items: restrict to Admin or the caller's own branch
-create or replace function public.get_requestable_items(
-  p_exclude_branch_id uuid default null,
-  p_category text default null
-)
-returns table(
-  id uuid, branch_id uuid, category text, subcategory text, name text,
-  brand text, size text, unit text, quantity numeric
-)
-language sql
-security definer
-set search_path = public
-as $$
-  select iv.id, iv.branch_id, iv.category, iv.subcategory, iv.name,
-         iv.brand, iv.size, iv.unit, iv.quantity
-  from public.inventory_items iv
-  where iv.quantity > 0
-    and (p_exclude_branch_id is null or iv.branch_id != p_exclude_branch_id)
-    and (p_category is null or iv.category = p_category)
-    and (
-      get_current_user_role() = 'Admin'
-      or iv.branch_id = (select branch_id from public.users where auth_user_id = auth.uid())
-    );
-$$;
-
--- find_best_source_branch: restrict to Admin or the caller's own context
-create or replace function public.find_best_source_branch(
-  p_lookup_key text,
-  p_category text,
-  p_exclude_branch_id uuid default null
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_branch_id uuid;
-begin
-  if get_current_user_role() != 'Admin' then
-    raise exception 'Only admins can auto-select source branch';
-  end if;
-  select iv.branch_id into v_branch_id
-  from public.inventory_items iv
-  where iv.quantity > 0
-    and (p_exclude_branch_id is null or iv.branch_id != p_exclude_branch_id)
-    and (iv.name = p_lookup_key or iv.brand = p_lookup_key or iv.size = p_lookup_key)
-    and iv.category = p_category
-  order by iv.quantity desc
-  limit 1;
-  return v_branch_id;
-end;
-$$;
-
--- get_aggregated_inventory: add role/branch check
-create or replace function public.get_aggregated_inventory(
-  p_category text default null,
-  p_branch_id uuid default null
-)
-returns table(
-  id uuid, branch_id uuid, category text, subcategory text, name text,
-  brand text, size text, unit text, quantity numeric, reserved numeric,
-  used numeric, minimum_stock numeric, created_at timestamptz, updated_at timestamptz
-)
-language sql
-security definer
-set search_path = public
-as $$
-  select * from public.v_inventory_all
-  where (p_category is null or category = p_category)
-    and (
-      p_branch_id is not null
-      or get_current_user_role() = 'Admin'
-      or branch_id = (select branch_id from public.users where auth_user_id = auth.uid())
-    )
-    and (p_branch_id is null or branch_id = p_branch_id);
-$$;
-
--- confirm_auth_user: restrict to Admin only
-create or replace function public.confirm_auth_user(target_user_id uuid)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if get_current_user_role() != 'Admin' then
-    raise exception 'Only admins can confirm users';
-  end if;
-  update auth.users set email_confirmed_at = now() where id = target_user_id;
-end;
-$$;
+-- ── 3. RPC role fixes moved to 20260704000000_fix_spec_violations.sql ──

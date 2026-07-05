@@ -1,4 +1,32 @@
 export type UserRole = 'Manager' | 'Admin' | 'Doctor' | 'Assistant' | 'Receptionist';
+export type ReasonCategory =
+  | 'Billing Correction'
+  | 'Wrong Amount'
+  | 'Duplicate Invoice'
+  | 'Payment Adjustment'
+  | 'Refund Correction'
+  | 'Insurance Adjustment'
+  | 'Damaged Item'
+  | 'Expired Item'
+  | 'Stock Count Difference'
+  | 'Transfer Correction'
+  | 'Supplier Error'
+  | 'Manual Adjustment'
+  | 'Treatment Plan Updated'
+  | 'Clinical Correction'
+  | 'Wrong Patient Selection'
+  | 'Data Entry Error'
+  | 'User Request'
+  | 'Manager Decision'
+  | 'Administrative Correction'
+  | 'Other';
+
+export interface ChangeReason {
+  category: ReasonCategory;
+  reason: string;
+  approved_by?: string;
+  approval_notes?: string;
+}
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 export type PaymentStatus = 'Pending' | 'Partial' | 'Paid';
 export type PaymentMethod = 'cash' | 'card' | 'insurance' | 'bank_transfer';
@@ -45,6 +73,8 @@ export interface Patient {
   medication?: string;
   allergies?: string;
   smoking_status?: string;
+  external_medical_code?: string;
+  insurance_company?: string;
   created_at?: string;
   created_by?: string;
   branch_id?: string;
@@ -87,6 +117,10 @@ export interface FinancialRecord {
   payment_method?: PaymentMethod;
   notes?: string;
   created_at?: string;
+  branch_id?: string | null;
+  branch_name?: string | null;
+  change_reason?: string | null;
+  reason_category?: string | null;
 }
 
 export interface Procedure {
@@ -115,6 +149,8 @@ export interface Procedure {
   kit_id?: string;
   kit_snapshot?: Record<string, unknown>;
   created_at?: string;
+  change_reason?: string | null;
+  reason_category?: string | null;
 }
 
 export interface FollowUp {
@@ -166,6 +202,8 @@ export interface AuditLog {
   os?: string;
   session_id?: string;
   created_at?: string;
+  reason_category?: string | null;
+  change_reason?: string | null;
 }
 
 export interface ImplantInventory {
@@ -207,6 +245,8 @@ export interface InventoryTransaction {
   notes?: string;
   created_by?: string;
   created_at?: string;
+  change_reason?: string | null;
+  reason_category?: string | null;
 }
 
 export interface InventoryItem {
@@ -266,15 +306,53 @@ export interface CrossBranchRequest {
   delivery_status?: CrossBranchDeliveryStatus;
 }
 
+export interface ImplantFormAttachment {
+  id: string;
+  name: string;
+  type: string;
+  storage_path: string;
+  public_url: string;
+  file_size: number;
+}
+
+export interface ImplantFormDoctor {
+  id: string;
+  name: string;
+}
+
+export interface ImplantForm {
+  id: string;
+  patient_id: string;
+  implant_type: string;
+  manufacturer: string;
+  diameter: string;
+  length?: string;
+  quantity: number;
+  tooth_number: string;
+  batch_number?: string;
+  serial_number?: string;
+  warranty_number?: string;
+  doctors: ImplantFormDoctor[];
+  attachments: ImplantFormAttachment[];
+  notes?: string;
+  branch_id?: string;
+  status: 'Draft' | 'Completed';
+  created_by?: string;
+  updated_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface RequestableItem {
-  lookup_key: string;
+  id: string;
+  branch_id: string;
   category: string;
   subcategory?: string;
   name?: string;
   brand?: string;
   size?: string;
   unit: string;
-  total_quantity: number;
+  quantity: number;
 }
 
 export interface CrossBranchDelivery {

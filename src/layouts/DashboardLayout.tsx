@@ -126,7 +126,7 @@ export default function DashboardLayout() {
   return (
     <div className="min-h-screen flex" style={{ background: 'var(--app-bg)' }}>
       {/* Background tech grid + glow */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 'var(--z-base)' }}>
         <div className="absolute inset-0 opacity-[0.03]" style={{
           backgroundImage: 'linear-gradient(rgba(79,209,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(79,209,255,0.3) 1px, transparent 1px)',
           backgroundSize: '60px 60px',
@@ -135,7 +135,7 @@ export default function DashboardLayout() {
       </div>
 
       {/* ================= SIDEBAR ================= */}
-      <aside className="relative z-10 w-[240px] flex flex-col flex-shrink-0" style={{ borderRight: '1px solid var(--app-border)', background: 'var(--app-sidebar-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+      <aside className="relative w-[240px] flex flex-col flex-shrink-0" style={{ zIndex: 'var(--z-sidebar)', borderRight: '1px solid var(--app-border)', background: 'var(--app-sidebar-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
         
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-6 border-b border-[rgba(255,255,255,0.04)]">
@@ -227,10 +227,10 @@ export default function DashboardLayout() {
       </aside>
 
       {/* ================= MAIN AREA ================= */}
-      <div className="relative z-10 flex-1 flex flex-col min-w-0">
+      <div className="relative flex-1 flex flex-col min-w-0" style={{ zIndex: 'var(--z-content)' }}>
 
         {/* Top Navbar */}
-        <header className="h-16 flex items-center gap-4 px-6" style={{ borderBottom: '1px solid var(--app-border)', background: 'var(--app-header-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+        <header className="h-16 flex items-center gap-4 px-6" style={{ position: 'relative', zIndex: 'var(--z-header)', borderBottom: '1px solid var(--app-border)', background: 'var(--app-header-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
           
           {/* Search Bar with suggestions */}
           <div ref={searchRef} className="flex-1 max-w-lg relative">
@@ -257,8 +257,9 @@ export default function DashboardLayout() {
 
             {/* Search Results Dropdown */}
             {showResults && (
-              <div className="absolute top-full left-0 right-0 mt-2 rounded-xl overflow-hidden z-50"
+              <div className="absolute top-full left-0 right-0 mt-2 rounded-xl overflow-hidden"
                 style={{
+                  zIndex: 'var(--z-dropdown)',
                   background: 'rgba(8,15,25,0.98)',
                   border: '1px solid rgba(255,255,255,0.08)',
                   boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
@@ -317,8 +318,9 @@ export default function DashboardLayout() {
 
               {/* Dropdown */}
               {notifOpen && (
-                <div className="absolute top-full right-0 mt-2 w-[380px] rounded-2xl overflow-hidden z-50"
+                <div className="absolute top-full right-0 mt-2 w-[380px] rounded-2xl overflow-hidden"
                   style={{
+                    zIndex: 'var(--z-notification)',
                     background: 'rgba(10,20,35,0.98)',
                     border: '1px solid rgba(255,255,255,0.08)',
                     boxShadow: '0 16px 48px rgba(0,0,0,0.5)',

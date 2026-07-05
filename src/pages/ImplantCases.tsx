@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import type { Procedure } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import FixedOverlay from '../components/ui/FixedOverlay';
 
 const statusStyles: Record<string, { bg: string; text: string; dot: string }> = {
   'Consultation': { bg: 'rgba(79,209,255,0.12)', text: '#4FD1FF', dot: '#4FD1FF' },
@@ -104,7 +105,6 @@ export function ImplantCases() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [editProcId, setEditProcId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-
   const selectedId = searchParams.get('id') || '';
 
   const { data: procedures = [], isLoading } = useQuery({
@@ -171,13 +171,15 @@ export function ImplantCases() {
   };
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => procedureService.updateStatus(id, status),
+    mutationFn: ({ id, status, change_reason, reason_category }: { id: string; status: string; change_reason?: string; reason_category?: string }) =>
+      procedureService.updateStatus(id, status, change_reason, reason_category),
     onSuccess: () => { toast.success(t('cases.toast_status_updated')); invalidateAll(); },
     onError: (err: Error) => toast.error(err.message),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: Omit<Procedure, 'id' | 'created_at'>) => procedureService.create(data, userBranchId),
+    mutationFn: ({ data, change_reason, reason_category }: { data: Omit<Procedure, 'id' | 'created_at'>; change_reason?: string; reason_category?: string }) =>
+      procedureService.create(data, userBranchId, undefined, change_reason, reason_category),
     onSuccess: () => {
       toast.success(t('cases.toast_case_created'));
       invalidateAll();
@@ -187,7 +189,8 @@ export function ImplantCases() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Procedure> }) => procedureService.update(id, data),
+    mutationFn: ({ id, data, change_reason, reason_category }: { id: string; data: Partial<Procedure>; change_reason?: string; reason_category?: string }) =>
+      procedureService.update(id, data, change_reason, reason_category),
     onSuccess: () => {
       toast.success(t('cases.toast_procedure_updated'));
       invalidateAll();
@@ -197,7 +200,8 @@ export function ImplantCases() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => procedureService.delete(id),
+    mutationFn: ({ id, change_reason, reason_category }: { id: string; change_reason?: string; reason_category?: string }) =>
+      procedureService.delete(id, change_reason, reason_category),
     onSuccess: () => {
       toast.success(t('cases.toast_procedure_deleted'));
       invalidateAll();
@@ -269,27 +273,9 @@ export function ImplantCases() {
     setShowWizard(true);
   };
 
-  const handleSave = () => {
-    if (!validateStep(1) || !validateStep(2) || !validateStep(3)) return;
+  const doSave = (reason?: { reason: string; category: string }) => {
     const patient = patients.find(p => p.id === form.patient_id);
     if (!patient) { toast.error(t('cases.toast_patient_not_found')); return; }
-
-    if (form.implant_brand && form.implant_size) {
-      const invItem = implants.find(i => i.brand === form.implant_brand && i.size === form.implant_size);
-      if (invItem && invItem.quantity <= 0) {
-        toast.error(t('cases.toast_no_stock_implant'));
-        return;
-      }
-    }
-
-    if (form.abutment_type) {
-      const abtItem = abutmentInv.find(a => a.type === form.abutment_type);
-      if (abtItem && abtItem.quantity <= 0) {
-        toast.error(t('cases.toast_no_stock_abutment'));
-        return;
-      }
-    }
-
     if (editProcId) {
       updateMutation.mutate({
         id: editProcId,
@@ -315,32 +301,62 @@ export function ImplantCases() {
           extraction_needed: form.extraction_needed || undefined,
           abutment_type: form.abutment_type || undefined,
         },
+        change_reason: reason?.reason,
+        reason_category: reason?.category,
       });
     } else {
       createMutation.mutate({
-        patient_id: form.patient_id,
-        procedure_name: form.procedure_name.trim(),
-        tooth_number: form.tooth_number || undefined,
-        implant_brand: form.implant_brand || undefined,
-        implant_system: form.implant_system || undefined,
-        implant_size: form.implant_size || undefined,
-        procedure_date: form.procedure_date,
-        status: 'Consultation',
-        doctor_name: form.doctor_name || undefined,
-        notes: form.notes || undefined,
-        bone_condition: form.bone_condition || undefined,
-        bone_density: form.bone_density || undefined,
-        bone_height: form.bone_height ? Number(form.bone_height) : undefined,
-        bone_width: form.bone_width ? Number(form.bone_width) : undefined,
-        pathology: form.pathology || undefined,
-        ct_scan_notes: form.ct_scan_notes || undefined,
-        chronic_disease: form.chronic_disease || undefined,
-        medication: form.medication || undefined,
-        implant_decision: (form.implant_decision || undefined) as Procedure['implant_decision'],
-        extraction_needed: form.extraction_needed || undefined,
-        abutment_type: form.abutment_type || undefined,
+        data: {
+          patient_id: form.patient_id,
+          procedure_name: form.procedure_name.trim(),
+          tooth_number: form.tooth_number || undefined,
+          implant_brand: form.implant_brand || undefined,
+          implant_system: form.implant_system || undefined,
+          implant_size: form.implant_size || undefined,
+          procedure_date: form.procedure_date,
+          status: 'Consultation',
+          doctor_name: form.doctor_name || undefined,
+          notes: form.notes || undefined,
+          bone_condition: form.bone_condition || undefined,
+          bone_density: form.bone_density || undefined,
+          bone_height: form.bone_height ? Number(form.bone_height) : undefined,
+          bone_width: form.bone_width ? Number(form.bone_width) : undefined,
+          pathology: form.pathology || undefined,
+          ct_scan_notes: form.ct_scan_notes || undefined,
+          chronic_disease: form.chronic_disease || undefined,
+          medication: form.medication || undefined,
+          implant_decision: (form.implant_decision || undefined) as Procedure['implant_decision'],
+          extraction_needed: form.extraction_needed || undefined,
+          abutment_type: form.abutment_type || undefined,
+        },
+        change_reason: reason?.reason,
+        reason_category: reason?.category,
       });
     }
+  };
+
+  const handleSave = () => {
+    if (!validateStep(1) || !validateStep(2) || !validateStep(3)) return;
+    const patient = patients.find(p => p.id === form.patient_id);
+    if (!patient) { toast.error(t('cases.toast_patient_not_found')); return; }
+
+    if (form.implant_brand && form.implant_size) {
+      const invItem = implants.find(i => i.brand === form.implant_brand && i.size === form.implant_size);
+      if (invItem && invItem.quantity <= 0) {
+        toast.error(t('cases.toast_no_stock_implant'));
+        return;
+      }
+    }
+
+    if (form.abutment_type) {
+      const abtItem = abutmentInv.find(a => a.type === form.abutment_type);
+      if (abtItem && abtItem.quantity <= 0) {
+        toast.error(t('cases.toast_no_stock_abutment'));
+        return;
+      }
+    }
+
+    doSave();
   };
 
   const closeWizard = () => {
@@ -352,7 +368,7 @@ export function ImplantCases() {
   };
 
   return (
-    <div className="font-sans select-none space-y-5">
+    <div className="font-sans select-auto space-y-5">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -628,9 +644,8 @@ export function ImplantCases() {
 
       {/* ===== NEW PROCEDURE WIZARD MODAL ===== */}
       {showWizard && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 pb-10 overflow-y-auto"
-          style={{ background: 'rgba(5,11,20,0.88)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) closeWizard(); }}>
+        <FixedOverlay className="flex items-start justify-center p-4 pt-10 pb-10 overflow-y-auto"
+          style={{ background: 'rgba(5,11,20,0.88)', backdropFilter: 'blur(8px)' }} onClose={closeWizard}>
           <div className="w-full max-w-2xl rounded-[24px] overflow-hidden" style={{ background: 'rgba(13,24,40,0.97)', border: '1px solid rgba(255,255,255,0.08)' }}>
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
@@ -923,14 +938,13 @@ export function ImplantCases() {
               </div>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
 
       {/* ===== DELETE CONFIRMATION MODAL ===== */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setDeleteConfirmId(null); }}>
+        <FixedOverlay className="flex items-center justify-center p-4"
+          style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setDeleteConfirmId(null)}>
           <div className="w-full max-w-sm rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="p-6">
               <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(239,68,68,0.1)' }}>
@@ -946,14 +960,14 @@ export function ImplantCases() {
                 className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>
                 {t('cases.modal_delete_cancel')}
               </button>
-              <button onClick={() => deleteMutation.mutate(deleteConfirmId)} disabled={deleteMutation.isPending}
+              <button onClick={() => deleteMutation.mutate({ id: deleteConfirmId })} disabled={deleteMutation.isPending}
                 className="h-10 px-5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
                 style={{ background: '#ef4444', color: 'white' }}>
                 {deleteMutation.isPending ? t('cases.modal_delete_deleting') : t('cases.modal_delete_confirm')}
               </button>
             </div>
           </div>
-        </div>
+        </FixedOverlay>
       )}
     </div>
   );

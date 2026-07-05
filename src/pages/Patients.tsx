@@ -1,20 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { patientService } from '../services/patientService';
-import { getBranchScope } from '../services/authScope';
-import { useAuth } from '../context/AuthContext';
+import type { Patient } from '../types';
 import {
   Search, ChevronLeft, ChevronRight, Plus, Calendar
 } from 'lucide-react';
 import AddPatientModal from '../components/AddPatientModal';
+import Copyable from '../components/ui/Copyable';
 import { useLanguage } from '../context/LanguageContext';
 
 export const Patients = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const scope = getBranchScope(user);
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -23,25 +21,37 @@ export const Patients = () => {
 
   const selectedId = searchParams.get('selected') || null;
 
-  const { data: patients = [], isLoading } = useQuery({
-    queryKey: ['patients', scope.branchId],
-    queryFn: () => patientService.getAll(scope.branchId),
+  const { data: allPatients = [], isLoading: loadingAll } = useQuery({
+    queryKey: ['patients'],
+    queryFn: () => patientService.getAll(),
+    enabled: !searchQuery,
   });
 
-  const filtered = useMemo(() => {
-    let list = [...patients];
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(p =>
-        p.full_name.toLowerCase().includes(q) ||
-        (p.phone || '').includes(q)
-      );
-    }
-    return list;
-  }, [patients, searchQuery]);
+  const [searchResults, setSearchResults] = useState<Patient[]>([]);
+  const [searching, setSearching] = useState(false);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
-  const paged = filtered.slice((page - 1) * perPage, page * perPage);
+  useEffect(() => {
+    if (!searchQuery) { setSearchResults([]); setSearching(false); return; }
+    const q = searchQuery.trim();
+    setSearching(true);
+    patientService.search(q)
+      .then(results => {
+        console.log('SEARCH DONE:', q, '→', results.length, 'results');
+        if (results.length > 0) console.log('FIRST RESULT:', { name: results[0].full_name, code: results[0].external_medical_code });
+        setSearchResults(results);
+      })
+      .catch(err => {
+        console.error('SEARCH ERROR:', err);
+        setSearchResults([]);
+      })
+      .finally(() => setSearching(false));
+  }, [searchQuery]);
+
+  const patients = searchQuery ? searchResults : allPatients;
+  const isLoading = searchQuery ? searching : loadingAll;
+
+  const totalPages = Math.max(1, Math.ceil(patients.length / perPage));
+  const paged = patients.slice((page - 1) * perPage, page * perPage);
 
   const selectedPatient = patients.find(p => p.id === selectedId) || paged[0] || null;
 
@@ -50,7 +60,7 @@ export const Patients = () => {
   };
 
   return (
-    <div className="font-sans select-none space-y-5">
+    <div className="font-sans select-auto space-y-5">
       {/* ===== HEADER ===== */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -92,7 +102,8 @@ export const Patients = () => {
             style={{ color: 'rgba(255,255,255,0.25)' }}>
             <div className="flex-[3]">{t('patients.table_patient')}</div>
             <div className="flex-[2]">{t('patients.table_phone')}</div>
-            <div className="flex-[1.5]">{t('patients.table_id')}</div>
+            <div className="flex-[1.5]">{t('patients.table_code')}</div>
+            <div className="flex-[1.5]">{t('patients.table_insurance')}</div>
             <div className="flex-[1.5]">{t('patients.table_created')}</div>
           </div>
 
@@ -128,10 +139,13 @@ export const Patients = () => {
                     <span className="text-sm font-medium text-white">{p.full_name}</span>
                   </div>
                   <div className="flex-[2] text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                    {p.phone || t('common.dash')}
+                    {p.phone ? <Copyable text={p.phone}>{p.phone}</Copyable> : t('common.dash')}
                   </div>
-                  <div className="flex-[1.5] text-sm font-mono" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                    #{(p.id || '').slice(0, 6).toUpperCase()}
+                  <div className="flex-[1.5] text-sm font-mono" style={{ color: p.external_medical_code ? '#4FD1FF' : 'rgba(255,255,255,0.3)' }}>
+                    {p.external_medical_code ? <Copyable text={p.external_medical_code}><span>{p.external_medical_code}</span></Copyable> : t('common.dash')}
+                  </div>
+                  <div className="flex-[1.5] text-sm" style={{ color: p.insurance_company ? '#4FD1FF' : '#00E5A8' }}>
+                    {p.insurance_company || 'Cash'}
                   </div>
                   <div className="flex-[1.5] text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
                     {p.created_at ? new Date(p.created_at).toLocaleDateString() : t('common.dash')}
@@ -144,7 +158,7 @@ export const Patients = () => {
           {/* Pagination */}
           <div className="flex items-center justify-between px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
             <span className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
-              Showing {(page - 1) * perPage + 1} to {Math.min(page * perPage, filtered.length)} of {filtered.length} entries
+              Showing {(page - 1) * perPage + 1} to {Math.min(page * perPage, patients.length)} of {patients.length} entries
             </span>
             <div className="flex items-center gap-1.5">
               <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -201,6 +215,18 @@ export const Patients = () => {
               <div className="flex items-center justify-between py-2.5">
                 <span className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('patients.phone_label')}</span>
                 <span className="text-xs font-medium text-white">{selectedPatient.phone || t('common.dash')}</span>
+              </div>
+              {selectedPatient.external_medical_code && (
+                <div className="flex items-center justify-between py-2.5">
+                  <span className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>External Code</span>
+                  <span className="text-xs font-mono font-medium text-[#4FD1FF]">{selectedPatient.external_medical_code}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between py-2.5">
+                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Payment</span>
+                <span className="text-xs font-medium" style={{ color: selectedPatient.insurance_company ? '#4FD1FF' : '#00E5A8' }}>
+                  {selectedPatient.insurance_company || 'Cash'}
+                </span>
               </div>
             </div>
 
