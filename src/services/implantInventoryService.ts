@@ -380,8 +380,13 @@ export const implantInventoryService = {
   },
 
   async recordTransaction(tx: Omit<InventoryTransaction, 'id' | 'created_at'>): Promise<void> {
-    const { error } = await supabase.from('inventory_transactions').insert([{ ...tx, operation_type: tx.operation_type || 'add' }]);
-    if (error) throw new Error(error.message);
+    const payload = { ...tx, operation_type: tx.operation_type || 'add' };
+    console.log('[INVENTORY] recordTransaction payload:', JSON.stringify(payload));
+    const { error } = await supabase.from('inventory_transactions').insert([payload]);
+    if (error) {
+      console.error('[INVENTORY] recordTransaction error:', error.message, 'details:', JSON.stringify(error));
+      throw new Error(error.message);
+    }
   },
 
   // ── Stock Adjustments ──
