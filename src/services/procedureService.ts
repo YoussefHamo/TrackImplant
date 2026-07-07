@@ -138,6 +138,20 @@ export const procedureService = {
       });
     }
 
+    // Consume abutment if selected
+    if (branchId && procedure.abutment_type) {
+      try {
+        await implantInventoryService.consumeAbutmentForProcedure({
+          branchId,
+          abutmentType: procedure.abutment_type,
+          patientId: procedure.patient_id,
+          procedureId: data.id,
+        });
+      } catch {
+        // Don't block procedure creation if abutment consumption fails
+      }
+    }
+
     const actor = await getCurrentUserInfo();
     if (actor) {
       auditLogService.log({

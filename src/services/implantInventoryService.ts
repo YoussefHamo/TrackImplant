@@ -614,6 +614,54 @@ export const implantInventoryService = {
     });
   },
 
+  async consumeAbutmentForProcedure(params: {
+    branchId: string;
+    abutmentType: string;
+    patientId?: string;
+    procedureId?: string;
+  }): Promise<void> {
+    const { data: item, error: readErr } = await supabase
+      .from('inventory_items')
+      .select('id, name, quantity, used')
+      .eq('branch_id', params.branchId)
+      .eq('category', 'abutment')
+      .eq('subcategory', params.abutmentType)
+      .maybeSingle();
+    if (readErr) throw new Error(readErr.message);
+    if (!item || (item.quantity as number) < 1) {
+      throw new Error(`Not enough stock for abutment: ${params.abutmentType}. Please request from Main Warehouse.`);
+    }
+
+    const { data: updated, error: updErr } = await supabase
+      .from('inventory_items')
+      .update({
+        quantity: (item.quantity as number) - 1,
+        used: ((item.used as number) || 0) + 1,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', item.id)
+      .eq('quantity', item.quantity)
+      .select()
+      .maybeSingle();
+    if (updErr) throw new Error(updErr.message);
+    if (!updated) {
+      throw new Error('Concurrent stock change detected. Please retry the procedure.');
+    }
+
+    await this.recordTransaction({
+      item_type: 'abutment',
+      item_id: item.id as string,
+      type: 'deduct',
+      operation_type: 'issue',
+      quantity: 1,
+      item_category: 'abutment',
+      item_name: params.abutmentType,
+      patient_id: params.patientId,
+      procedure_id: params.procedureId,
+      notes: 'Auto-consumed for abutment procedure',
+    });
+  },
+
   async returnStock(id: string, quantity: number, opts?: {
     notes?: string;
     change_reason?: string;
