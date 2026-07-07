@@ -73,6 +73,7 @@ export const patientService = {
       medical_history: patient.medical_history,
       external_medical_code: patient.external_medical_code,
       insurance_company: patient.insurance_company,
+      branch_id: patient.branch_id || null,
     }]).select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id').single();
     if (error) throw new Error(error.message);
 

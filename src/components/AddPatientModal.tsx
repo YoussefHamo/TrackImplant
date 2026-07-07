@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import { patientService } from '../services/patientService';
+import { branchService } from '../services/branchService';
+import { useAuth } from '../context/AuthContext';
 import type { Patient } from '../types';
 import Portal from './ui/Portal';
 
@@ -17,17 +19,28 @@ const emptyForm = {
   medical_history: '',
   external_medical_code: '',
   insurance_company: '',
+  branch_id: '',
 };
 
 export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProps) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [form, setForm] = useState({ ...emptyForm });
   const [hasInsurance, setHasInsurance] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  const { data: branches } = useQuery({
+    queryKey: ['branches'],
+    queryFn: () => branchService.getAll(),
+    enabled: isOpen,
+  });
+
+  const isAdmin = user?.role === 'Admin';
+  const userBranch = user?.branch_id;
+
   const resetForm = () => {
-    setForm({ ...emptyForm });
+    setForm({ ...emptyForm, branch_id: userBranch || '' });
     setHasInsurance(false);
     setErrors({});
   };
@@ -45,12 +58,14 @@ export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProp
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const branchId = isAdmin ? form.branch_id : userBranch;
       const payload: Omit<Patient, 'id' | 'created_at'> = {
         full_name: form.full_name,
         phone: form.phone,
         medical_history: form.medical_history || undefined,
         external_medical_code: form.external_medical_code || undefined,
         insurance_company: hasInsurance ? form.insurance_company : undefined,
+        branch_id: branchId || undefined,
       };
       return patientService.create(payload);
     },
@@ -71,6 +86,7 @@ export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProp
     if (!form.phone.trim()) errs.phone = 'Phone number is required';
     else if (!/^[\d\s\-+()]{7,20}$/.test(form.phone)) errs.phone = 'Invalid phone number';
     if (hasInsurance && !form.insurance_company.trim()) errs.insurance_company = 'Insurance company is required';
+    if (isAdmin && !form.branch_id) errs.branch_id = 'Branch is required';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -158,6 +174,25 @@ export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProp
                 </button>
               </div>
             </div>
+            {/* Branch selector */}
+            <div>
+              <label style={labelColor} className={labelClass}>{isAdmin ? 'Branch *' : 'Branch'}</label>
+              {isAdmin ? (
+                <select value={form.branch_id} onChange={e => update('branch_id', e.target.value)}
+                  className={inputClass('branch_id')}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: errors.branch_id ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.06)', color: 'white' }}>
+                  <option value="" style={{ background: '#0D1B2A', color: '#888' }}>Select branch...</option>
+                  {(branches || []).map((b: any) => (
+                    <option key={b.id} value={b.id} style={{ background: '#0D1B2A', color: 'white' }}>{b.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <input value={branches?.find((b: any) => b.id === userBranch)?.name || ''} disabled
+                  className={inputClass('branch_id')} style={{ opacity: 0.6 }} />
+              )}
+              {errors.branch_id && <p className="text-[11px] mt-1 text-red-400">{errors.branch_id}</p>}
+            </div>
+
             {hasInsurance && (
               <div>
                 <label style={labelColor} className={labelClass}>Insurance Company *</label>
