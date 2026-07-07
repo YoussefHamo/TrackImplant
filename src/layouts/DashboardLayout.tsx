@@ -23,15 +23,15 @@ function ToothLogo({ className }: { className?: string }) {
   );
 }
 
-const allNavItems: { path: string; labelKey: string; icon: React.ElementType; adminOnly?: boolean }[] = [
+const allNavItems: { path: string; labelKey: string; icon: React.ElementType; adminOnly?: boolean; hideForDoctor?: boolean }[] = [
   { path: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
   { path: "/dashboard/patients", labelKey: "nav.patients", icon: Users },
   { path: "/dashboard/cases", labelKey: "nav.tracking", icon: Activity },
   { path: "/dashboard/appointments", labelKey: "nav.appointments", icon: Calendar },
-  { path: "/dashboard/payments", labelKey: "nav.finances", icon: CreditCard },
+  { path: "/dashboard/payments", labelKey: "nav.finances", icon: CreditCard, hideForDoctor: true },
   { path: "/dashboard/follow-ups", labelKey: "nav.follow_ups", icon: Clock },
-  { path: "/dashboard/reports", labelKey: "nav.reports", icon: BarChart3 },
-  { path: "/dashboard/inventory", labelKey: "nav.inventory", icon: Package },
+  { path: "/dashboard/reports", labelKey: "nav.reports", icon: BarChart3, hideForDoctor: true },
+  { path: "/dashboard/inventory", labelKey: "nav.inventory", icon: Package, hideForDoctor: true },
   { path: "/dashboard/logs", labelKey: "nav.logs", icon: FileText, adminOnly: true },
 ];
 
@@ -151,7 +151,7 @@ export default function DashboardLayout() {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {allNavItems.filter(item => !item.adminOnly || user?.role === 'Admin').map((item) => {
+          {allNavItems.filter(item => (!item.adminOnly || user?.role === 'Admin') && !(item.hideForDoctor && user?.role === 'Doctor')).map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
             return (
