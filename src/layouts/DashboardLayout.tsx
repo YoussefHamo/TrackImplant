@@ -389,9 +389,10 @@ export default function DashboardLayout() {
               {t('nav.add_patient')}
             </button>
 
-            {/* Role Debug */}
-            <div className="text-[10px] font-mono px-2.5 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
-              {t('nav.role')} <span className="text-[#4FD1FF] font-bold">{user?.role || t('nav.na')}</span>
+            {/* Role & Name */}
+            <div className="flex items-center gap-2 text-[10px] font-mono px-2.5 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
+              {user?.full_name && <span className="text-white/70">{user.full_name}</span>}
+              <span className="text-[#4FD1FF] font-bold">{user?.role || t('nav.na')}</span>
             </div>
 
             {/* Profile */}
