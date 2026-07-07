@@ -820,7 +820,7 @@ export function ImplantCases() {
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step3_brand')}</label>
-                        <select value={form.implant_brand} onChange={e => { updateField('implant_brand', e.target.value); updateField('implant_size', ''); }}
+                        <select value={form.implant_brand} onChange={e => { updateField('implant_brand', e.target.value); updateField('implant_system', e.target.value); updateField('implant_size', ''); }}
                           className={inputCls + ' cursor-pointer appearance-none'}>
                           <option value="" style={{ background: '#0D1B2A' }}>{t('cases.wizard_placeholder_brand')}</option>
                           {implantBrands.map(o => <option key={o} value={o} style={{ background: '#0D1B2A' }}>{o}</option>)}
