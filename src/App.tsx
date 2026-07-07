@@ -50,7 +50,11 @@ export default function App() {
             <Route path="cases" element={<ImplantCases />} />
             <Route path="appointments" element={<Appointments />} />
             <Route path="follow-ups" element={<FollowUps />} />
-            <Route path="inventory" element={<Inventory />} />
+            <Route path="inventory" element={
+              <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Receptionist', 'Assistant']}>
+                <Inventory />
+              </ProtectedRoute>
+            } />
             <Route path="logs" element={
               <ProtectedRoute allowedRoles={['Admin']}>
                 <AuditLogs />

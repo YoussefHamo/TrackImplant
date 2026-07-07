@@ -31,7 +31,7 @@ export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cance
 export type PaymentStatus = 'Pending' | 'Partial' | 'Paid';
 export type PaymentMethod = 'cash' | 'card' | 'insurance' | 'bank_transfer';
 export type RecordType = 'invoice' | 'payment';
-export type AuditAction = 'INSERT' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'USER_CREATED' | 'ROLE_CHANGED' | 'INVENTORY_CHANGE' | 'PAYMENT_CHANGE';
+export type AuditAction = 'INSERT' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'USER_CREATED' | 'ROLE_CHANGED' | 'INVENTORY_CHANGE' | 'PAYMENT_CHANGE' | 'SOFT_DELETE';
 export type InventoryItemType = 'implant' | 'abutment';
 export type InventoryCategory = 'implant' | 'abutment' | 'prosthetic' | 'material';
 export type TransactionType = 'add' | 'deduct';
@@ -102,6 +102,15 @@ export interface Appointment {
   created_at?: string;
 }
 
+export interface ProcedureDoctor {
+  id: string;
+  procedure_id: string;
+  doctor_id: string;
+  doctor_name?: string;
+  role_in_procedure: 'primary' | 'assistant';
+  display_order: number;
+}
+
 export interface FinancialRecord {
   id: string;
   patient_id: string;
@@ -121,6 +130,7 @@ export interface FinancialRecord {
   branch_name?: string | null;
   change_reason?: string | null;
   reason_category?: string | null;
+  procedure_id?: string | null;
 }
 
 export interface Procedure {
@@ -143,6 +153,9 @@ export interface Procedure {
   ct_scan_notes?: string;
   chronic_disease?: string;
   medication?: string;
+  branch_id?: string | null;
+  is_deleted?: boolean;
+  deleted_at?: string | null;
   implant_decision?: 'Immediate' | 'Delayed' | 'Not Possible';
   extraction_needed?: boolean;
   abutment_type?: string;

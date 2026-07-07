@@ -742,6 +742,380 @@ function ManagerDashboard() {
 }
 
 /* ════════════════════════════════════════════
+   DOCTOR DASHBOARD
+   ════════════════════════════════════════════ */
+function DoctorDashboard() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data: doctorAppointments = [] } = useQuery({
+    queryKey: ['doctor-appointments', user?.id],
+    queryFn: () => appointmentService.getByDoctor(user!.id, user?.branch_id),
+    enabled: !!user?.id,
+  });
+  const { data: upcomingAppointments = [] } = useQuery({
+    queryKey: ['doctor-upcoming', user?.id],
+    queryFn: () => appointmentService.getUpcomingByDoctor(user!.id, 5),
+    enabled: !!user?.id,
+  });
+  const { data: doctorProcedures = [] } = useQuery({
+    queryKey: ['doctor-procedures', user?.id],
+    queryFn: () => procedureService.getByDoctor(user!.id, user?.branch_id),
+    enabled: !!user?.id,
+  });
+  const { data: allFollowUps = [] } = useQuery({
+    queryKey: ['follow-ups'],
+    queryFn: () => followUpService.getAll(),
+    enabled: !!user?.id,
+  });
+  const { data: doctorRevenue } = useQuery({
+    queryKey: ['doctor-revenue', user?.id],
+    queryFn: () => procedureService.getRevenueByDoctor(user!.id),
+    enabled: !!user?.id,
+  });
+
+  const todayAppts = useMemo(() => {
+    return doctorAppointments.filter(a => {
+      const d = new Date(a.appointment_date).toISOString().split('T')[0];
+      return d === today;
+    });
+  }, [doctorAppointments, today]);
+
+  const procStatusMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    doctorProcedures.forEach(p => {
+      const s = p.status || 'Unknown';
+      map[s] = (map[s] || 0) + 1;
+    });
+    return map;
+  }, [doctorProcedures]);
+
+  const totalProcedures = doctorProcedures.length;
+  const totalAppointments = doctorAppointments.length;
+
+  const myPatientIds = useMemo(() => {
+    return [...new Set(doctorProcedures.map(p => p.patient_id))];
+  }, [doctorProcedures]);
+
+  const myFollowUps = useMemo(() => {
+    const patientSet = new Set(myPatientIds);
+    return allFollowUps.filter(f => patientSet.has(f.patient_id));
+  }, [allFollowUps, myPatientIds]);
+
+  const criticalFollowUps = useMemo(() => {
+    return myFollowUps.filter(f => f.healing_status === 'Failure');
+  }, [myFollowUps]);
+
+  const todayProcedures = useMemo(() => {
+    return doctorProcedures.filter(p => {
+      const d = new Date(p.procedure_date).toISOString().split('T')[0];
+      return d === today;
+    });
+  }, [doctorProcedures, today]);
+
+  const todayProcsByStatus = useMemo(() => {
+    const map: Record<string, number> = {};
+    todayProcedures.forEach(p => {
+      const s = p.status || 'Unknown';
+      map[s] = (map[s] || 0) + 1;
+    });
+    return map;
+  }, [todayProcedures]);
+
+  return (
+    <div className="space-y-6 font-sans select-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Doctor Dashboard</h1>
+          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>{today}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-[22px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: 'rgba(79,209,255,0.1)' }}>
+            <Calendar className="w-5 h-5 text-[#4FD1FF]" />
+          </div>
+          <div className="text-2xl font-bold text-white">{todayAppts.length}</div>
+          <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Today's Appointments</div>
+        </div>
+        <div className="rounded-[22px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: 'rgba(255,193,7,0.1)' }}>
+            <Clock className="w-5 h-5 text-[#FFC107]" />
+          </div>
+          <div className="text-2xl font-bold text-white">{upcomingAppointments.length}</div>
+          <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Upcoming Appointments</div>
+        </div>
+        <div className="rounded-[22px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: 'rgba(0,229,168,0.1)' }}>
+            <Activity className="w-5 h-5 text-[#00E5A8]" />
+          </div>
+          <div className="text-2xl font-bold text-white">{totalProcedures}</div>
+          <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Total Procedures</div>
+        </div>
+        <div className="rounded-[22px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: 'rgba(124,92,255,0.1)' }}>
+            <Users className="w-5 h-5 text-[#7C5CFF]" />
+          </div>
+          <div className="text-2xl font-bold text-white">{totalAppointments}</div>
+          <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Total Appointments</div>
+        </div>
+      </div>
+
+      {/* Stats Row 2 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-[22px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: 'rgba(0,229,168,0.1)' }}>
+            <Heart className="w-5 h-5 text-[#00E5A8]" />
+          </div>
+          <div className="text-2xl font-bold text-white">{myFollowUps.length}</div>
+          <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Follow-ups</div>
+        </div>
+        <div className="rounded-[22px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: 'rgba(239,68,68,0.1)' }}>
+            <AlertTriangle className="w-5 h-5 text-[#ef4444]" />
+          </div>
+          <div className="text-2xl font-bold text-[#ef4444]">{criticalFollowUps.length}</div>
+          <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Critical Follow-ups</div>
+        </div>
+        <div className="rounded-[22px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: 'rgba(124,92,255,0.1)' }}>
+            <Users className="w-5 h-5 text-[#7C5CFF]" />
+          </div>
+          <div className="text-2xl font-bold text-white">{myPatientIds.length}</div>
+          <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>My Patients</div>
+        </div>
+        <div className="rounded-[22px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: 'rgba(79,209,255,0.1)' }}>
+            <DollarSign className="w-5 h-5 text-[#4FD1FF]" />
+          </div>
+          <div className="text-2xl font-bold text-white">${(doctorRevenue?.totalRevenue || 0).toLocaleString()}</div>
+          <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>My Revenue</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Today's Appointments */}
+        <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 className="text-base font-semibold text-white mb-4">Today's Appointments</h3>
+          {todayAppts.length === 0 ? (
+            <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No appointments today</div>
+          ) : (
+            <div className="space-y-2">
+              {todayAppts.map(a => (
+                <div key={a.id} className="flex items-center justify-between p-3 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div>
+                    <div className="text-sm font-medium text-white">{a.patient_id ? `Patient #${a.patient_id.slice(0, 6)}` : 'Unknown'}</div>
+                    <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      {new Date(a.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
+                    style={{
+                      background: a.status === 'confirmed' ? 'rgba(0,229,168,0.12)' : 'rgba(255,193,7,0.12)',
+                      color: a.status === 'confirmed' ? '#00E5A8' : '#FFC107',
+                    }}>
+                    {a.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <button onClick={() => navigate('/dashboard/appointments')}
+            className="w-full mt-4 py-2.5 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(79,209,255,0.06)', color: '#4FD1FF' }}>View All Appointments</button>
+        </div>
+
+        {/* Upcoming Appointments */}
+        <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 className="text-base font-semibold text-white mb-4">Upcoming Appointments</h3>
+          {upcomingAppointments.length === 0 ? (
+            <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No upcoming appointments</div>
+          ) : (
+            <div className="space-y-2">
+              {upcomingAppointments.map(a => (
+                <div key={a.id} className="flex items-center justify-between p-3 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div className="flex items-center gap-3">
+                    <div className="flex flex-col items-center min-w-[40px]">
+                      <span className="text-[10px] font-bold text-[#4FD1FF]">
+                        {new Date(a.appointment_date).toLocaleDateString([], { weekday: 'short' })}
+                      </span>
+                      <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                        {new Date(a.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-white">{a.patient_id ? `Patient #${a.patient_id.slice(0, 6)}` : 'Unknown'}</div>
+                      <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>{a.status}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Follow-ups & Critical */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 className="text-base font-semibold text-white mb-4">Upcoming Follow-ups</h3>
+          {myFollowUps.length === 0 ? (
+            <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No follow-ups found</div>
+          ) : (
+            <div className="space-y-2">
+              {myFollowUps.slice(0, 5).map(f => (
+                <div key={f.id} className="flex items-center justify-between p-3 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div>
+                    <div className="text-sm font-medium text-white">Patient #{f.patient_id.slice(0, 6)}</div>
+                    <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      Health: {f.health_score ?? '—'} · Pain: {f.pain_level ?? '—'}/10
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
+                    style={{
+                      background: f.healing_status === 'OnTrack' ? 'rgba(0,229,168,0.12)' : f.healing_status === 'Critical' ? 'rgba(239,68,68,0.12)' : f.healing_status === 'Failure' ? 'rgba(239,68,68,0.2)' : 'rgba(255,193,7,0.12)',
+                      color: f.healing_status === 'OnTrack' ? '#00E5A8' : f.healing_status === 'Critical' ? '#ef4444' : f.healing_status === 'Failure' ? '#ef4444' : '#FFC107',
+                    }}>
+                    {f.healing_status || 'Unknown'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 className="text-base font-semibold text-white mb-4">Critical Follow-ups</h3>
+          {criticalFollowUps.length === 0 ? (
+            <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No critical follow-ups</div>
+          ) : (
+            <div className="space-y-2">
+              {criticalFollowUps.slice(0, 5).map(f => (
+                <div key={f.id} className="flex items-center justify-between p-3 rounded-xl"
+                  style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)' }}>
+                  <div>
+                    <div className="text-sm font-medium text-white">Patient #{f.patient_id.slice(0, 6)}</div>
+                    <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      Health: {f.health_score ?? '—'} · Pain: {f.pain_level ?? '—'}/10
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
+                    style={{
+                      background: 'rgba(239,68,68,0.15)',
+                      color: '#ef4444',
+                    }}>
+                    {f.healing_status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <button onClick={() => navigate('/dashboard/cases')}
+            className="w-full mt-4 py-2.5 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(239,68,68,0.06)', color: '#ef4444' }}>View All Cases</button>
+        </div>
+      </div>
+
+      {/* Today's Procedures */}
+      <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <h3 className="text-base font-semibold text-white mb-4">Today's Procedures</h3>
+        {todayProcedures.length === 0 ? (
+          <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No procedures today</div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {Object.entries(todayProcsByStatus).map(([status, count]) => (
+              <div key={status} className="p-4 rounded-xl text-center"
+                style={{ background: 'rgba(79,209,255,0.06)', border: '1px solid rgba(79,209,255,0.1)' }}>
+                <div className="text-lg font-bold text-[#4FD1FF]">{count}</div>
+                <div className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>{status}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={() => navigate('/dashboard/cases')}
+          className="w-full mt-4 py-2.5 rounded-xl text-xs font-medium"
+          style={{ background: 'rgba(79,209,255,0.06)', color: '#4FD1FF' }}>View All Procedures</button>
+      </div>
+
+      {/* Procedures Summary */}
+      <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <h3 className="text-base font-semibold text-white mb-4">Procedures by Status</h3>
+        {doctorProcedures.length === 0 ? (
+          <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No procedures found</div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {Object.entries(procStatusMap).map(([status, count]) => (
+              <div key={status} className="p-4 rounded-xl text-center"
+                style={{ background: 'rgba(79,209,255,0.06)', border: '1px solid rgba(79,209,255,0.1)' }}>
+                <div className="text-lg font-bold text-[#4FD1FF]">{count}</div>
+                <div className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>{status}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={() => navigate('/dashboard/cases')}
+          className="w-full mt-4 py-2.5 rounded-xl text-xs font-medium"
+          style={{ background: 'rgba(79,209,255,0.06)', color: '#4FD1FF' }}>View All Procedures</button>
+      </div>
+
+      {/* My Patients & Revenue */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 className="text-base font-semibold text-white mb-4">My Patients</h3>
+          {myPatientIds.length === 0 ? (
+            <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No patients yet</div>
+          ) : (
+            <div className="space-y-2">
+              {doctorProcedures.filter((p, i, arr) => arr.findIndex(x => x.patient_id === p.patient_id) === i).slice(0, 6).map(p => (
+                <div key={p.patient_id}
+                  onClick={() => navigate(`/dashboard/patients/${p.patient_id}/profile`)}
+                  className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold"
+                    style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }}>
+                    {p.patient_id.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-white">Patient #{p.patient_id.slice(0, 6)}</div>
+                    <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>{p.procedure_name}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <button onClick={() => navigate('/dashboard/patients')}
+            className="w-full mt-4 py-2.5 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(79,209,255,0.06)', color: '#4FD1FF' }}>View All Patients</button>
+        </div>
+        <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 className="text-base font-semibold text-white mb-4">Revenue from My Procedures</h3>
+          <div className="flex flex-col gap-4">
+            <div className="p-5 rounded-xl" style={{ background: 'rgba(0,229,168,0.06)', border: '1px solid rgba(0,229,168,0.1)' }}>
+              <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Total Revenue</div>
+              <div className="text-2xl font-bold text-[#00E5A8]">${(doctorRevenue?.totalRevenue || 0).toLocaleString()}</div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-4 rounded-xl" style={{ background: 'rgba(79,209,255,0.06)', border: '1px solid rgba(79,209,255,0.1)' }}>
+                <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Collected</div>
+                <div className="text-lg font-bold text-[#4FD1FF]">${(doctorRevenue?.collected || 0).toLocaleString()}</div>
+              </div>
+              <div className="p-4 rounded-xl" style={{ background: 'rgba(255,193,7,0.06)', border: '1px solid rgba(255,193,7,0.1)' }}>
+                <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Pending</div>
+                <div className="text-lg font-bold text-[#FFC107]">${(doctorRevenue?.pending || 0).toLocaleString()}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════
    MAIN DASHBOARD EXPORT (role-aware)
    ════════════════════════════════════════════ */
 export default function Dashboard() {
@@ -751,6 +1125,9 @@ export default function Dashboard() {
   }
   if (user?.role === 'Manager') {
     return <ManagerDashboard />;
+  }
+  if (user?.role === 'Doctor') {
+    return <DoctorDashboard />;
   }
   return <ClinicalDashboard />;
 }

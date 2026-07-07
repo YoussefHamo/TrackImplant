@@ -5,6 +5,8 @@ import { procedureService } from '../services/procedureService';
 import { patientService } from '../services/patientService';
 import { followUpService } from '../services/followUpService';
 import { implantInventoryService } from '../services/implantInventoryService';
+import { userService } from '../services/userService';
+import { supabase } from '../integrations/supabase/client';
 import {
   Search, Activity, AlertTriangle,
   Calendar, User, Plus, X, ChevronRight, ChevronLeft, Check,
@@ -105,6 +107,12 @@ export function ImplantCases() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [editProcId, setEditProcId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [filterDoctor, setFilterDoctor] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterBranch, setFilterBranch] = useState('');
+  const [filterImplant, setFilterImplant] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const selectedId = searchParams.get('id') || '';
 
   const { data: procedures = [], isLoading } = useQuery({
@@ -132,6 +140,54 @@ export function ImplantCases() {
     queryFn: () => implantInventoryService.getAbutments(),
   });
 
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => userService.getAll(),
+  });
+  const doctors = useMemo(() => allUsers.filter(u => u.role === 'Doctor' && u.is_active !== false), [allUsers]);
+
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: async () => {
+      const { data } = await supabase.from('branches').select('id, name').order('name');
+      return data || [];
+    },
+  });
+
+  const implantSystems = useMemo(() => [...new Set(implants.map(i => i.brand))].sort(), [implants]);
+
+  const [doctorAssignments, setDoctorAssignments] = useState<{ doctor_id: string; role_in_procedure: 'primary' | 'assistant'; display_order: number }[]>([]);
+  const [doctorSearch, setDoctorSearch] = useState('');
+  const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
+
+  const getAvailableDoctors = (excludeIds: string[]) =>
+    doctors.filter(d => !excludeIds.includes(d.auth_user_id || d.id));
+
+  const addDoctorAssignment = (doctorId: string) => {
+    if (doctorAssignments.length >= 3) return;
+    if (doctorAssignments.some(d => d.doctor_id === doctorId)) return;
+    const isPrimary = doctorAssignments.length === 0;
+    setDoctorAssignments(prev => [...prev, {
+      doctor_id: doctorId,
+      role_in_procedure: isPrimary ? 'primary' : 'assistant',
+      display_order: prev.length,
+    }]);
+    setDoctorSearch('');
+    setShowDoctorDropdown(false);
+  };
+
+  const removeDoctorAssignment = (doctorId: string) => {
+    setDoctorAssignments(prev => {
+      const updated = prev.filter(d => d.doctor_id !== doctorId);
+      // Reassign primary and display_order
+      return updated.map((d, i) => ({
+        ...d,
+        role_in_procedure: i === 0 ? 'primary' as const : 'assistant' as const,
+        display_order: i,
+      }));
+    });
+  };
+
   const implantBrands = useMemo(() => [...new Set(implants.map(i => i.brand))].sort(), [implants]);
   const implantSizesForBrand = useMemo(() => {
     if (!form.implant_brand) return [];
@@ -147,16 +203,37 @@ export function ImplantCases() {
   ];
 
   const filtered = useMemo(() => {
-    if (!searchQuery) return procedures;
-    const q = searchQuery.toLowerCase();
-    return procedures.filter(p =>
-      p.procedure_name.toLowerCase().includes(q) ||
-      (p.tooth_number || '').toLowerCase().includes(q) ||
-      (p.implant_system || '').toLowerCase().includes(q) ||
-      (p.doctor_name || '').toLowerCase().includes(q) ||
-      (p.status || '').toLowerCase().includes(q)
-    );
-  }, [procedures, searchQuery]);
+    let items = procedures;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      items = items.filter(p =>
+        p.procedure_name.toLowerCase().includes(q) ||
+        (p.tooth_number || '').toLowerCase().includes(q) ||
+        (p.implant_system || '').toLowerCase().includes(q) ||
+        (p.doctor_name || '').toLowerCase().includes(q) ||
+        (p.status || '').toLowerCase().includes(q)
+      );
+    }
+    if (filterDoctor) {
+      items = items.filter(p => p.doctor_name?.toLowerCase().includes(filterDoctor.toLowerCase()));
+    }
+    if (filterStatus) {
+      items = items.filter(p => p.status === filterStatus);
+    }
+    if (filterBranch) {
+      items = items.filter(p => p.branch_id === filterBranch);
+    }
+    if (filterImplant) {
+      items = items.filter(p => p.implant_system === filterImplant);
+    }
+    if (filterDateFrom) {
+      items = items.filter(p => p.procedure_date >= filterDateFrom);
+    }
+    if (filterDateTo) {
+      items = items.filter(p => p.procedure_date <= filterDateTo);
+    }
+    return items;
+  }, [procedures, searchQuery, filterDoctor, filterStatus, filterBranch, filterImplant, filterDateFrom, filterDateTo]);
 
   const selectedProc = selectedId ? procedures.find(p => p.id === selectedId) : filtered[0];
   const patientMap = useMemo(() => new Map(patients.map(p => [p.id, p])), [patients]);
@@ -178,10 +255,30 @@ export function ImplantCases() {
   });
 
   const createMutation = useMutation({
-    mutationFn: ({ data, change_reason, reason_category }: { data: Omit<Procedure, 'id' | 'created_at'>; change_reason?: string; reason_category?: string }) =>
-      procedureService.create(data, userBranchId, undefined, change_reason, reason_category),
+    mutationFn: async ({ data, change_reason, reason_category }: { data: Omit<Procedure, 'id' | 'created_at'>; change_reason?: string; reason_category?: string }) => {
+      const proc = await procedureService.create(data, userBranchId, undefined, change_reason, reason_category);
+      if (doctorAssignments.length > 0 && proc.id) {
+        await procedureService.assignDoctors(proc.id, doctorAssignments);
+      }
+      return proc;
+    },
     onSuccess: () => {
       toast.success(t('cases.toast_case_created'));
+      invalidateAll();
+      closeWizard();
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const updateWithDoctorsMutation = useMutation({
+    mutationFn: async ({ id, data, change_reason, reason_category }: { id: string; data: Partial<Procedure>; change_reason?: string; reason_category?: string }) => {
+      await procedureService.update(id, data, change_reason, reason_category);
+      if (doctorAssignments.length > 0) {
+        await procedureService.assignDoctors(id, doctorAssignments);
+      }
+    },
+    onSuccess: () => {
+      toast.success(t('cases.toast_procedure_updated'));
       invalidateAll();
       closeWizard();
     },
@@ -236,6 +333,16 @@ export function ImplantCases() {
       if (!form.procedure_name.trim()) errs.procedure_name = t('cases.wizard_error_procedure');
       if (!form.procedure_date) errs.procedure_date = t('cases.wizard_error_date');
     }
+    if (step === 3) {
+      if (form.implant_brand || form.implant_size) {
+        if (doctorAssignments.length === 0) {
+          errs.doctor = 'At least one doctor is required for implant procedures';
+        }
+        if (doctorAssignments.length > 0 && !doctorAssignments.some(d => d.role_in_procedure === 'primary')) {
+          errs.doctor = 'One doctor must be marked as Primary';
+        }
+      }
+    }
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -243,7 +350,7 @@ export function ImplantCases() {
   const handleNext = () => { if (validateStep(wizardStep)) setWizardStep(s => s + 1); };
   const handlePrev = () => setWizardStep(s => Math.max(1, s - 1));
 
-  const openEditWizard = (proc: Procedure) => {
+  const openEditWizard = async (proc: Procedure) => {
     const patient = patientMap.get(proc.patient_id);
     setForm({
       patient_id: proc.patient_id,
@@ -269,6 +376,17 @@ export function ImplantCases() {
       notes: proc.notes || '',
     });
     setEditProcId(proc.id);
+    // Load existing doctor assignments
+    try {
+      const existingDoctors = await procedureService.getDoctors(proc.id);
+      setDoctorAssignments(existingDoctors.map(d => ({
+        doctor_id: d.doctor_id,
+        role_in_procedure: d.role_in_procedure,
+        display_order: d.display_order,
+      })));
+    } catch {
+      setDoctorAssignments([]);
+    }
     setWizardStep(1);
     setShowWizard(true);
   };
@@ -276,59 +394,44 @@ export function ImplantCases() {
   const doSave = (reason?: { reason: string; category: string }) => {
     const patient = patients.find(p => p.id === form.patient_id);
     if (!patient) { toast.error(t('cases.toast_patient_not_found')); return; }
+    const primaryDoctor = doctorAssignments.find(d => d.role_in_procedure === 'primary');
+    const primaryDoctorName = primaryDoctor
+      ? (doctors.find(d => d.auth_user_id === primaryDoctor.doctor_id || d.id === primaryDoctor.doctor_id)?.full_name || '')
+      : form.doctor_name;
+
+    const procedureData = {
+      patient_id: form.patient_id,
+      procedure_name: form.procedure_name.trim(),
+      tooth_number: form.tooth_number || undefined,
+      implant_brand: form.implant_brand || undefined,
+      implant_system: form.implant_system || undefined,
+      implant_size: form.implant_size || undefined,
+      procedure_date: form.procedure_date,
+      doctor_name: primaryDoctorName || undefined,
+      notes: form.notes || undefined,
+      bone_condition: form.bone_condition || undefined,
+      bone_density: form.bone_density || undefined,
+      bone_height: form.bone_height ? Number(form.bone_height) : undefined,
+      bone_width: form.bone_width ? Number(form.bone_width) : undefined,
+      pathology: form.pathology || undefined,
+      ct_scan_notes: form.ct_scan_notes || undefined,
+      chronic_disease: form.chronic_disease || undefined,
+      medication: form.medication || undefined,
+      implant_decision: (form.implant_decision || undefined) as Procedure['implant_decision'],
+      extraction_needed: form.extraction_needed || undefined,
+      abutment_type: form.abutment_type || undefined,
+    };
+
     if (editProcId) {
-      updateMutation.mutate({
+      updateWithDoctorsMutation.mutate({
         id: editProcId,
-        data: {
-          patient_id: form.patient_id,
-          procedure_name: form.procedure_name.trim(),
-          tooth_number: form.tooth_number || undefined,
-          implant_brand: form.implant_brand || undefined,
-          implant_system: form.implant_system || undefined,
-          implant_size: form.implant_size || undefined,
-          procedure_date: form.procedure_date,
-          doctor_name: form.doctor_name || undefined,
-          notes: form.notes || undefined,
-          bone_condition: form.bone_condition || undefined,
-          bone_density: form.bone_density || undefined,
-          bone_height: form.bone_height ? Number(form.bone_height) : undefined,
-          bone_width: form.bone_width ? Number(form.bone_width) : undefined,
-          pathology: form.pathology || undefined,
-          ct_scan_notes: form.ct_scan_notes || undefined,
-          chronic_disease: form.chronic_disease || undefined,
-          medication: form.medication || undefined,
-          implant_decision: (form.implant_decision || undefined) as Procedure['implant_decision'],
-          extraction_needed: form.extraction_needed || undefined,
-          abutment_type: form.abutment_type || undefined,
-        },
+        data: procedureData,
         change_reason: reason?.reason,
         reason_category: reason?.category,
       });
     } else {
       createMutation.mutate({
-        data: {
-          patient_id: form.patient_id,
-          procedure_name: form.procedure_name.trim(),
-          tooth_number: form.tooth_number || undefined,
-          implant_brand: form.implant_brand || undefined,
-          implant_system: form.implant_system || undefined,
-          implant_size: form.implant_size || undefined,
-          procedure_date: form.procedure_date,
-          status: 'Consultation',
-          doctor_name: form.doctor_name || undefined,
-          notes: form.notes || undefined,
-          bone_condition: form.bone_condition || undefined,
-          bone_density: form.bone_density || undefined,
-          bone_height: form.bone_height ? Number(form.bone_height) : undefined,
-          bone_width: form.bone_width ? Number(form.bone_width) : undefined,
-          pathology: form.pathology || undefined,
-          ct_scan_notes: form.ct_scan_notes || undefined,
-          chronic_disease: form.chronic_disease || undefined,
-          medication: form.medication || undefined,
-          implant_decision: (form.implant_decision || undefined) as Procedure['implant_decision'],
-          extraction_needed: form.extraction_needed || undefined,
-          abutment_type: form.abutment_type || undefined,
-        },
+        data: { ...procedureData, status: 'Consultation' },
         change_reason: reason?.reason,
         reason_category: reason?.category,
       });
@@ -356,6 +459,16 @@ export function ImplantCases() {
       }
     }
 
+    // Doctor validation
+    if ((form.implant_brand || form.implant_size) && doctorAssignments.length === 0) {
+      toast.error('At least one doctor must be assigned');
+      return;
+    }
+    if (doctorAssignments.length > 0 && !doctorAssignments.some(d => d.role_in_procedure === 'primary')) {
+      toast.error('One doctor must be marked as Primary');
+      return;
+    }
+
     doSave();
   };
 
@@ -365,6 +478,8 @@ export function ImplantCases() {
     setForm({ ...emptyForm });
     setFormErrors({});
     setEditProcId(null);
+    setDoctorAssignments([]);
+    setDoctorSearch('');
   };
 
   return (
@@ -374,21 +489,59 @@ export function ImplantCases() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">{t('cases.title')}</h1>
           <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
-            {isLoading ? t('common.loading') : t('cases.subtitle', { count: procedures.length })}
+            {isLoading ? t('common.loading') : t('cases.subtitle', { count: filtered.length })}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative max-w-xs w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative max-w-[180px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.25)' }} />
             <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('cases.search_placeholder')}
-              className="w-full h-10 pl-10 pr-4 rounded-xl text-sm outline-none transition-all"
+              className="w-full h-9 pl-9 pr-3 rounded-xl text-xs outline-none transition-all"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)' }} />
           </div>
+          <select value={filterDoctor} onChange={e => setFilterDoctor(e.target.value)}
+      className="h-9 px-2.5 rounded-xl text-xs outline-none cursor-pointer appearance-none"
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: filterDoctor ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)' }}>
+      <option value="" style={{ background: '#0D1B2A' }}>All Doctors</option>
+      {doctors.map(d => (
+        <option key={d.auth_user_id || d.id} value={d.full_name || d.username} style={{ background: '#0D1B2A' }}>{d.full_name || d.username}</option>
+      ))}
+    </select>
+    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            className="h-9 px-2.5 rounded-xl text-xs outline-none cursor-pointer appearance-none"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: filterStatus ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)' }}>
+            <option value="" style={{ background: '#0D1B2A' }}>All Status</option>
+            {['Consultation', 'Imaging', 'Surgery Prep', 'Implant Placement', 'Healing Phase', 'Crown Placement', 'Conclusion', 'Completed'].map(s => (
+              <option key={s} value={s} style={{ background: '#0D1B2A' }}>{s}</option>
+            ))}
+          </select>
+          <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)}
+            className="h-9 px-2.5 rounded-xl text-xs outline-none cursor-pointer appearance-none"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: filterBranch ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)' }}>
+            <option value="" style={{ background: '#0D1B2A' }}>All Branches</option>
+            {branches.map(b => (
+              <option key={b.id} value={b.id} style={{ background: '#0D1B2A' }}>{b.name}</option>
+            ))}
+          </select>
+          <select value={filterImplant} onChange={e => setFilterImplant(e.target.value)}
+            className="h-9 px-2.5 rounded-xl text-xs outline-none cursor-pointer appearance-none"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: filterImplant ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)' }}>
+            <option value="" style={{ background: '#0D1B2A' }}>All Systems</option>
+            {implantSystems.map(s => (
+              <option key={s} value={s} style={{ background: '#0D1B2A' }}>{s}</option>
+            ))}
+          </select>
+          <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)}
+            className="h-9 px-2.5 rounded-xl text-xs outline-none [color-scheme:dark]"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)', width: 130 }} />
+          <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)}
+            className="h-9 px-2.5 rounded-xl text-xs outline-none [color-scheme:dark]"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)', width: 130 }} />
           <button onClick={() => setShowWizard(true)}
-            className="h-10 px-5 rounded-xl flex items-center gap-2 text-sm font-bold transition-all duration-300 active:scale-[0.98]"
+            className="h-9 px-4 rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all duration-300 active:scale-[0.98]"
             style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
-            <Plus className="w-4 h-4" /> {t('cases.new_procedure')}
+            <Plus className="w-3.5 h-3.5" /> {t('cases.new_procedure')}
           </button>
         </div>
       </div>
@@ -707,10 +860,54 @@ export function ImplantCases() {
                         className={inputCls + ' [color-scheme:dark]'} />
                       {formErrors.procedure_date && <p className="text-[11px] mt-1 text-red-400">{formErrors.procedure_date}</p>}
                     </div>
-                    <div>
+                    <div className="relative">
                       <label className={labelCls} style={{ color: 'rgba(255,255,255,0.3)' }}>{t('cases.wizard_step1_doctor')}</label>
-                      <input value={form.doctor_name} onChange={e => updateField('doctor_name', e.target.value)}
-                        placeholder={t('cases.wizard_placeholder_doctor')} className={inputCls} />
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {doctorAssignments.map(d => {
+                          const doc = doctors.find(dd => dd.auth_user_id === d.doctor_id || dd.id === d.doctor_id);
+                          return (
+                            <span key={d.doctor_id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium"
+                              style={{ background: d.role_in_procedure === 'primary' ? 'rgba(79,209,255,0.15)' : 'rgba(255,255,255,0.06)', border: `1px solid ${d.role_in_procedure === 'primary' ? 'rgba(79,209,255,0.2)' : 'rgba(255,255,255,0.08)'}` }}>
+                              {d.role_in_procedure === 'primary' && <span className="text-[#4FD1FF] mr-0.5">★</span>}
+                              <span style={{ color: d.role_in_procedure === 'primary' ? '#4FD1FF' : 'rgba(255,255,255,0.6)' }}>{doc?.full_name || d.doctor_id}</span>
+                              <button onClick={() => removeDoctorAssignment(d.doctor_id)} className="ml-0.5 hover:opacity-70">
+                                <X className="w-3 h-3" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                      {doctorAssignments.length < 3 && (
+                        <div className="relative">
+                          <input
+                            value={doctorSearch}
+                            onChange={e => { setDoctorSearch(e.target.value); setShowDoctorDropdown(true); }}
+                            onFocus={() => setShowDoctorDropdown(true)}
+                            onBlur={() => setTimeout(() => setShowDoctorDropdown(false), 200)}
+                            placeholder={t('cases.wizard_placeholder_doctor')}
+                            className={inputCls}
+                          />
+                          {showDoctorDropdown && (
+                            <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden z-50"
+                              style={{ background: '#0D1B2A', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+                              {getAvailableDoctors(doctorAssignments.map(d => d.doctor_id))
+                                .filter(d => !doctorSearch || d.full_name?.toLowerCase().includes(doctorSearch.toLowerCase()))
+                                .slice(0, 10)
+                                .map(d => (
+                                  <button key={d.auth_user_id || d.id}
+                                    onMouseDown={() => addDoctorAssignment(d.auth_user_id || d.id)}
+                                    className="w-full text-left px-3 py-2.5 text-sm transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+                                    style={{ color: 'rgba(255,255,255,0.8)' }}>
+                                    {d.full_name || d.username}
+                                  </button>
+                                ))}
+                              {doctors.filter(d => !doctorAssignments.some(da => da.doctor_id === (d.auth_user_id || d.id))).length === 0 && (
+                                <div className="px-3 py-2 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>No doctors available</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </>
@@ -879,7 +1076,24 @@ export function ImplantCases() {
                       <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_procedure')} </span><span className="text-white">{form.procedure_name || t('common.dash')}</span></div>
                       <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_tooth')} </span><span className="text-white">{form.tooth_number || t('common.dash')}</span></div>
                       <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_date')} </span><span className="text-white">{form.procedure_date || t('common.dash')}</span></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_doctor')} </span><span className="text-white">{form.doctor_name || t('common.dash')}</span></div>
+                      <div className="col-span-2">
+                        <span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('cases.wizard_review_doctor')} </span>
+                        <div className="inline-flex flex-wrap gap-1.5 mt-1">
+                          {doctorAssignments.length > 0
+                            ? doctorAssignments.map(d => {
+                                const doc = doctors.find(dd => dd.auth_user_id === d.doctor_id || dd.id === d.doctor_id);
+                                return (
+                                  <span key={d.doctor_id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                                    style={{ background: d.role_in_procedure === 'primary' ? 'rgba(79,209,255,0.12)' : 'rgba(255,255,255,0.06)', color: d.role_in_procedure === 'primary' ? '#4FD1FF' : 'rgba(255,255,255,0.5)' }}>
+                                    {doc?.full_name || d.doctor_id}
+                                    {d.role_in_procedure === 'primary' && <span style={{ color: '#4FD1FF', opacity: 0.6 }}>★</span>}
+                                  </span>
+                                );
+                              })
+                            : <span className="text-white">{form.doctor_name || t('common.dash')}</span>
+                          }
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div className={sectionCls} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>

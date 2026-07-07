@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { financialRecordService } from '../../services/financialRecordService';
 import { patientService } from '../../services/patientService';
+import { procedureService } from '../../services/procedureService';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   DollarSign, TrendingUp, FileText, PieChart,
@@ -35,6 +37,7 @@ const inputCls = 'w-full h-10 px-3 rounded-xl text-sm outline-none transition-al
 
 export default function Payments() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { t } = useLanguage();
 
   const [page, setPage] = useState(1);
@@ -162,6 +165,22 @@ export default function Payments() {
 
   const totalPages = Math.max(1, Math.ceil(invoices.length / perPage));
   const paged = invoices.slice((page - 1) * perPage, page * perPage);
+
+  const procedureIds = useMemo(
+    () => [...new Set(paged.filter(inv => inv.procedure_id).map(inv => inv.procedure_id!))],
+    [paged]
+  );
+
+  const { data: procedures = [] } = useQuery({
+    queryKey: ['invoice-procedures', ...procedureIds],
+    queryFn: () => Promise.all(procedureIds.map(id => procedureService.getById(id))),
+    enabled: procedureIds.length > 0,
+  });
+
+  const procedureMap = useMemo(
+    () => new Map(procedures.filter(Boolean).map(p => [p!.id, p!])),
+    [procedures]
+  );
 
   const a = analytics || { totalRevenue: 0, totalPending: 0, monthlyCollected: 0, monthlyGrowth: 0, invoiceCount: 0, paidCount: 0, partialCount: 0, pendingCount: 0 };
 
@@ -304,6 +323,8 @@ export default function Payments() {
           <div className="flex-[1]">{t('payments.table_paid')}</div>
           <div className="flex-[1]">{t('payments.table_remaining')}</div>
           <div className="flex-[0.8]">{t('payments.table_branch')}</div>
+          <div className="flex-[1]">Doctor</div>
+          <div className="flex-[0.9]">Procedure</div>
           <div className="flex-[1]">{t('payments.table_status')}</div>
           <div className="flex-[1]">{t('payments.table_date')}</div>
           <div className="w-28 text-right">{t('payments.table_actions')}</div>
@@ -330,6 +351,24 @@ export default function Payments() {
               </div>
               <div className="flex-[0.8] text-[10px] truncate" style={{ color: 'rgba(255,255,255,0.35)' }}>
                 {inv.branch_name || '—'}
+              </div>
+              <div className="flex-[1] text-xs truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                {inv.procedure_id && procedureMap.get(inv.procedure_id)?.doctor_name
+                  ? procedureMap.get(inv.procedure_id)!.doctor_name
+                  : '—'}
+              </div>
+              <div className="flex-[0.9]">
+                {inv.procedure_id ? (
+                  <button onClick={() => navigate(`/dashboard/cases?id=${inv.procedure_id}`)}
+                    className="text-xs font-medium px-2.5 py-1 rounded-lg transition-all"
+                    style={{ color: '#4FD1FF', background: 'rgba(79,209,255,0.1)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(79,209,255,0.2)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(79,209,255,0.1)'; }}>
+                    View Procedure
+                  </button>
+                ) : (
+                  <span className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>
+                )}
               </div>
               <div className="flex-[1]"><Badge status={inv.status} /></div>
               <div className="flex-[1] text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>

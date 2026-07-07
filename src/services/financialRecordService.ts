@@ -21,6 +21,7 @@ function rowToRecord(row: Record<string, unknown>): FinancialRecord {
     created_at: row.created_at as string | undefined,
     branch_id: row.branch_id as string | null | undefined,
     branch_name: branchObj?.name ?? null,
+    procedure_id: row.procedure_id as string | null | undefined,
   };
 }
 
@@ -97,29 +98,42 @@ export const financialRecordService = {
     if (error) throw new Error(error.message);
   },
 
+  async getByProcedure(procedureId: string): Promise<FinancialRecord | null> {
+    const { data, error } = await supabase
+      .from('financial_records')
+      .select('*, branches:branch_id(name)')
+      .eq('procedure_id', procedureId)
+      .eq('record_type', 'invoice')
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? rowToRecord(data) : null;
+  },
+
   async createInvoice(data: {
     patient_id: string;
     patient_name: string;
     invoice_name: string;
     total_amount: number;
     notes?: string;
+    procedure_id?: string;
     change_reason?: string;
     reason_category?: string;
   }): Promise<FinancialRecord> {
-    const record = {
+    const record: Record<string, unknown> = {
       patient_id: data.patient_id,
       patient_name: data.patient_name,
-      record_type: 'invoice' as const,
+      record_type: 'invoice',
       invoice_name: data.invoice_name,
       total_amount: data.total_amount,
       amount: 0,
       paid_so_far: 0,
       remaining_amount: data.total_amount,
-      status: 'Pending' as PaymentStatus,
+      status: 'Pending',
       notes: data.notes || null,
       change_reason: data.change_reason || null,
       reason_category: data.reason_category || null,
     };
+    if (data.procedure_id) record.procedure_id = data.procedure_id;
     const { data: inserted, error } = await supabase
       .from('financial_records')
       .insert([record])

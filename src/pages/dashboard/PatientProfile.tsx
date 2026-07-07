@@ -13,7 +13,7 @@ import { implantFormService } from '../../services/implantFormService';
 import ImplantFormDialog from '../../components/implantForm/ImplantFormDialog';
 import ImplantFormViewer from '../../components/implantForm/ImplantFormViewer';
 import Copyable from '../../components/ui/Copyable';
-import type { Patient, FinancialRecord, PatientFile, Communication, ChangeReason, ImplantForm } from '../../types';
+import type { Patient, FinancialRecord, PatientFile, Communication, ChangeReason, ImplantForm, ProcedureDoctor } from '../../types';
 import ReasonDialog from '../../components/ReasonDialog';
 import { toast } from 'sonner';
 import { useLanguage } from '../../context/LanguageContext';
@@ -145,6 +145,23 @@ export default function PatientProfile() {
   const { data: procedures = [] } = useQuery({
     queryKey: ['patient-procedures', id], queryFn: () => procedureService.getByPatient(id!), enabled: !!id,
   });
+
+  const procedureIds = useMemo(() => procedures.map(p => p.id), [procedures]);
+
+  const { data: procedureDoctors = [] } = useQuery({
+    queryKey: ['procedure-doctors', procedureIds],
+    queryFn: () => procedureService.getDoctorsByProcedureIds(procedureIds),
+    enabled: procedureIds.length > 0,
+  });
+
+  const doctorsByProcedure = useMemo(() => {
+    const map: Record<string, ProcedureDoctor[]> = {};
+    for (const pd of procedureDoctors) {
+      if (!map[pd.procedure_id]) map[pd.procedure_id] = [];
+      map[pd.procedure_id].push(pd);
+    }
+    return map;
+  }, [procedureDoctors]);
 
   const { data: financialRecords = [] } = useQuery({
     queryKey: ['patient-financial', id], queryFn: () => financialRecordService.getByPatient(id!), enabled: !!id,
@@ -732,7 +749,19 @@ export default function PatientProfile() {
                 {p.implant_decision && <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.decision_label')}: </span><span className="text-white">{p.implant_decision}</span></div>}
                 {p.abutment_type && <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.abutment_label')}: </span><span className="text-white">{p.abutment_type}</span></div>}
                 {p.bone_condition && <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.bone_label')}: </span><span className="text-white">{p.bone_condition}</span></div>}
-                {p.doctor_name && <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.doctor_label')}: </span><span className="text-white">{p.doctor_name}</span></div>}
+                {doctorsByProcedure[p.id] && doctorsByProcedure[p.id].length > 0 && (
+                  <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.doctor_label')}: </span>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {doctorsByProcedure[p.id].map(pd => (
+                        <span key={pd.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                          style={{ background: pd.role_in_procedure === 'primary' ? 'rgba(79,209,255,0.12)' : 'rgba(255,255,255,0.06)', color: pd.role_in_procedure === 'primary' ? '#4FD1FF' : 'rgba(255,255,255,0.5)' }}>
+                          {pd.doctor_name || pd.doctor_id}
+                          {pd.role_in_procedure === 'primary' && <span style={{ color: '#4FD1FF', opacity: 0.6 }}>★</span>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {p.extraction_needed !== undefined && <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.extraction_label')}: </span><span className="text-white">{p.extraction_needed ? t('common.yes') : t('common.no')}</span></div>}
               </div>
               {p.notes && <p className="text-xs mt-3" style={{ color: 'rgba(255,255,255,0.4)' }}>{p.notes}</p>}

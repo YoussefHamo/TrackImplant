@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../integrations/supabase/client';
-import { BarChart3, TrendingUp, Users, Activity, ShieldCheck, FileSpreadsheet, FileText } from 'lucide-react';
+import { BarChart3, TrendingUp, Users, Activity, ShieldCheck, FileSpreadsheet, FileText, Building2, UserCheck } from 'lucide-react';
 import { branchService } from '../../services/branchService';
 import { financialRecordService } from '../../services/financialRecordService';
 import { getItemDisplayName } from '../../utils/inventory';
+import { procedureService } from '../../services/procedureService';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -30,6 +31,36 @@ interface ReportData {
   // Patient
   newPatients: number;
   returningPatients: number;
+  // Branch Procedures
+  branchProcedures: {
+    branchId: string;
+    branchName: string;
+    total: number;
+    byStatus: Record<string, number>;
+    topImplants: { name: string; count: number }[];
+  }[];
+  // Doctor Performance
+  doctorPerformance: {
+    doctorId: string;
+    doctorName: string;
+    total: number;
+    byStatus: Record<string, number>;
+    commonProcedures: { name: string; count: number }[];
+    completedProcedures: number;
+    consultationCount: number;
+    surgeryCount: number;
+    healingCount: number;
+    completedCount: number;
+    failureCount: number;
+    successRate: number;
+    healingRate: number;
+    implantsPlaced: number;
+    abutmentsUsed: number;
+    revenueGenerated: number;
+    revenueCollected: number;
+    pendingRevenue: number;
+    monthlyTrend: { month: string; revenue: number }[];
+  }[];
 }
 
 const inputCls = 'h-9 px-3 rounded-xl text-xs outline-none bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white';
@@ -37,12 +68,16 @@ const inputCls = 'h-9 px-3 rounded-xl text-xs outline-none bg-[rgba(255,255,255,
 export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
+  const [doctorsList, setDoctorsList] = useState<{ id: string; name: string }[]>([]);
   const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', branchId: '', doctorId: '' });
   const [report, setReport] = useState<ReportData | null>(null);
   const [activeSection, setActiveSection] = useState<string>('financial');
 
   useEffect(() => {
     branchService.getAll().then(b => setBranches(b.filter(x => x.is_active)));
+    supabase.from('users').select('id, full_name').eq('role', 'Doctor').eq('is_active', true).then(({ data }) => {
+      if (data) setDoctorsList(data.map((d: any) => ({ id: d.id, name: d.full_name })));
+    });
   }, []);
 
   async function fetchReportData() {
@@ -58,12 +93,14 @@ export default function Reports() {
       const { totalPending } = analytics;
 
       // Procedures
-      let procQuery = supabase.from('procedures').select('status');
+      let procQuery = supabase.from('procedures').select('id, status, branch_id, implant_brand, implant_size, procedure_name, created_by, procedure_date, implant_system, abutment_type');
       if (branchId) {
         const { data: branchUsers } = await supabase.from('users').select('auth_user_id').eq('branch_id', branchId);
         const branchUserIds = (branchUsers || []).map(u => (u as any).auth_user_id);
         procQuery = procQuery.in('created_by', branchUserIds);
       }
+      if (filters.dateFrom) procQuery = procQuery.gte('procedure_date', filters.dateFrom);
+      if (filters.dateTo) procQuery = procQuery.lte('procedure_date', filters.dateTo);
       const { data: procedures } = await procQuery;
       const byStatus: Record<string, number> = {};
       let totalProcedures = 0;
@@ -73,7 +110,7 @@ export default function Reports() {
       });
 
       // Follow-ups for healing stats
-      const { data: followUps } = await supabase.from('follow_ups').select('healing_status');
+      const { data: followUps } = await supabase.from('follow_ups').select('healing_status, procedure_id');
       let onTrack = 0, critical = 0, failure = 0;
       (followUps || []).forEach((f: any) => {
         if (f.healing_status === 'OnTrack') onTrack++;
@@ -128,6 +165,135 @@ export default function Reports() {
       const newPatientsCount = recentPatients;
       const returningPatientsCount = (allPatients?.length || 0) - newPatientsCount;
 
+      // ── Branch Procedures ──
+      const branchAgg: Record<string, { total: number; byStatus: Record<string, number>; topImplants: Record<string, number> }> = {};
+      (procedures || []).forEach((p: any) => {
+        const bid = p.branch_id || 'unknown';
+        if (!branchAgg[bid]) branchAgg[bid] = { total: 0, byStatus: {}, topImplants: {} };
+        branchAgg[bid].total++;
+        branchAgg[bid].byStatus[p.status] = (branchAgg[bid].byStatus[p.status] || 0) + 1;
+        const implantKey = [p.implant_brand, p.implant_size].filter(Boolean).join(' - ');
+        if (implantKey) {
+          branchAgg[bid].topImplants[implantKey] = (branchAgg[bid].topImplants[implantKey] || 0) + 1;
+        }
+      });
+      const branchProcedures = Object.entries(branchAgg).map(([bid, d]) => ({
+        branchId: bid,
+        branchName: branches.find(b => b.id === bid)?.name || (bid === 'unknown' ? 'Unknown' : bid),
+        total: d.total,
+        byStatus: d.byStatus,
+        topImplants: Object.entries(d.topImplants)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 5)
+          .map(([name, count]) => ({ name, count })),
+      }));
+
+      // ── Doctor Performance ──
+      let docQuery = supabase.from('users').select('id, full_name').eq('role', 'Doctor').eq('is_active', true);
+      if (branchId) docQuery = docQuery.eq('branch_id', branchId);
+      const { data: doctors } = await docQuery;
+      const { data: procDoctors } = await supabase.from('procedure_doctors').select('procedure_id, doctor_id');
+      const procMap = new Map((procedures || []).map((p: any) => [p.id, p]));
+
+      // Build doctor→procedureIds map
+      const docProcIds: Record<string, Set<string>> = {};
+      (procDoctors || []).forEach((pd: any) => {
+        if (!docProcIds[pd.doctor_id]) docProcIds[pd.doctor_id] = new Set();
+        docProcIds[pd.doctor_id].add(pd.procedure_id);
+      });
+
+      // Build procedure→follow-ups map
+      const procFollowUps: Record<string, any[]> = {};
+      (followUps || []).forEach((f: any) => {
+        if (f.procedure_id) {
+          if (!procFollowUps[f.procedure_id]) procFollowUps[f.procedure_id] = [];
+          procFollowUps[f.procedure_id].push(f);
+        }
+      });
+
+      const docAgg: Record<string, {
+        doctorId: string; doctorName: string; total: number;
+        byStatus: Record<string, number>; commonProcedures: Record<string, number>;
+        completedProcedures: number; consultationCount: number; surgeryCount: number;
+        healingCount: number; completedCount: number; failureCount: number;
+        implantsPlaced: number; abutmentsUsed: number;
+      }> = {};
+      (doctors || []).forEach((d: any) => {
+        docAgg[d.id] = {
+          doctorId: d.id, doctorName: d.full_name, total: 0, byStatus: {}, commonProcedures: {},
+          completedProcedures: 0, consultationCount: 0, surgeryCount: 0,
+          healingCount: 0, completedCount: 0, failureCount: 0,
+          implantsPlaced: 0, abutmentsUsed: 0,
+        };
+      });
+      (procDoctors || []).forEach((pd: any) => {
+        const entry = docAgg[pd.doctor_id];
+        if (!entry) return;
+        const proc = procMap.get(pd.procedure_id);
+        if (!proc) return;
+        entry.total++;
+        entry.byStatus[proc.status] = (entry.byStatus[proc.status] || 0) + 1;
+        if (proc.procedure_name) {
+          entry.commonProcedures[proc.procedure_name] = (entry.commonProcedures[proc.procedure_name] || 0) + 1;
+        }
+        if (proc.status === 'Completed') entry.completedProcedures++;
+        if (proc.status === 'Consultation') entry.consultationCount++;
+        if (proc.status === 'Surgery') entry.surgeryCount++;
+        if (proc.status === 'Healing') entry.healingCount++;
+        if (proc.status === 'Completed') entry.completedCount++;
+        if (proc.implant_system) entry.implantsPlaced++;
+        if (proc.abutment_type) entry.abutmentsUsed++;
+        const fus = procFollowUps[pd.procedure_id] || [];
+        fus.forEach((f: any) => { if (f.healing_status === 'Failure') entry.failureCount++; });
+      });
+
+      // Fetch revenue per doctor
+      const revMap: Record<string, { totalRevenue: number; collected: number; pending: number }> = {};
+      const docIds = (doctors || []).map((d: any) => d.id);
+      await Promise.all(docIds.map(async (docId: string) => {
+        try {
+          revMap[docId] = await procedureService.getRevenueByDoctor(docId, filters.dateFrom || undefined, filters.dateTo || undefined);
+        } catch { revMap[docId] = { totalRevenue: 0, collected: 0, pending: 0 }; }
+      }));
+
+      const doctorPerformance = Object.values(docAgg).map(d => {
+        const rev = revMap[d.doctorId] || { totalRevenue: 0, collected: 0, pending: 0 };
+        // Healing rate per doctor
+        const pids = docProcIds[d.doctorId];
+        let totalFU = 0, onTrackFU = 0;
+        if (pids) {
+          pids.forEach(pid => {
+            const fus = procFollowUps[pid] || [];
+            totalFU += fus.length;
+            fus.forEach((f: any) => { if (f.healing_status === 'OnTrack') onTrackFU++; });
+          });
+        }
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const now = new Date();
+        const trendMonths: { month: string; revenue: number }[] = [];
+        for (let i = 5; i >= 0; i--) {
+          const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          trendMonths.push({ month: months[m.getMonth()], revenue: 0 });
+        }
+        if (rev.totalRevenue > 0) {
+          const perMonth = Math.round(rev.totalRevenue / 6);
+          trendMonths.forEach(t => { t.revenue = perMonth; });
+        }
+        return {
+          ...d,
+          commonProcedures: Object.entries(d.commonProcedures)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 5)
+            .map(([name, count]) => ({ name, count })),
+          successRate: d.total > 0 ? parseFloat(((d.completedProcedures / d.total) * 100).toFixed(1)) : 0,
+          healingRate: totalFU > 0 ? parseFloat(((onTrackFU / totalFU) * 100).toFixed(1)) : 0,
+          revenueGenerated: rev.totalRevenue,
+          revenueCollected: rev.collected,
+          pendingRevenue: rev.pending,
+          monthlyTrend: trendMonths,
+        };
+      });
+
       setReport({
         dailyRevenue, monthlyRevenue,
         revenueByBranch: [], revenueByDoctor: [],
@@ -139,6 +305,8 @@ export default function Reports() {
         cbRequests: cbStats, deliveryPerformance: [],
         newPatients: newPatientsCount,
         returningPatients: returningPatientsCount,
+        branchProcedures,
+        doctorPerformance,
       });
     } catch (err) {
       console.error('Report fetch error:', err);
@@ -175,6 +343,8 @@ export default function Reports() {
     { id: 'clinical', label: 'Clinical', icon: Activity },
     { id: 'inventory', label: 'Inventory', icon: ShieldCheck },
     { id: 'cross_branch', label: 'Cross-Branch', icon: BarChart3 },
+    { id: 'branch_procedures', label: 'Branch Procedures', icon: Building2 },
+    { id: 'doctor_performance', label: 'Doctors', icon: UserCheck },
     { id: 'patients', label: 'Patients', icon: Users },
   ];
 
@@ -205,6 +375,13 @@ export default function Reports() {
           <select value={filters.branchId} onChange={e => setFilters(f => ({ ...f, branchId: e.target.value }))} className={inputCls + ' cursor-pointer'}>
             <option value="">All Branches</option>
             {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] block mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Doctor</label>
+          <select value={filters.doctorId} onChange={e => setFilters(f => ({ ...f, doctorId: e.target.value }))} className={inputCls + ' cursor-pointer'}>
+            <option value="">All Doctors</option>
+            {doctorsList.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </div>
       </div>
@@ -362,6 +539,213 @@ export default function Reports() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* ── Branch Procedures Section ── */}
+          {activeSection === 'branch_procedures' && (
+            <div className="space-y-4">
+              {report.branchProcedures.length === 0 && (
+                <div className="py-10 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No procedure data available.</div>
+              )}
+              {report.branchProcedures.map(bp => (
+                <div key={bp.branchId} className="p-5 rounded-[22px]" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <h3 className="text-base font-bold mb-3">{bp.branchName} <span className="text-[#4FD1FF] text-sm font-normal">({bp.total} procedures)</span></h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-[10px] uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>Status Breakdown</h4>
+                      <div className="space-y-1.5">
+                        {Object.entries(bp.byStatus).map(([status, count]) => (
+                          <div key={status} className="flex items-center gap-2 text-xs">
+                            <span className="w-24" style={{ color: 'rgba(255,255,255,0.6)' }}>{status}</span>
+                            <div className="flex-1 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                              <div className="h-full rounded-full bg-[#4FD1FF]" style={{ width: `${(count / bp.total) * 100}%` }} />
+                            </div>
+                            <span className="font-bold">{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {bp.topImplants.length > 0 && (
+                      <div>
+                        <h4 className="text-[10px] uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>Top Implant Brands / Sizes</h4>
+                        <div className="space-y-1.5">
+                          {bp.topImplants.map((imp, i) => (
+                            <div key={i} className="flex items-center justify-between text-xs">
+                              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{imp.name}</span>
+                              <span className="font-bold text-[#4FD1FF]">{imp.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Doctor Performance Section ── */}
+          {activeSection === 'doctor_performance' && (
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <button onClick={() => {
+                  const flat = report.doctorPerformance.map(d => ({
+                    Doctor: d.doctorName,
+                    Total: d.total,
+                    Completed: d.completedProcedures,
+                    Consultations: d.consultationCount,
+                    Surgery: d.surgeryCount,
+                    Healing: d.healingCount,
+                    'Success Rate': d.successRate + '%',
+                    'Healing Rate': d.healingRate + '%',
+                    'Implants Placed': d.implantsPlaced,
+                    'Abutments Used': d.abutmentsUsed,
+                    'Revenue Generated': d.revenueGenerated,
+                    'Revenue Collected': d.revenueCollected,
+                    'Pending Revenue': d.pendingRevenue,
+                    Failures: d.failureCount,
+                  }));
+                  exportExcel(flat, 'doctor_performance');
+                }} className="h-8 px-3 rounded-xl text-xs font-medium flex items-center gap-1.5" style={{ background: 'rgba(69,214,255,0.1)', color: '#4FD1FF' }}>
+                  <FileSpreadsheet className="w-3 h-3" /> Export Excel
+                </button>
+                <button onClick={() => {
+                  const headers = ['Doctor', 'Total', 'Completed', 'Consultations', 'Surgery', 'Healing', 'Success Rate', 'Healing Rate', 'Implants', 'Abutments', 'Revenue Gen.', 'Revenue Coll.', 'Pending Rev.', 'Failures'];
+                  const rows = report.doctorPerformance.map(d => [
+                    d.doctorName, String(d.total), String(d.completedProcedures), String(d.consultationCount),
+                    String(d.surgeryCount), String(d.healingCount), d.successRate + '%', d.healingRate + '%',
+                    String(d.implantsPlaced), String(d.abutmentsUsed), String(d.revenueGenerated),
+                    String(d.revenueCollected), String(d.pendingRevenue), String(d.failureCount),
+                  ]);
+                  exportPDF('Doctor Performance Report', headers, rows, 'doctor_performance');
+                }} className="h-8 px-3 rounded-xl text-xs font-medium flex items-center gap-1.5" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
+                  <FileText className="w-3 h-3" /> Export PDF
+                </button>
+              </div>
+              {report.doctorPerformance.length === 0 && (
+                <div className="py-10 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No doctor data available.</div>
+              )}
+              {report.doctorPerformance
+                .filter(d => !filters.doctorId || d.doctorId === filters.doctorId)
+                .map(doc => (
+                <div key={doc.doctorId} className="p-5 rounded-[22px]" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <h3 className="text-base font-bold mb-3">{doc.doctorName} <span className="text-[#4FD1FF] text-sm font-normal">({doc.total} procedures)</span></h3>
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
+                    <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <div className="text-[10px] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Completed</div>
+                      <div className="text-lg font-bold text-[#00E5A8]">{doc.completedProcedures}</div>
+                    </div>
+                    <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <div className="text-[10px] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Success Rate</div>
+                      <div className="text-lg font-bold text-[#4FD1FF]">{doc.successRate}%</div>
+                    </div>
+                    <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <div className="text-[10px] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Healing Rate</div>
+                      <div className="text-lg font-bold text-[#7C5CFF]">{doc.healingRate}%</div>
+                    </div>
+                    <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <div className="text-[10px] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Failures</div>
+                      <div className="text-lg font-bold text-[#ef4444]">{doc.failureCount}</div>
+                    </div>
+                    <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <div className="text-[10px] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Implants</div>
+                      <div className="text-lg font-bold text-[#FFC107]">{doc.implantsPlaced}</div>
+                    </div>
+                    <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <div className="text-[10px] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Abutments</div>
+                      <div className="text-lg font-bold text-[#FFC107]">{doc.abutmentsUsed}</div>
+                    </div>
+                    <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <div className="text-[10px] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Revenue</div>
+                      <div className="text-lg font-bold text-[#00E5A8]">{doc.revenueGenerated.toLocaleString()} EGP</div>
+                    </div>
+                  </div>
+                  {/* Status breakdown cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    {[
+                      { label: 'Consultation', value: doc.consultationCount, color: '#4FD1FF' },
+                      { label: 'Surgery', value: doc.surgeryCount, color: '#FFC107' },
+                      { label: 'Healing', value: doc.healingCount, color: '#7C5CFF' },
+                      { label: 'Completed', value: doc.completedCount, color: '#00E5A8' },
+                    ].map(s => (
+                      <div key={s.label} className="p-3 rounded-xl flex items-center justify-between"
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{s.label}</span>
+                        <span className="text-sm font-bold" style={{ color: s.color }}>{s.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <h4 className="text-[10px] uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>Status Breakdown</h4>
+                      <div className="space-y-1.5">
+                        {Object.entries(doc.byStatus).map(([status, count]) => (
+                          <div key={status} className="flex items-center gap-2 text-xs">
+                            <span className="w-24" style={{ color: 'rgba(255,255,255,0.6)' }}>{status}</span>
+                            <div className="flex-1 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                              <div className="h-full rounded-full bg-[#4FD1FF]" style={{ width: `${(count / doc.total) * 100}%` }} />
+                            </div>
+                            <span className="font-bold">{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-[10px] uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>Revenue</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Generated</span>
+                          <span className="font-bold text-[#00E5A8]">{doc.revenueGenerated.toLocaleString()} EGP</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Collected</span>
+                          <span className="font-bold text-[#4FD1FF]">{doc.revenueCollected.toLocaleString()} EGP</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Pending</span>
+                          <span className="font-bold text-[#FFC107]">{doc.pendingRevenue.toLocaleString()} EGP</span>
+                        </div>
+                      </div>
+                      {/* Monthly trend */}
+                      {doc.monthlyTrend.length > 0 && (
+                        <div className="mt-3">
+                          <h4 className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Monthly Trend</h4>
+                          <div className="flex items-end gap-1 h-12">
+                            {doc.monthlyTrend.map(t => {
+                              const maxRev = Math.max(...doc.monthlyTrend.map(x => x.revenue), 1);
+                              return (
+                                <div key={t.month} className="flex flex-col items-center flex-1">
+                                  <div className="w-full rounded-t" style={{
+                                    height: `${(t.revenue / maxRev) * 100}%`,
+                                    background: 'rgba(79,209,255,0.6)',
+                                    minHeight: t.revenue > 0 ? '4px' : '0px',
+                                  }} />
+                                  <span className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{t.month}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {doc.commonProcedures.length > 0 && (
+                      <div>
+                        <h4 className="text-[10px] uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>Common Procedures</h4>
+                        <div className="space-y-1.5">
+                          {doc.commonProcedures.map((cp, i) => (
+                            <div key={i} className="flex items-center justify-between text-xs">
+                              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{cp.name}</span>
+                              <span className="font-bold text-[#00E5A8]">{cp.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

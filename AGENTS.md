@@ -61,13 +61,13 @@ Complete multi-branch dental implant ERP with financial, clinical, inventory, an
 | Patients | View, search, update | **Global** — all branches |
 | Patient Financial Records | View only | **Global** — all branches |
 | Patient Profile | Full view, add communications, add invoices | **Global** |
-| Dashboard | **ClinicalDashboard** (financial analytics, revenue, appointments, procedures stats) | **Global** |
-| Appointments | View, update own appointments | **Own branch only** |
-| Procedures | Full CRUD, stock consumption on create | **Own branch only** |
+| Dashboard | **DoctorDashboard** (own stats: appointments, procedures, revenue, follow-ups, patients) | **Own data only** |
+| Appointments | View, update own appointments; RLS isolates to `doctor_id = auth.uid()` | **Own only** |
+| Procedures | Full CRUD, stock consumption on create; RLS isolates via `procedure_doctors` subquery | **Own only (where assigned via procedure_doctors)** |
 | Follow-ups | Full CRUD, healing status tracking | **Own branch only** |
-| Inventory | **Read-only** — view all tabs (Implants, Abutments, Prosthetic, Materials, Branches, Count, Deliveries) | **Own branch only** |
+| Inventory | **BLOCKED** — no access at RLS or route level | **None** |
 | Returns | View own returns, request returns | **Own branch only** |
-| Reports | All sections — read-only | **Own branch filtered** |
+| Reports | All sections — read-only, doctor-filtered | **Own branch filtered** |
 | Communications | View/create for own patients | **Own branch only** |
 | Settings | None | — |
 
@@ -169,13 +169,15 @@ Complete multi-branch dental implant ERP with financial, clinical, inventory, an
 ### Phase 2 — Pages/Components
 
 #### `Reports.tsx`
-- Financial section: daily revenue (7-day), monthly breakdown, outstanding balance
-- Clinical section: procedures by status, healing stats (on-track/critical/failure)
-- Inventory section: low stock alerts, top 5 used implants, estimated inventory value
-- Cross-branch section: request stats (pending/approved/rejected/completed)
-- Patient section: new vs returning patients (30-day window)
-- Export: Excel (xlsx) and PDF per section
-- Date range + Branch + Doctor filters
+- **Financial section**: daily revenue (7-day), monthly breakdown, outstanding balance
+- **Clinical section**: procedures by status, healing stats (on-track/critical/failure)
+- **Inventory section**: low stock alerts, top 5 used implants, estimated inventory value
+- **Cross-branch section**: request stats (pending/approved/rejected/completed)
+- **Patient section**: new vs returning patients (30-day window)
+- **Branch Procedures section**: total procedures by branch, status breakdown, common implants per branch
+- **Doctors section**: per-doctor analytics — total/completed/surgery/healing/consultation counts, success rate, healing rate, failures, implants placed, abutments used, revenue generated/collected/pending (split equally), monthly trend chart
+- **Export**: Excel (xlsx) and PDF per section
+- **Filters**: Date range + Branch + Doctor + Doctor Performance filters
 
 #### `Inventory.tsx` — Count Tab
 - Sessions list table: name (from notes), branch, status badge, created date, actions
@@ -214,13 +216,53 @@ Complete multi-branch dental implant ERP with financial, clinical, inventory, an
 - Fixed filter param names: `branchId` (not `branch_id`), `dateFrom`/`dateTo`
 
 #### `Dashboard.tsx`
+- **DoctorDashboard**: today's appointments, upcoming appointments, upcoming/critical follow-ups, today's procedures, procedure status summary, my patients, revenue (generated/collected/pending)
 - **ManagerDashboard**: stock requests widget, low stock alerts, total deliveries, today's appointments
-- Role-aware routing: Receptionist → ReceptionDashboard, Manager → ManagerDashboard, Admin/Doctor → ClinicalDashboard
+- **ReceptionDashboard**: today's appointments, patient check-ins, quick actions
+- **ClinicalDashboard** (Admin): full analytics, revenue, appointments, procedures
+- Role-aware routing: Doctor → DoctorDashboard, Receptionist → ReceptionDashboard, Manager → ManagerDashboard, Admin → ClinicalDashboard
 - Removed unused queries/variables for clean build
 
 #### `DashboardLayout.tsx`
 - Nav items properly typed with optional `adminOnly` prop
 - `Logs` tab visible only for Admin role
+
+### Phase 2 — Doctor Workflow
+
+#### Database (Migration `20260710000000_doctor_workflow.sql` + `20260711000000_doctor_workflow_phase2.sql`)
+- `procedure_doctors` junction table (procedure_id, doctor_id, role_in_procedure, display_order, revenue_percentage)
+- `revenue_percentage` column (equal split: 100 / num_doctors)
+- `procedure_id` FK on `financial_records` (nullable, only for implant procedures)
+- Auto-invoice trigger `trg_procedure_auto_invoice` (implant procedures only, atomic with procedure insert)
+- RLS: Doctor sees only own procedures (via `procedure_doctors` subquery) + own appointments (via `doctor_id`)
+- RLS: Doctor **blocked** from ALL inventory tables (`get_current_user_role() != 'Doctor'`)
+- Procedure notification trigger `trg_procedure_notification`
+
+#### Services
+- `procedureService.assignDoctors()` — saves multi-doctor assignments with equal revenue_percentage
+- `procedureService.getDoctors()` / `getDoctorsByProcedureIds()` — fetch procedure doctors
+- `procedureService.getByDoctor()` / `getProcedureStatsForDoctor()` / `getProceduresByDoctorForPeriod()` — doctor-isolated queries
+- `procedureService.getInvoiceForProcedure()` — fetch linked invoice
+- `procedureService.getRevenueByDoctor()` — revenue split equally, with date range filter
+- `financialRecordService.getByProcedure()` — fetch invoice by procedure_id
+- `appointmentService.getByDoctor()` / `getUpcomingByDoctor()` — doctor-isolated queries
+
+#### UI
+- **ImplantCases.tsx**: Searchable multi-doctor dropdown (max 3, primary/assistant), validation (requires at least 1 doctor + primary), dedicated filters (Doctor, Branch, Status, Implant System, Date Range)
+- **PatientProfile.tsx**: Doctor badges with primary star on each procedure card
+- **Payments.tsx**: "View Procedure" button for procedure-linked invoices
+- **Appointments.tsx**: Doctor sees only own appointments
+- **Dashboard.tsx**: New DoctorDashboard with appointments, follow-ups, procedures, revenue, patients
+- **Reports.tsx**: New "Branch Procedures" + "Doctors" tabs with full analytics (revenue, success rate, healing rate, implants, abutments, export)
+- **App.tsx**: Inventory route blocks Doctor via `ProtectedRoute`
+- **Inventory.tsx**: Doctor cannot access at all
+
+#### Key Decisions
+- Revenue splits equally among all assigned doctors (Option B)
+- Primary doctor's name stored on `procedures.doctor_name` for backward compatibility
+- Auto-invoice created via DB trigger (not app code) — ensures atomicity
+- Doctor isolated via RLS + UI filtering (two layers)
+- Procedure search filters: doctor, branch, status, date range, implant system
 
 ### Build Fixes (TypeScript Errors Resolved)
 
@@ -276,6 +318,11 @@ Implemented per the specification. Every sensitive business operation requires a
 - Procedure kit items are SNAPSHOT on assignment (`kit_snapshot` JSONB on `procedures`)
 - `auth.jwt()->>'role'` returns `'authenticated'` — always use `get_current_user_role()` or `auth.jwt()->'user_metadata'->>'role'`
 - All FKs reference `users(auth_user_id)` (auth.users.id)
+- **Procedure soft delete**: `procedures` has `is_deleted` (boolean) + `deleted_at` (timestamptz). All queries filter `is_deleted = false`. On delete:
+  - If linked invoice has payments → BLOCK with error
+  - If linked invoice exists with no payments → mark invoice `Cancelled`
+  - Then set `is_deleted = true, deleted_at = now()` on the procedure
+- `financial_records.procedure_id` FK: `ON DELETE SET NULL` (safety fallback — actual deletes handled by app soft-delete logic)
 - `LanguageContext.t()` second argument accepts `string | Record` — string is treated as a default fallback, Record is used for interpolation
 
 ---
