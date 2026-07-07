@@ -189,7 +189,7 @@ export default function Reports() {
       }));
 
       // ── Doctor Performance ──
-      let docQuery = supabase.from('users').select('id, full_name').eq('role', 'Doctor').eq('is_active', true);
+      let docQuery = supabase.from('users').select('auth_user_id as id, full_name').eq('role', 'Doctor').eq('is_active', true);
       if (branchId) docQuery = docQuery.eq('branch_id', branchId);
       const { data: doctors } = await docQuery;
       const { data: procDoctors } = await supabase.from('procedure_doctors').select('procedure_id, doctor_id');
