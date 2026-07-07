@@ -93,12 +93,8 @@ export default function Reports() {
       const { totalPending } = analytics;
 
       // Procedures
-      let procQuery = supabase.from('procedures').select('id, status, branch_id, implant_brand, implant_size, procedure_name, created_by, procedure_date, implant_system, abutment_type');
-      if (branchId) {
-        const { data: branchUsers } = await supabase.from('users').select('auth_user_id').eq('branch_id', branchId);
-        const branchUserIds = (branchUsers || []).map(u => (u as any).auth_user_id);
-        procQuery = procQuery.in('created_by', branchUserIds);
-      }
+      let procQuery = supabase.from('procedures').select('id, status, branch_id, implant_brand, implant_size, procedure_name, procedure_date, implant_system, abutment_type').eq('is_deleted', false);
+      if (branchId) procQuery = procQuery.eq('branch_id', branchId);
       if (filters.dateFrom) procQuery = procQuery.gte('procedure_date', filters.dateFrom);
       if (filters.dateTo) procQuery = procQuery.lte('procedure_date', filters.dateTo);
       const { data: procedures } = await procQuery;
