@@ -189,7 +189,7 @@ export default function Reports() {
       }));
 
       // ── Doctor Performance ──
-      let docQuery = supabase.from('users').select('auth_user_id as id, full_name').eq('role', 'Doctor').eq('is_active', true);
+      let docQuery = supabase.from('users').select('auth_user_id, full_name').eq('role', 'Doctor').eq('is_active', true);
       if (branchId) docQuery = docQuery.eq('branch_id', branchId);
       const { data: doctors } = await docQuery;
       const { data: procDoctors } = await supabase.from('procedure_doctors').select('procedure_id, doctor_id');
@@ -219,8 +219,9 @@ export default function Reports() {
         implantsPlaced: number; abutmentsUsed: number;
       }> = {};
       (doctors || []).forEach((d: any) => {
-        docAgg[d.id] = {
-          doctorId: d.id, doctorName: d.full_name, total: 0, byStatus: {}, commonProcedures: {},
+        const uuid = d.auth_user_id;
+        docAgg[uuid] = {
+          doctorId: uuid, doctorName: d.full_name, total: 0, byStatus: {}, commonProcedures: {},
           completedProcedures: 0, consultationCount: 0, surgeryCount: 0,
           healingCount: 0, completedCount: 0, failureCount: 0,
           implantsPlaced: 0, abutmentsUsed: 0,
@@ -249,7 +250,7 @@ export default function Reports() {
 
       // Fetch revenue per doctor
       const revMap: Record<string, { totalRevenue: number; collected: number; pending: number }> = {};
-      const docIds = (doctors || []).map((d: any) => d.id);
+      const docIds = (doctors || []).map((d: any) => d.auth_user_id);
       await Promise.all(docIds.map(async (docId: string) => {
         try {
           revMap[docId] = await procedureService.getRevenueByDoctor(docId, filters.dateFrom || undefined, filters.dateTo || undefined);
