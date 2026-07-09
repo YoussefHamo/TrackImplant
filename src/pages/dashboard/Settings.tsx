@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../integrations/supabase/client';
 import { userService } from '../../services/userService';
@@ -8,11 +8,14 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import {
   Plus, Search, X, Shield, UserCog, Globe, Sun, Moon, User,
-  ChevronLeft, ChevronRight, Eye, EyeOff, Download, Upload
+  ChevronLeft, ChevronRight, Eye, EyeOff, Download, Upload,
+  Bell, BellOff
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AppUser, UserRole } from '../../types';
 import FixedOverlay from '../../components/ui/FixedOverlay';
+import { notificationPreferenceService } from '../../services/notificationPreferenceService';
+import type { NotificationCategory } from '../../services/notificationService';
 
 const inputCls = 'w-full h-10 px-3 rounded-xl text-sm outline-none transition-all bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500';
 
@@ -55,6 +58,8 @@ export default function Settings() {
   const [createForm, setCreateForm] = useState({ full_name: '', username: '', email: '', password: '', role: 'Doctor' as UserRole, branch_id: '' });
   const [editForm, setEditForm] = useState({ full_name: '', role: 'Doctor' as UserRole, is_active: true, branch_id: '' });
   const [showPassword, setShowPassword] = useState(false);
+  const [notificationPrefs, setNotificationPrefs] = useState<Record<string, boolean>>({});
+  const [prefsLoading, setPrefsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const perPage = 10;
 
@@ -97,6 +102,19 @@ export default function Settings() {
     setProfileEmail(user.email || '');
     setProfileLoaded(true);
   }
+
+  // Load notification preferences
+  useEffect(() => {
+    if (!user?.id) return;
+    notificationPreferenceService.bulkInit(user.id).then(() => {
+      notificationPreferenceService.getAll(user.id).then(prefs => {
+        const map: Record<string, boolean> = {};
+        prefs.forEach(p => { map[p.category] = p.in_app; });
+        setNotificationPrefs(map);
+        setPrefsLoading(false);
+      });
+    }).catch(() => setPrefsLoading(false));
+  }, [user?.id]);
 
   const updateProfileMut = useMutation({
     mutationFn: async (data: { full_name?: string; email?: string }) => {
@@ -284,6 +302,62 @@ export default function Settings() {
           )}
         </div>
       )}
+
+      {/* Notification Preferences Section */}
+      <div className="rounded-[20px] p-6" style={{ background: 'var(--app-card-bg)', border: '1px solid var(--app-border)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(79,209,255,0.1)' }}>
+            <Bell className="w-4 h-4" style={{ color: '#4FD1FF' }} />
+          </div>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--app-text)' }}>Notification Preferences</h2>
+        </div>
+        <p className="text-xs mb-4" style={{ color: 'rgba(255,255,255,0.4)' }}>Choose which notification categories you want to see in-app.</p>
+        {prefsLoading ? (
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-[#4FD1FF] border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Loading preferences...</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {Object.entries({
+              appointment: { label: 'Appointments', icon: '📅' },
+              procedure: { label: 'Procedures', icon: '🔬' },
+              invoice: { label: 'Invoices', icon: '💰' },
+              payment: { label: 'Payments', icon: '💵' },
+              inventory: { label: 'Inventory', icon: '📦' },
+              stock_request: { label: 'Stock Requests', icon: '🔄' },
+              delivery: { label: 'Deliveries', icon: '🚚' },
+              follow_up: { label: 'Follow-ups', icon: '🩺' },
+              reminder: { label: 'Reminders', icon: '🔔' },
+              crm: { label: 'CRM', icon: '💬' },
+              system: { label: 'System', icon: '⚙️' },
+              general: { label: 'General', icon: '📋' },
+            }).map(([cat, cfg]) => {
+              const isEnabled = notificationPrefs[cat] !== false;
+              return (
+                <div key={cat} className="flex items-center justify-between p-3 rounded-xl transition-all"
+                  style={{ background: isEnabled ? 'rgba(79,209,255,0.04)' : 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{cfg.icon}</span>
+                    <span className="text-sm font-medium" style={{ color: isEnabled ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)' }}>{cfg.label}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newVal = !isEnabled;
+                      setNotificationPrefs(prev => ({ ...prev, [cat]: newVal }));
+                      if (user?.id) notificationPreferenceService.upsert(user.id, cat as NotificationCategory, newVal);
+                    }}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+                    style={{ background: isEnabled ? 'rgba(79,209,255,0.1)' : 'rgba(239,68,68,0.1)', color: isEnabled ? '#4FD1FF' : '#ef4444' }}
+                  >
+                    {isEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* System Section */}
       <div className="rounded-[20px] p-6" style={{ background: 'var(--app-card-bg)', border: '1px solid var(--app-border)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>

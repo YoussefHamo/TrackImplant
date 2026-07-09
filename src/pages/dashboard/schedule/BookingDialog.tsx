@@ -6,6 +6,7 @@ import { userService } from '../../../services/userService';
 import { appointmentService } from '../../../services/appointmentService';
 import { doctorScheduleService } from '../../../services/doctorScheduleService';
 import Portal from '../../../components/ui/Portal';
+import { useBranch } from '../../../context/BranchContext';
 import DoubleBookingWarning from './DoubleBookingWarning';
 import type { Appointment } from '../../../types';
 
@@ -27,6 +28,7 @@ interface BookingDialogProps {
 }
 
 export default function BookingDialog({ isOpen, onClose, onSave, appointment, defaultDate, defaultDoctorId }: BookingDialogProps) {
+  const { activeBranchId } = useBranch();
   const [patientId, setPatientId] = useState('');
   const [doctorId, setDoctorId] = useState('');
   const [date, setDate] = useState('');
@@ -114,7 +116,7 @@ export default function BookingDialog({ isOpen, onClose, onSave, appointment, de
   }
 
   async function doSave(appointmentDate: string) {
-    await onSave({ patient_id: patientId, doctor_id: doctorId, appointment_date: appointmentDate, duration_minutes: duration, status: appointment?.status || 'scheduled', notes, branch_id: selectedDoctor?.branch_id });
+    await onSave({ patient_id: patientId, doctor_id: doctorId, appointment_date: appointmentDate, duration_minutes: duration, status: appointment?.status || 'scheduled', notes, branch_id: activeBranchId || undefined });
     resetForm();
     onClose();
   }

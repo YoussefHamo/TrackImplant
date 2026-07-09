@@ -8,6 +8,7 @@ import { appointmentService } from '../../services/appointmentService';
 import { followUpService } from '../../services/followUpService';
 import { patientFileService, type DocumentCategory } from '../../services/patientFileService';
 import { communicationService } from '../../services/communicationService';
+import { timelineService } from '../../services/timelineService';
 import { useAuth } from '../../context/AuthContext';
 import { implantFormService } from '../../services/implantFormService';
 import ImplantFormDialog from '../../components/implantForm/ImplantFormDialog';
@@ -186,8 +187,14 @@ export default function PatientProfile() {
     queryKey: ['patient-implant-forms', id], queryFn: () => implantFormService.getByPatient(id!), enabled: !!id,
   });
 
-  const { data: communications = [] } = useQuery({
+  useQuery({
     queryKey: ['patient-communications', id], queryFn: () => communicationService.getByPatient(id!), enabled: !!id,
+  });
+
+  const { data: timelineEvents = [] } = useQuery({
+    queryKey: ['patient-timeline', id],
+    queryFn: () => timelineService.getByPatient(id!),
+    enabled: !!id,
   });
 
   const [showCommForm, setShowCommForm] = useState(false);
@@ -534,6 +541,9 @@ export default function PatientProfile() {
                   <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{t('profile.registered_prefix')} {patient.created_at ? new Date(patient.created_at).toLocaleDateString() : t('common.dash')}</span>
                   {patient.external_medical_code && <span className="text-[10px] font-mono px-2 py-0.5 rounded-md" style={{ background: 'rgba(79,209,255,0.08)', color: '#4FD1FF' }}>
                     <Copyable text={patient.external_medical_code}>{patient.external_medical_code}</Copyable>
+                  </span>}
+                  {patient.home_branch_name && <span className="text-[10px] font-medium px-2 py-0.5 rounded-md" style={{ background: 'rgba(0,229,168,0.08)', color: '#00E5A8' }}>
+                    {patient.home_branch_name}
                   </span>}
                   <span className="text-[10px] px-2 py-0.5 rounded-md" style={{ background: patient.insurance_company ? 'rgba(79,209,255,0.08)' : 'rgba(0,229,168,0.08)', color: patient.insurance_company ? '#4FD1FF' : '#00E5A8' }}>{patient.insurance_company || 'Cash'}</span>
                 </div>
@@ -1056,106 +1066,38 @@ export default function PatientProfile() {
           TAB 7: TIMELINE
           ══════════════════════════════════════ */}
       {activeTab === 'Timeline' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>Activity Timeline</span>
-            <button onClick={() => setShowCommForm(true)}
-              className="h-9 px-4 rounded-xl flex items-center gap-1.5 text-xs font-bold"
-              style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
-              <Plus className="w-3.5 h-3.5" /> Add Note
-            </button>
-          </div>
-
-          {(() => {
-            // Build timeline entries
-            const entries: { date: string; type: string; title: string; desc: string; color: string; icon: string }[] = [];
-
-            communications.forEach(c => {
-              entries.push({
-                date: c.created_at || '',
-                type: c.type,
-                title: c.type.charAt(0).toUpperCase() + c.type.slice(1) + (c.direction === 'inbound' ? ' (Inbound)' : ' (Outbound)'),
-                desc: c.content || '',
-                color: (c.direction === 'inbound' ? '#4FD1FF' : '#FFC107') as string,
-                icon: c.type === 'call' ? '📞' : c.type === 'email' ? '✉️' : c.type === 'sms' ? '💬' : '📝',
-              });
-            });
-
-            procedures.forEach(p => {
-              entries.push({
-                date: p.created_at || p.procedure_date || '',
-                type: 'procedure',
-                title: p.procedure_name || 'Procedure',
-                desc: `Tooth ${p.tooth_number || '—'} · ${p.status}`,
-                color: '#7C5CFF',
-                icon: '🔧',
-              });
-            });
-
-            appointments.forEach(a => {
-              if (a.patient_id === id) {
-                entries.push({
-                  date: a.created_at || '',
-                  type: 'appointment',
-                  title: `Appointment - ${a.status}`,
-                  desc: new Date(a.appointment_date).toLocaleString(),
-                  color: '#00E5A8',
-                  icon: '📅',
-                });
-              }
-            });
-
-            payments.forEach(p => {
-              entries.push({
-                date: p.created_at || '',
-                type: 'payment',
-                title: `Payment $${Number(p.amount).toLocaleString()}`,
-                desc: p.payment_method || '',
-                color: '#00E5A8',
-                icon: '💰',
-              });
-            });
-
-            invoices.forEach(i => {
-              entries.push({
-                date: i.created_at || '',
-                type: 'invoice',
-                title: `Invoice: ${i.invoice_name}`,
-                desc: `$${Number(i.total_amount).toLocaleString()} · ${i.status}`,
-                color: '#7C5CFF',
-                icon: '🧾',
-              });
-            });
-
-            entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-            return entries.length === 0 ? (
-              <div className="py-12 text-center text-sm rounded-[18px]" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)' }}>
-                No activity recorded yet
-              </div>
-            ) : (
-              <div className="space-y-0">
-                {entries.slice(0, 50).map((e, i) => (
-                  <div key={i} className="flex gap-4 pb-4 pl-4 relative">
-                    {i < entries.length - 1 && <div className="absolute left-[19px] top-8 bottom-0 w-px" style={{ background: 'rgba(255,255,255,0.06)' }} />}
-                    <div className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs"
-                      style={{ background: `${e.color}15`, border: `1px solid ${e.color}30` }}>
-                      <span>{e.icon}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-white">{e.title}</span>
-                        <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                          {e.date ? new Date(e.date).toLocaleDateString() : ''}
-                        </span>
-                      </div>
-                      <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>{e.desc}</p>
+        <div className="space-y-3">
+          {timelineEvents.length === 0 ? (
+            <div className="text-center py-16" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              <div className="text-4xl mb-3">📋</div>
+              <p className="text-sm">No timeline events recorded yet</p>
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {timelineEvents.map(event => (
+                <div key={event.id} className="flex items-start gap-4 p-4 rounded-xl transition-colors hover:bg-[rgba(255,255,255,0.03)] cursor-pointer"
+                  onClick={() => {
+                    if (event.related_entity_type === 'appointment') navigate(`/dashboard/appointments`);
+                    else if (event.related_entity_type === 'procedure') navigate(`/dashboard/cases`);
+                    else if (event.related_entity_type === 'financial_record') navigate(`/dashboard/payments`);
+                  }}
+                  style={{ borderLeft: `2px solid rgba(255,255,255,0.06)` }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: 'rgba(79,209,255,0.08)' }}>
+                    {event.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white/80 font-medium">{event.description}</p>
+                    <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      <span>{new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span>{event.time}</span>
+                      {event.user_name && <span>by {event.user_name}</span>}
+                      {event.branch_name && <span>at {event.branch_name}</span>}
                     </div>
                   </div>
-                ))}
-              </div>
-            );
-          })()}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

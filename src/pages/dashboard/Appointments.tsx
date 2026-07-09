@@ -7,6 +7,7 @@ import { patientService } from '../../services/patientService';
 import type { Appointment } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { useBranch } from '../../context/BranchContext';
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -51,16 +52,17 @@ export default function Appointments() {
   const [form, setForm] = useState({ patient_id: '', appointment_date: '' });
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { activeBranchId } = useBranch();
   const MONTHS_KEYS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
   const DAYS_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
   const { data: appointments = [] } = useQuery<Appointment[]>({
-    queryKey: ['appointments'],
+    queryKey: ['appointments', activeBranchId],
     queryFn: () => {
       if (user?.role === 'Doctor') {
-        return appointmentService.getByDoctor(user.id);
+        return appointmentService.getByDoctor(user.id, activeBranchId);
       }
-      return appointmentService.getAll();
+      return appointmentService.getAll(activeBranchId);
     },
   });
 

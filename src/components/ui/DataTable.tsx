@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import Skeleton from './Skeleton';
+import { Skeleton } from './Skeleton';
 import EmptyState from './EmptyState';
 
 interface Column<T> {
@@ -56,7 +56,7 @@ export default function DataTable<T>({
   if (safeData.length === 0) {
     return (
       <EmptyState
-        message={emptyMessage}
+        title={emptyMessage}
         description={emptyDescription}
       />
     );

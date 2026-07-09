@@ -1,6 +1,7 @@
 import { supabase } from '../integrations/supabase/client';
 import { auditLogService, getCurrentUserInfo } from './auditLogService';
 import { implantInventoryService } from './implantInventoryService';
+import { timelineEventService } from './timelineEventService';
 import { getItemDisplayName } from '../utils/inventory';
 import type { Procedure, ProcedureKitItem, InventoryItem, ProcedureDoctor, FinancialRecord } from '../types';
 
@@ -346,6 +347,17 @@ export const procedureService = {
       }
     }
 
+    // Write timeline event
+    timelineEventService.write({
+      patient_id: procedure.patient_id,
+      event_type: 'procedure_created',
+      description: `${procedure.procedure_name}${procedure.tooth_number ? ` (Tooth #${procedure.tooth_number})` : ''} — ${procedure.status}`,
+      related_entity_type: 'procedure',
+      related_entity_id: data.id,
+      branch_id: procedure.branch_id || undefined,
+      metadata: { status: procedure.status, tooth_number: procedure.tooth_number, implant_system: procedure.implant_system },
+    }).catch(() => {});
+
     const actor = await getCurrentUserInfo();
     if (actor) {
       auditLogService.log({
@@ -370,6 +382,20 @@ export const procedureService = {
     const { error } = await supabase.from('procedures').update(updates).eq('id', id);
     if (error) throw new Error(error.message);
 
+    // Write timeline event
+    const proc = await this.getById(id).catch(() => null);
+    if (proc?.patient_id) {
+      timelineEventService.write({
+        patient_id: proc.patient_id,
+        event_type: status === 'completed' ? 'procedure_completed' : `procedure_${status}`,
+        description: `${proc.procedure_name}${proc.tooth_number ? ` (Tooth #${proc.tooth_number})` : ''} — ${status}`,
+        related_entity_type: 'procedure',
+        related_entity_id: id,
+        branch_id: proc.branch_id || undefined,
+        metadata: { status, previous_status: proc.status },
+      }).catch(() => {});
+    }
+
     const actor = await getCurrentUserInfo();
     if (actor) {
       auditLogService.log({
@@ -391,6 +417,22 @@ export const procedureService = {
     if (reason_category !== undefined) payload.reason_category = reason_category;
     const { error } = await supabase.from('procedures').update(payload).eq('id', id);
     if (error) throw new Error(error.message);
+
+    // Write timeline event
+    if (updates.status) {
+      const proc2 = await this.getById(id).catch(() => null);
+      if (proc2?.patient_id) {
+        timelineEventService.write({
+          patient_id: proc2.patient_id,
+          event_type: updates.status === 'completed' ? 'procedure_completed' : `procedure_${updates.status}`,
+          description: `${proc2.procedure_name}${proc2.tooth_number ? ` (Tooth #${proc2.tooth_number})` : ''} — ${updates.status}`,
+          related_entity_type: 'procedure',
+          related_entity_id: id,
+          branch_id: proc2.branch_id || undefined,
+          metadata: { status: updates.status },
+        }).catch(() => {});
+      }
+    }
 
     const actor = await getCurrentUserInfo();
     if (actor) {
@@ -436,6 +478,21 @@ export const procedureService = {
       .update({ is_deleted: true, deleted_at: new Date().toISOString() })
       .eq('id', id);
     if (error) throw new Error(error.message);
+
+    // Write timeline event
+    const hasInvoice = !!invoice;
+    const proc = await this.getById(id).catch(() => null);
+    if (proc?.patient_id) {
+      timelineEventService.write({
+        patient_id: proc.patient_id,
+        event_type: 'procedure_deleted',
+        description: `${proc.procedure_name}${proc.tooth_number ? ` (Tooth #${proc.tooth_number})` : ''} — deleted${hasInvoice ? ' (invoice cancelled)' : ''}`,
+        related_entity_type: 'procedure',
+        related_entity_id: id,
+        branch_id: proc.branch_id || undefined,
+        metadata: { is_deleted: true, had_invoice: hasInvoice },
+      }).catch(() => {});
+    }
 
     const actor = await getCurrentUserInfo();
     if (actor) {

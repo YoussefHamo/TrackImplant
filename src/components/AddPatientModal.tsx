@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { patientService } from '../services/patientService';
 import { branchService } from '../services/branchService';
 import { useAuth } from '../context/AuthContext';
+import { useBranch } from '../context/BranchContext';
 import type { Patient } from '../types';
 import Portal from './ui/Portal';
 
@@ -25,6 +26,7 @@ const emptyForm = {
 export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { activeBranchId } = useBranch();
   const [form, setForm] = useState({ ...emptyForm });
   const [hasInsurance, setHasInsurance] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -37,7 +39,7 @@ export default function AddPatientModal({ isOpen, onClose }: AddPatientModalProp
   });
 
   const isAdmin = user?.role === 'Admin';
-  const userBranch = user?.branch_id;
+  const userBranch = isAdmin ? activeBranchId : user?.branch_id;
 
   const resetForm = () => {
     setForm({ ...emptyForm, branch_id: userBranch || '' });

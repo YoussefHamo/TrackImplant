@@ -78,6 +78,7 @@ export interface Patient {
   created_at?: string;
   created_by?: string;
   branch_id?: string;
+  home_branch_name?: string;
 }
 
 export interface PatientDocument {
@@ -191,6 +192,7 @@ export interface FollowUp {
   pain_level?: number;
   healing_status?: HealingStatus;
   notes?: string;
+  branch_id?: string;
   created_at?: string;
 }
 

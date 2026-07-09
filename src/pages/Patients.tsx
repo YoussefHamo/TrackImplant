@@ -228,6 +228,12 @@ export const Patients = () => {
                   {selectedPatient.insurance_company || 'Cash'}
                 </span>
               </div>
+              {selectedPatient.home_branch_name && (
+                <div className="flex items-center justify-between py-2.5">
+                  <span className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Branch</span>
+                  <span className="text-xs font-medium text-[#4FD1FF]">{selectedPatient.home_branch_name}</span>
+                </div>
+              )}
             </div>
 
             {/* Medical History */}

@@ -480,6 +480,204 @@ Manual → Postponed / Cancelled
 npm run build  # PASS — 0 errors (tsc + vite)
 ```
 
+---
+
+## Phase 3 — ERP Completion
+
+### Overview
+Phase 3 completes the ERP experience across 8 areas: Dashboard widgets, Patient Timeline, Schedule Quick Actions, Calendar Improvements, Appointment Analytics, Reports Expansion, Notification Center, and UI/UX Polish.
+
+### What Was Done
+
+#### Part 1 — Complete Dashboard for Every Role
+
+**ClinicalDashboard (Admin)** — Enhanced with 15+ new widgets:
+- Revenue: Total, Today, This Month, Trend chart (AreaChart), Outstanding Payments, Revenue by Branch
+- Performance: Branch Performance Ranking (revenue bars), Doctor Performance Ranking (procedure counts)
+- Patients: Total Patients, New Patients, Active Implant Cases
+- Operations: Procedures Today, Cross-Branch Requests (pending count), Deliveries In Transit, Inventory Value, Low Stock Items
+- Activity: Notifications widget, Upcoming Appointments list
+- Quick Actions bar: New Patient, New Appointment, New Procedure, View Reports, View Inventory, View Schedule
+
+**ManagerDashboard** — Enhanced with:
+- Today's Operational Stats: Procedures Today, Waiting/Checked In/Working/Completed/No-Show counts (6 compact cards)
+- Branch Financial Overview: Branch Revenue + Inventory Value
+- Doctor Performance: Top 5 doctors by procedure count
+- Quick Actions: New Appointment, View Inventory, Reports, Stock Request
+- Notifications Widget with color-coded type dots
+
+**ReceptionDashboard** — Enhanced with:
+- Patient Status Widget: Waiting/Checked In/Working/Completed/No-Show color-coded cards
+- Outstanding Payments Card with "View Payments" button
+- Today's Follow-ups list with health/pain scores
+- Enhanced Quick Actions: 2×4 grid
+- Notifications Widget
+
+**DoctorDashboard** — Enhanced with:
+- Monthly Procedures BarChart (Recharts, grouped by month)
+- Implant Success Rate SVG ring/donut chart (completed/total %)
+- Quick Actions: Schedule Appointment, Record Procedure, View Patients, View Schedule
+- Notifications Widget with unread dot indicator
+- Enhanced Today's Procedures table (Patient, Procedure, Status, Tooth, Time)
+
+#### Part 2 — Patient Timeline
+- **Services**: `src/services/timelineEventService.ts` (writes/reads from `patient_timeline_events` table) + `src/services/timelineService.ts` (reads from table, falls back to legacy aggregation)
+- **Primary source**: `patient_timeline_events` DB table — events written automatically by `appointmentService`, `procedureService`, `financialRecordService`, `communicationService`
+- **Fallback**: If table is empty, aggregates from 6 source tables (Communications, Appointments, Procedures, Financial Records, Reminders, Follow-ups)
+- Sorted newest → oldest
+- Each event: icon, user_name, date, time, branch_name, description
+- Click navigates to related entity (appointments page, cases page, payments page)
+- Integrated into PatientProfile.tsx Timeline tab
+
+#### Part 3 — Schedule Quick Actions
+- **ContextMenu.tsx**: Enhanced with separators, disabled items, Escape key support, ContextMenuItem exported
+- **SchedulePage.tsx**: 20+ context menu actions
+  - Open Patient (new tab), Open Procedure, Open Invoice
+  - Call Patient (tel:), WhatsApp Patient (wa.me)
+  - Check In, Start Working, Complete, Postpone, Cancel
+  - Reschedule, Duplicate Appointment (clones +24h), Print Appointment (HTML print), Assign Doctor
+  - Create Procedure (navigates to cases with patientId)
+  - Delete (Admin only)
+  - Separators between logical groups
+
+#### Part 4 — Calendar Improvements
+- **Keyboard shortcuts**: N=New, T=Today, 1=Day, 2=Week, 3=Month, ArrowLeft/Right=Navigate
+- **Zoom**: −/+ buttons, 50%-200%, adjusts row height in WeekView/DayView via zoomLevel prop
+- **Print**: Print button generates formatted HTML table for current view+date range
+- **Resize**: True drag-to-resize on AppointmentBlock — mouse drag on bottom edge updates `duration_minutes` in real-time, persists via `appointmentService.update()` on release, `end_time` auto-computed
+- **Mobile**: Toolbar wraps with flex-wrap
+
+#### Part 5 — Appointment Analytics
+- **Service**: `src/services/appointmentAnalyticsService.ts`
+- `getAnalytics()` returns: averageWaitingTime, averageTreatmentTime, appointmentDuration stats, doctorUtilization[], peakHours[], peakDays[], cancellationRate, noShowRate, completionRate, workingTime, idleTime
+- Used by Reports.tsx Schedule section and can be used by dashboards
+
+### Notification Preferences
+- **Service**: `src/services/notificationPreferenceService.ts` — CRUD for `notification_preferences` table
+- **Settings integration**: Notification Preferences section in Settings.tsx with per-category toggle (Bell/BellOff icons)
+- **Auto-init**: On Settings page mount, ensures every category has a preference row via `bulkInit()`
+- **Notification Center**: Respects enabled categories — only shows category pills for user-enabled categories
+
+#### Part 6 — Reports Expansion
+- **Schedule Reports tab** added to `Reports.tsx`:
+  - Summary cards: Total appointments, cancellation/no-show/completion rates
+  - Analytics cards: Avg wait time, treatment time, working/idle time
+  - Appointments by Doctor: Horizontal BarChart
+  - Appointments by Status: Donut PieChart with status colors
+  - Cancellation Report: Count, rate %, list
+  - No Show Report: Count, rate %, list
+  - Doctor Utilization: Colored progress bars (green/yellow/red thresholds)
+  - Peak Hours: BarChart
+  - Peak Days: BarChart
+- **Enhanced Patient Reports**: Active patients count respects date range filters
+
+#### Part 7 — Notification Center
+- **Page**: `src/pages/dashboard/NotificationCenter.tsx` at `/dashboard/notifications`
+- Category filter pills with unread counts per category
+- Search input + read/unread filter dropdown
+- Mark All Read button
+- Notification cards: type-colored left border, category icon, title, message, timeAgo, read/unread dot
+- Click-to-navigate on linked entities
+- Pagination with page numbers, prev/next, item range
+- Delete individual notifications
+- Loading skeleton, empty state, error state
+
+#### Part 8 — UI/UX Polish
+- **Components**: `Skeleton.tsx` (Skeleton, CardSkeleton, TableSkeleton, StatSkeleton), `EmptyState.tsx`
+- Dashboard loading: ClinicalDashboard uses StatSkeleton grid + TableSkeleton
+- NotificationCenter: Uses TableSkeleton + EmptyState
+- All components use the app's dark theme conventions
+
+### Database Changes
+- Migration `20260725000000_phase3_erp_completion.sql`:
+  - `notifications` enhanced: category, related_entity_type, related_entity_id columns + indexes
+  - `notification_preferences` table with per-user per-category settings + RLS
+  - `patient_timeline_events` table with metadata JSONB + indexes — used as primary timeline event source; events auto-written on create/update/delete of appointments, procedures, financial records, communications
+  - `appointments` extended: waiting/treatment time, cancellation info, timestamps (checked_in_at, started_at, completed_at)
+  - Enhanced notification trigger `handle_appointment_notification_v2()` (covers insert, check-in, cancel, no-show, complete)
+  - Old `trg_appointment_notification` replaced
+
+### Build Status
+```bash
+npm run build  # PASS — 0 errors (tsc + vite)
+```
+
+---
+
+## Phase 4 — Branch Context & Branch Isolation
+
+### Overview
+Every operation belongs to a branch. Admin users select their active branch via a UI selector; non-admin users always operate within their own `branch_id`. The `BranchContext` React context provides `activeBranchId` across the entire app.
+
+### Architecture
+
+#### `src/context/BranchContext.tsx` (new)
+- `BranchProvider` wraps the app inside `AuthProvider`
+- `useBranch()` hook returns: `activeBranchId`, `setActiveBranchId`, `availableBranches`, `branchLoading`, `isBranchRequired`, `currentBranchName`
+- For **Admin** users: `activeBranchId` is stored in `localStorage` and selectable via UI
+- For **non-Admin** users: `activeBranchId` is always their `user.branch_id` — set automatically, never changeable
+
+#### `BranchSelector` (in `DashboardLayout.tsx`)
+- Inline dropdown component rendered only for Admin users in the header bar
+- Shows current branch name; click to open dropdown with all branches
+- Changes trigger `setActiveBranchId()` which re-fetches all scoped data via updated query keys
+
+#### DB Migration `20260726000000_branch_context.sql`
+- Added `branch_id` columns to: `notifications`, `patient_timeline_events`, `communications`, `patient_reminders`, `follow_ups`
+- Created indexes on all new `branch_id` columns
+- Added `get_current_user_branch_id()` function
+- Updated RLS policies for new columns
+
+### How Branch Context Flows
+
+1. **React Context** (`BranchContext`) → provides `activeBranchId`
+2. **React Query Keys** include `activeBranchId` (e.g. `['appointments', activeBranchId]`) — automatic refetch on branch switch
+3. **Services** accept optional `branchId` param (already existed in most services)
+4. **All pages** import `useBranch()` and pass `activeBranchId` to service calls
+
+### Pages Updated for Branch Context
+
+| Page | Changes |
+|------|---------|
+| `Dashboard.tsx` — All 4 dashboards | Added `useBranch()`, pass `activeBranchId` to all analytics/procedures/appointments/financial queries |
+| `SchedulePage.tsx` | Syncs `filterBranch` from `activeBranchId`, auto-refetches appointments on branch switch |
+| `BookingDialog.tsx` | Passes `activeBranchId` as `branch_id` on appointment create |
+| `Appointments.tsx` | Filters appointments by `activeBranchId` |
+| `ImplantCases.tsx` | Filters procedures by `activeBranchId`, syncs branch filter |
+| `Patients.tsx` | **Global (unchanged)** — patients from all branches visible; shows `home_branch_name` in detail panel |
+| `PatientProfile.tsx` | Shows `home_branch_name` badge in patient header |
+| `Reports.tsx` | Defaults branch filter to `activeBranchId`, syncs on change |
+| `AddPatientModal.tsx` | Pre-fills branch from `activeBranchId` for both Admin and non-Admin |
+
+### Patients are Global
+- `patients` table queries are **never** filtered by branch
+- `patientService.getAll/search/getById` return patients from all branches
+- Each patient shows `home_branch_name` (joined from `branches` table)
+- Patient creation stores `branch_id` as home branch (for reporting)
+
+### Services Updated
+- `communicationService.create()` — accepts `branch_id`, stores it, writes to timeline events
+- `reminderService.create()` — accepts `branch_id`, stores it
+- `timelineEventService.write()` — already supported `branch_id`, now all callers pass it
+- `appointmentService` — timeline events include `branch_id`
+- `procedureService` — timeline events include `branch_id`
+- `patientService` — queries join `branches` table for `home_branch_name`
+
+### Type Changes
+- `Patient` interface: added `home_branch_name: string | undefined`
+- `FollowUp` interface: added `branch_id?: string`
+
+### RLS Notes
+- Notifications: users see only their own (`user_id = auth.uid()`) — no branch filter needed
+- Timeline events: visible globally (patients are global)
+- Communications: visible globally (patients are global)
+- All other tables: existing RLS already enforces branch isolation via `get_current_user_role()` function
+
+### Build Status
+```bash
+npm run build  # PASS — 0 errors (tsc + vite)
+```
+
 ## Running the App
 ```bash
 npm run dev

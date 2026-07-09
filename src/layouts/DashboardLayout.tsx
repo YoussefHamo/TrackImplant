@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from "../integrations/supabase/client";
 import { useAuth } from "../context/AuthContext";
+import { useBranch } from "../context/BranchContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useDebounce } from "../hooks/useDebounce";
 import { searchService, type SearchResult } from "../services/searchService";
@@ -13,6 +14,74 @@ import {
   Bell, Search, Plus, Settings, LogOut, ChevronRight,
   User, FileText, Info, AlertTriangle, CheckCircle
 } from "lucide-react";
+
+function BranchSelector() {
+  const { activeBranchId, setActiveBranchId, availableBranches, branchLoading, currentBranchName } = useBranch();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) { document.addEventListener('mousedown', handler); return () => document.removeEventListener('mousedown', handler); }
+  }, [open]);
+
+  if (branchLoading || availableBranches.length === 0) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' }}>
+        Loading...
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 px-3 h-9 rounded-xl text-xs font-medium transition-all"
+        style={{
+          background: open ? 'rgba(79,209,255,0.1)' : 'rgba(255,255,255,0.03)',
+          border: open ? '1px solid rgba(79,209,255,0.2)' : '1px solid rgba(255,255,255,0.06)',
+          color: open ? '#4FD1FF' : 'rgba(255,255,255,0.6)',
+        }}
+      >
+        <span className="text-[10px] uppercase tracking-wider opacity-50 mr-0.5">Branch:</span>
+        {currentBranchName || 'Select branch'}
+        <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-2 w-[200px] rounded-xl overflow-hidden"
+          style={{
+            zIndex: 'var(--z-dropdown)',
+            background: 'rgba(10,20,35,0.98)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+          }}>
+          {availableBranches.map(b => (
+            <button
+              key={b.id}
+              onClick={() => { setActiveBranchId(b.id); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-xs transition-all hover:bg-[rgba(79,209,255,0.06)]"
+              style={{
+                color: b.id === activeBranchId ? '#4FD1FF' : 'rgba(255,255,255,0.7)',
+                background: b.id === activeBranchId ? 'rgba(79,209,255,0.08)' : 'transparent',
+              }}
+            >
+              {b.id === activeBranchId && (
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#4FD1FF' }} />
+              )}
+              <span className={b.id !== activeBranchId ? 'ml-[14px]' : ''}>{b.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ToothLogo({ className }: { className?: string }) {
   return (
@@ -34,6 +103,7 @@ const allNavItems: { path: string; labelKey: string; icon: React.ElementType; ad
   { path: "/dashboard/reports", labelKey: "nav.reports", icon: BarChart3, hideForDoctor: true },
   { path: "/dashboard/inventory", labelKey: "nav.inventory", icon: Package, hideForDoctor: true },
   { path: "/dashboard/logs", labelKey: "nav.logs", icon: FileText, adminOnly: true },
+  { path: "/dashboard/notifications", labelKey: "nav.notifications", icon: Bell },
 ];
 
 const resultIcons: Record<string, React.ElementType> = {
@@ -301,6 +371,9 @@ export default function DashboardLayout() {
               </div>
             )}
           </div>
+
+          {/* Branch Selector (Admin only) */}
+          {user?.role === 'Admin' && <BranchSelector />}
 
           {/* Right Actions */}
           <div className="flex items-center gap-3">

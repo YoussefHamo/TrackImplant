@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./context/AuthContext";
 import { LanguageProvider } from "./context/LanguageContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { BranchProvider } from "./context/BranchContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Toaster } from "sonner";
 
@@ -33,6 +34,7 @@ export default function App() {
       <ThemeProvider>
       <LanguageProvider>
       <AuthProvider>
+      <BranchProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Login />} />
@@ -83,6 +85,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      </BranchProvider>
       </AuthProvider>
       </LanguageProvider>
       </ThemeProvider>

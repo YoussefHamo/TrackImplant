@@ -1,4 +1,5 @@
 import { supabase } from '../integrations/supabase/client';
+import { timelineEventService } from './timelineEventService';
 import type { Communication, CommunicationType, CommunicationDirection } from '../types';
 
 function commFromRow(row: Record<string, unknown>): Communication {
@@ -33,14 +34,30 @@ export const communicationService = {
     direction: CommunicationDirection;
     subject?: string;
     content?: string;
+    branch_id?: string;
   }): Promise<Communication> {
     const { data: { user } } = await supabase.auth.getUser();
+    const payload: Record<string, unknown> = { ...data, staff_id: user?.id };
+    delete payload.branch_id;
+    payload.branch_id = data.branch_id || null;
     const { data: inserted, error } = await supabase
       .from('communications')
-      .insert([{ ...data, staff_id: user?.id }])
+      .insert([payload])
       .select()
       .single();
     if (error) throw new Error(error.message);
+
+    // Write timeline event
+    timelineEventService.write({
+      patient_id: data.patient_id,
+      event_type: 'communication_added',
+      description: `${data.direction === 'inbound' ? 'Inbound' : 'Outbound'} ${data.type}: ${data.subject || '(no subject)'}`,
+      related_entity_type: 'communication',
+      related_entity_id: inserted.id,
+      branch_id: data.branch_id || undefined,
+      metadata: { type: data.type, direction: data.direction, subject: data.subject },
+    }).catch(() => {});
+
     return commFromRow(inserted);
   },
 

@@ -180,7 +180,10 @@ When multiple doctors are assigned to a procedure, revenue is **split equally**:
 | `communicationService` | `communicationService.ts` | `getByPatient()`, `create()`, `delete()` |
 | `reminderService` | `reminderService.ts` | `getByPatient()`, `create()`, `update()`, `delete()` |
 | `auditLogService` | `auditLogService.ts` | `getAll()` (with role, branchId, dateFrom, dateTo, pagination), `log()` |
-| `notificationService` | `notificationService.ts` | `getAll()`, `markRead()`, `markAllRead()`, `getUnreadCount()` |
+| `notificationService` | `notificationService.ts` | `getByUser()`, `getUnreadCount()`, `markRead()`, `markAllRead()`, `create()`, `createForRole()`, `getFiltered()`, `delete()`, `getByCategory()`, `getUnreadByCategory()`, `createWithDetails()` |
+| `notificationPreferenceService` | `notificationPreferenceService.ts` | `getAll()`, `getEnabledCategories()`, `upsert()`, `bulkInit()` |
+| `timelineEventService` | `timelineEventService.ts` | `write()`, `getByPatient()` |
+| `timelineService` | `timelineService.ts` | `getByPatient()` |
 | `searchService` | `searchService.ts` | `search()` (patients, procedures) |
 
 ---
@@ -253,6 +256,116 @@ Inventory is also blocked at the RLS level: all inventory tables reject SELECT/I
 8. **Inventory Block**: RLS check `get_current_user_role() != 'Doctor'` on ALL inventory tables
 9. **Procedure-Only Invoices**: Trigger only fires for implant procedures
 10. **Consumption**: Implant + abutment deducted from inventory on procedure creation
+
+---
+
+---
+
+## Phase 3 — ERP Completion
+
+### Services Added
+
+| Service | File | Key Methods |
+|---------|------|------------|
+| `timelineService` | `timelineService.ts` | `getByPatient()` — aggregates appointments, procedures, financial records, communications, reminders, follow-ups into chronological `TimelineEvent[]` |
+| `appointmentAnalyticsService` | `appointmentAnalyticsService.ts` | `getAnalytics()` — average waiting/treatment time, doctor utilization, peak hours/days, cancellation/no-show/completion rates |
+
+### Services Enhanced
+
+| Service | Enhancements |
+|---------|-------------|
+| `appointmentService` | `getTodayStats()` returns per-status counts |
+| `notificationService` | Added `NotificationCategory` type, extended `AppNotification` with `category`/`related_entity_type`/`related_entity_id`, new methods: `getByCategory()`, `getFiltered()`, `delete()`, `getUnreadByCategory()`, `createWithDetails()` |
+
+### Pages/Components Added
+
+| Page | Route | Purpose |
+|------|-------|---------|
+| NotificationCenter | `/dashboard/notifications` | Complete notification center with category filters, search, pagination, mark read/all read, delete |
+
+### Dashboard Enhancements
+
+#### ClinicalDashboard (Admin)
+- **18+ KPI widgets**: Total Revenue, Revenue Today/Month, Revenue Trend chart, Outstanding Payments, Branch/Doctor Performance Ranking, Total/New Patients, Active Implant Cases, Procedures Today, Cross-Branch Requests, Deliveries In Transit, Inventory Value, Low Stock, Notifications, Recent Activity, Upcoming Appointments, Quick Actions
+- **Branch Performance**: Ranked by revenue with colored bars
+- **Doctor Performance**: Top doctors by procedure count
+- **Inventory Overview**: Value estimate + low stock alerts
+
+#### ManagerDashboard
+- **Today's Operational Stats**: Procedures Today, Waiting/Checked In/Working/Completed/No-Show counts
+- **Branch Financial Overview**: Branch Revenue + Inventory Value
+- **Doctor Performance**: Top 5 doctors by procedure count
+- **Quick Actions**: New Appointment, View Inventory, Reports, Stock Request
+- **Notifications Widget**
+
+#### ReceptionDashboard
+- **Patient Status Widget**: Waiting/Checked In/Working/Completed/No-Show color-coded counts
+- **Outstanding Payments Card**
+- **Today's Follow-ups** list
+- **Enhanced Quick Actions**: Quick Patient Registration, Quick Appointment, Find Patient, View Schedule
+- **Notifications Widget**
+
+#### DoctorDashboard
+- **Monthly Procedures BarChart** (Recharts)
+- **Implant Success Rate** with SVG ring/donut visualization
+- **Quick Actions**: Schedule Appointment, Record Procedure, View Patients, View Schedule
+- **Notifications Widget**
+- **Enhanced Today's Procedures** table
+
+### Patient Timeline
+- Comprehensive chronological feed via `timelineService.getByPatient(patientId)`
+- Sources: Communications, Appointments, Procedures, Financial Records, Reminders, Follow-ups
+- Each event has: Icon, User, Date, Time, Description
+- Click navigates to related entity (appointments, procedures, payments)
+- Sorted newest → oldest
+
+### Schedule Quick Actions (Context Menu)
+Extended context menu with 20+ actions:
+- **Patient**: Open Patient (new tab)
+- **Clinical**: Open Procedure, Open Invoice
+- **Communication**: Call Patient, WhatsApp Patient
+- **Status**: Check In, Start Working, Complete, Postpone, Cancel
+- **Appointment**: Reschedule, Duplicate Appointment, Print Appointment, Assign Doctor
+- **Procedures**: Create Procedure
+- **Admin**: Delete
+- Separators between logical groups
+- Keyboard shortcut: `Escape` closes menu
+
+### Calendar Improvements
+- **Keyboard shortcuts**: `N`=New, `T`=Today, `1/2/3`=Day/Week/Month, Arrow keys=navigate
+- **Zoom**: Zoom in/out from 50% to 200%, adjusts row height
+- **Print schedule**: Print button generates formatted table for current view
+- **Resize**: True drag-to-resize — mouse drag on bottom edge of appointment block updates `duration_minutes`, `end_time` auto-computed, persists via `appointmentService.update()`
+- **Mobile**: Toolbar wraps with `flex-wrap`
+
+### Reports Expansion
+- **Schedule Reports tab**: Appointments by Doctor (bar chart), by Status (pie chart), Cancellation Report, No Show Report, Doctor Utilization (progress bars), Peak Hours/Days (bar charts)
+- **Enhanced Patient Reports**: New/Returning/Active patients with date range filters
+- **Scheduling Analytics**: Average wait time, treatment time, working/idle time
+
+### Notification Center
+- Category filter pills with unread counts
+- Search + read/unread filter
+- Mark All Read button
+- Notification cards with type-colored borders, category icons, timeAgo display
+- Click-to-navigate on linked entities
+- Pagination with page numbers and item range
+- Delete individual notifications
+- Loading skeletons, empty states, error states
+
+### UI/UX Polish
+- **Skeleton components**: `Skeleton`, `CardSkeleton`, `TableSkeleton`, `StatSkeleton` with pulse animation
+- **Empty State component**: Reusable with icon/title/description/action button
+- Integrated skeletons into Dashboard ClinicalDashboard loading and NotificationCenter
+- Consistent dark theme styling throughout
+
+### Database Changes (Migration `20260725000000_phase3_erp_completion.sql`)
+- `notifications`: Added `category`, `related_entity_type`, `related_entity_id` columns + indexes
+- `notification_preferences`: New table (user_id, category, email, in_app) with RLS — per-user per-category notification toggles, wired to Settings UI and Notification Center filtering
+- `patient_timeline_events`: New table (patient_id, event_type, description, user info, branch, related entity, metadata) with RLS + indexes — used as primary timeline event source; events auto-written on create/update/delete of appointments, procedures, financial records, communications
+- `appointments`: Added `waiting_time_minutes`, `treatment_time_minutes`, `cancelled_at`, `cancelled_by`, `cancellation_reason`, `checked_in_at`, `started_at`, `completed_at` columns
+- Enhanced notification trigger `handle_appointment_notification_v2()` now fires for: INSERT (new), UPDATE to checked_in, cancelled, no_show, completed statuses
+- Old `trg_appointment_notification` trigger replaced with v2
 
 ---
 

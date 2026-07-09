@@ -1,6 +1,7 @@
 import { supabase } from '../integrations/supabase/client';
 import { auditLogService, getCurrentUserInfo } from './auditLogService';
 import { notificationService } from './notificationService';
+import { timelineEventService } from './timelineEventService';
 import type { Appointment } from '../types';
 
 function rowToAppointment(row: Record<string, unknown>): Appointment {
@@ -178,6 +179,19 @@ export const appointmentService = {
       });
     }
 
+    // Write timeline event
+    if (appointment.patient_id) {
+      timelineEventService.write({
+        patient_id: appointment.patient_id,
+        event_type: 'appointment_scheduled',
+        description: `Appointment scheduled${appointment.doctor_id ? '' : ''}`,
+        related_entity_type: 'appointment',
+        related_entity_id: data.id,
+        branch_id: appointment.branch_id || undefined,
+        metadata: { status: appointment.status || 'scheduled', doctor_id: appointment.doctor_id },
+      }).catch(() => {});
+    }
+
     // Notify doctor
     if (appointment.doctor_id) {
       notificationService.create({
@@ -219,12 +233,37 @@ export const appointmentService = {
       });
     }
 
+    // Write timeline event for status changes
+    const appt = await this.getById(id).catch(() => null);
+    if (appt?.patient_id) {
+      if (updates.status) {
+        timelineEventService.write({
+          patient_id: appt.patient_id,
+          event_type: `appointment_${updates.status}`,
+          description: `Appointment ${updates.status}${appt.doctor_name ? ` with Dr. ${appt.doctor_name}` : ''}`,
+          related_entity_type: 'appointment',
+          related_entity_id: id,
+          branch_id: appt.branch_id || undefined,
+          metadata: { status: updates.status },
+        }).catch(() => {});
+      } else if (updates.duration_minutes) {
+        timelineEventService.write({
+          patient_id: appt.patient_id,
+          event_type: 'appointment_updated',
+          description: `Duration changed to ${updates.duration_minutes} min`,
+          related_entity_type: 'appointment',
+          related_entity_id: id,
+          branch_id: appt.branch_id || undefined,
+          metadata: { duration_minutes: updates.duration_minutes },
+        }).catch(() => {});
+      }
+    }
+
     // Notify doctor on check-in
     if (updates.status === 'checked_in') {
-      const app = await this.getById(id);
-      if (app?.doctor_id) {
+      if (appt?.doctor_id) {
         notificationService.create({
-          user_id: app.doctor_id,
+          user_id: appt.doctor_id,
           title: 'Patient Checked In',
           message: 'Your patient has arrived and checked in.',
           type: 'info',
@@ -239,6 +278,17 @@ export const appointmentService = {
   },
 
   async delete(id: string): Promise<void> {
+    const appt = await this.getById(id).catch(() => null);
+    if (appt?.patient_id) {
+      timelineEventService.write({
+        patient_id: appt.patient_id,
+        event_type: 'appointment_cancelled',
+        description: 'Appointment deleted',
+        related_entity_type: 'appointment',
+        related_entity_id: id,
+        metadata: { deleted: true },
+      }).catch(() => {});
+    }
     const { error } = await supabase.from('appointments').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },

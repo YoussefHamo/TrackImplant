@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { procedureService } from '../services/procedureService';
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import type { Procedure } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useBranch } from '../context/BranchContext';
 import FixedOverlay from '../components/ui/FixedOverlay';
 
 const statusStyles: Record<string, { bg: string; text: string; dot: string }> = {
@@ -97,7 +98,8 @@ function StepCircle({ num, active, done }: { num: number; active: boolean; done:
 export function ImplantCases() {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const userBranchId = user?.branch_id;
+  const { activeBranchId } = useBranch();
+  const userBranchId = activeBranchId || user?.branch_id;
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,15 +111,20 @@ export function ImplantCases() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [filterDoctor, setFilterDoctor] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterBranch, setFilterBranch] = useState('');
+  const [filterBranch, setFilterBranch] = useState(activeBranchId || '');
   const [filterImplant, setFilterImplant] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const selectedId = searchParams.get('id') || '';
 
+  // Sync filterBranch when activeBranchId changes
+  useEffect(() => {
+    if (activeBranchId) setFilterBranch(activeBranchId);
+  }, [activeBranchId]);
+
   const { data: procedures = [], isLoading } = useQuery({
-    queryKey: ['procedures'],
-    queryFn: () => procedureService.getAll(),
+    queryKey: ['procedures', activeBranchId],
+    queryFn: () => procedureService.getAll(activeBranchId),
   });
 
   const { data: patients = [] } = useQuery({

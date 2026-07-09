@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useBranch } from '../context/BranchContext';
 import { useLanguage } from '../context/LanguageContext';
 import { financialRecordService } from '../services/financialRecordService';
 import { patientService } from '../services/patientService';
@@ -11,12 +12,15 @@ import { appointmentService } from '../services/appointmentService';
 import { implantInventoryService } from '../services/implantInventoryService';
 import { deliveryService } from '../services/deliveryService';
 import { branchService } from '../services/branchService';
+import { notificationService } from '../services/notificationService';
+import { StatSkeleton } from '../components/ui/Skeleton';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import {
   TrendingUp, DollarSign, Heart, Activity, Calendar, Clock, Users,
-  ChevronRight, Plus, User, Package, AlertTriangle, Truck
+  ChevronRight, Plus, User, Package, AlertTriangle, Truck,
+  ArrowLeftRight, Bell, BarChart3
 } from 'lucide-react';
 
 /* ════════════════════════════════════════════
@@ -24,6 +28,8 @@ import {
    ════════════════════════════════════════════ */
 function ReceptionDashboard() {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const { activeBranchId } = useBranch();
   const navigate = useNavigate();
   const [today] = useState(() => new Date().toISOString().split('T')[0]);
   const [since] = useState(() => Date.now() - 24 * 60 * 60 * 1000);
@@ -34,16 +40,25 @@ function ReceptionDashboard() {
     queryFn: () => patientService.getAll(),
   });
   const { data: allAppointments = [] } = useQuery({
-    queryKey: ['appointments'],
-    queryFn: () => appointmentService.getAll(),
+    queryKey: ['appointments', activeBranchId],
+    queryFn: () => appointmentService.getAll(activeBranchId),
   });
   const { data: procedures = [] } = useQuery({
-    queryKey: ['procedures'],
-    queryFn: () => procedureService.getAll(),
+    queryKey: ['procedures', activeBranchId],
+    queryFn: () => procedureService.getAll(activeBranchId),
   });
   const { data: analytics } = useQuery({
-    queryKey: ['financial-analytics'],
-    queryFn: () => financialRecordService.getAnalytics(),
+    queryKey: ['financial-analytics', activeBranchId],
+    queryFn: () => financialRecordService.getAnalytics(activeBranchId),
+  });
+  const { data: followUps = [] } = useQuery({
+    queryKey: ['follow-ups-all'],
+    queryFn: () => followUpService.getAll(),
+  });
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['notifications-reception', user?.id],
+    queryFn: () => user?.id ? notificationService.getByUser(user.id, 10) : Promise.resolve([]),
+    enabled: !!user?.id,
   });
 
   const clientsLast24h = useMemo(() => {
@@ -86,6 +101,22 @@ function ReceptionDashboard() {
     if (!a) return 0;
     return a.monthlyCollected || 0;
   }, [analytics]);
+
+  const outstandingPayments = analytics?.totalPending || 0;
+
+  const todayFollowUps = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return (followUps || []).filter(f => f.created_at && new Date(f.created_at).toISOString().split('T')[0] === todayStr);
+  }, [followUps]);
+
+  const patientStatusCounts = useMemo(() => {
+    const counts: Record<string, number> = { scheduled: 0, checked_in: 0, working: 0, completed: 0, no_show: 0 };
+    allAppointments.forEach(a => {
+      const d = new Date(a.appointment_date).toISOString().split('T')[0];
+      if (d === today && counts.hasOwnProperty(a.status)) counts[a.status]++;
+    });
+    return counts;
+  }, [allAppointments, today]);
 
   return (
     <div className="space-y-6 font-sans select-auto">
@@ -298,6 +329,166 @@ function ReceptionDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Patient Status Widget */}
+      <div className="rounded-[22px] p-6"
+        style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+        <h3 className="text-base font-semibold text-white mb-4">Patient Status</h3>
+        <div className="grid grid-cols-5 gap-3">
+          {[
+            { label: 'Waiting', key: 'scheduled', color: '#4FD1FF' },
+            { label: 'Checked In', key: 'checked_in', color: '#FF9800' },
+            { label: 'Working', key: 'working', color: '#9C27B0' },
+            { label: 'Completed', key: 'completed', color: '#4CAF50' },
+            { label: 'No Shows', key: 'no_show', color: '#F44336' },
+          ].map(s => (
+            <div key={s.key} className="text-center p-4 rounded-xl"
+              style={{ background: `${s.color}10`, border: `1px solid ${s.color}20` }}>
+              <div className="text-xl font-bold" style={{ color: s.color }}>{patientStatusCounts[s.key]}</div>
+              <div className="text-[10px] mt-1 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Outstanding Payments + Today's Follow-ups + Notifications */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Outstanding Payments Card */}
+        <div className="rounded-[22px] p-6"
+          style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(255,193,7,0.1)', border: '1px solid rgba(255,193,7,0.12)' }}>
+              <DollarSign className="w-5 h-5 text-[#FFC107]" />
+            </div>
+            <h3 className="text-base font-semibold text-white">Outstanding Payments</h3>
+          </div>
+          <div className="text-3xl font-bold text-[#FFC107]">${outstandingPayments.toLocaleString()}</div>
+          <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Total pending balance across all patients</div>
+          <button onClick={() => navigate('/dashboard/payments')}
+            className="w-full mt-4 py-2.5 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(255,193,7,0.06)', color: '#FFC107' }}>View Payments</button>
+        </div>
+
+        {/* Today's Follow-ups */}
+        <div className="rounded-[22px] p-6"
+          style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(0,229,168,0.1)', border: '1px solid rgba(0,229,168,0.12)' }}>
+              <Heart className="w-5 h-5 text-[#00E5A8]" />
+            </div>
+            <h3 className="text-base font-semibold text-white">Today's Follow-ups</h3>
+          </div>
+          {todayFollowUps.length === 0 ? (
+            <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No follow-ups scheduled today</div>
+          ) : (
+            <div className="space-y-2">
+              {todayFollowUps.slice(0, 5).map(f => {
+                const patient = patients.find(p => p.id === f.patient_id);
+                return (
+                  <div key={f.id}
+                    onClick={() => navigate(`/dashboard/patients/${f.patient_id}/profile`)}
+                    className="flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all hover:bg-[rgba(255,255,255,0.03)]"
+                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold"
+                        style={{ background: 'rgba(0,229,168,0.1)', color: '#00E5A8' }}>
+                        {(patient?.full_name || '??').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-white">{patient?.full_name || 'Unknown'}</div>
+                        <div className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                          Health: {f.health_score ?? '—'} · Pain: {f.pain_level ?? '—'}/10
+                        </div>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
+                      style={{
+                        background: f.healing_status === 'OnTrack' ? 'rgba(0,229,168,0.12)' : f.healing_status === 'Critical' || f.healing_status === 'Failure' ? 'rgba(239,68,68,0.12)' : 'rgba(255,193,7,0.12)',
+                        color: f.healing_status === 'OnTrack' ? '#00E5A8' : f.healing_status === 'Critical' || f.healing_status === 'Failure' ? '#ef4444' : '#FFC107',
+                      }}>
+                      {f.healing_status || 'Unknown'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Notifications Widget */}
+        <div className="rounded-[22px] p-6"
+          style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(124,92,255,0.1)', border: '1px solid rgba(124,92,255,0.12)' }}>
+              <Activity className="w-5 h-5 text-[#7C5CFF]" />
+            </div>
+            <h3 className="text-base font-semibold text-white">Notifications</h3>
+          </div>
+          {notifications.length === 0 ? (
+            <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No new notifications</div>
+          ) : (
+            <div className="space-y-2">
+              {notifications.slice(0, 5).map(n => (
+                <div key={n.id} className="flex items-start gap-3 p-3 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                    style={{ background: n.is_read ? 'rgba(255,255,255,0.05)' : 'rgba(79,209,255,0.1)', color: n.is_read ? 'rgba(255,255,255,0.3)' : '#4FD1FF' }}>
+                    {(n.title || 'N')[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-white truncate">{n.title}</div>
+                    <div className="text-[11px] mt-0.5 line-clamp-2" style={{ color: 'rgba(255,255,255,0.45)' }}>{n.message}</div>
+                    <div className="text-[9px] mt-1" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                      {n.created_at ? new Date(n.created_at).toLocaleString() : ''}
+                    </div>
+                  </div>
+                  {!n.is_read && (
+                    <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ background: '#4FD1FF', boxShadow: '0 0 6px rgba(79,209,255,0.6)' }} />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <button onClick={() => navigate('/dashboard/logs')}
+            className="w-full mt-4 py-2.5 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(124,92,255,0.06)', color: '#7C5CFF' }}>View All Notifications</button>
+        </div>
+      </div>
+
+      {/* Enhanced Quick Actions */}
+      <div className="rounded-[22px] p-6"
+        style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+        <h3 className="text-base font-semibold text-white mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <button onClick={() => navigate('/dashboard/patients')}
+            className="flex items-center gap-3 p-4 rounded-xl text-sm font-medium transition-all hover:bg-[rgba(79,209,255,0.06)]"
+            style={{ background: 'rgba(79,209,255,0.04)', border: '1px solid rgba(79,209,255,0.1)', color: '#4FD1FF' }}>
+            <User className="w-5 h-5" />
+            <span>Quick Patient Reg.</span>
+          </button>
+          <button onClick={() => navigate('/dashboard/appointments')}
+            className="flex items-center gap-3 p-4 rounded-xl text-sm font-medium transition-all hover:bg-[rgba(255,193,7,0.06)]"
+            style={{ background: 'rgba(255,193,7,0.04)', border: '1px solid rgba(255,193,7,0.1)', color: '#FFC107' }}>
+            <Calendar className="w-5 h-5" />
+            <span>Quick Appointment</span>
+          </button>
+          <button onClick={() => navigate('/dashboard/patients')}
+            className="flex items-center gap-3 p-4 rounded-xl text-sm font-medium transition-all hover:bg-[rgba(0,229,168,0.06)]"
+            style={{ background: 'rgba(0,229,168,0.04)', border: '1px solid rgba(0,229,168,0.1)', color: '#00E5A8' }}>
+            <Users className="w-5 h-5" />
+            <span>Find Patient</span>
+          </button>
+          <button onClick={() => navigate('/dashboard/schedule')}
+            className="flex items-center gap-3 p-4 rounded-xl text-sm font-medium transition-all hover:bg-[rgba(124,92,255,0.06)]"
+            style={{ background: 'rgba(124,92,255,0.04)', border: '1px solid rgba(124,92,255,0.1)', color: '#7C5CFF' }}>
+            <Clock className="w-5 h-5" />
+            <span>View Schedule</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -307,17 +498,18 @@ function ReceptionDashboard() {
    ════════════════════════════════════════════ */
 function ClinicalDashboard() {
   const { t } = useLanguage();
+  const { activeBranchId } = useBranch();
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard-analytics'],
+    queryKey: ['dashboard-analytics', activeBranchId],
     queryFn: async () => {
       const [invStats, patientStats, procStats, followStats, revenueData, procedures, appointments, insuranceRevenue, cashRevenue] = await Promise.all([
-        financialRecordService.getAnalytics().catch(() => ({ totalRevenue: 0, totalPending: 0, monthlyCollected: 0, invoiceCount: 0, paidCount: 0, pendingCount: 0, partialCount: 0, monthlyGrowth: 0 })),
+        financialRecordService.getAnalytics(activeBranchId).catch(() => ({ totalRevenue: 0, totalPending: 0, monthlyCollected: 0, invoiceCount: 0, paidCount: 0, pendingCount: 0, partialCount: 0, monthlyGrowth: 0 })),
         patientService.getStats().catch(() => ({ total: 0, newThisMonth: 0 })),
-        procedureService.getStats().catch(() => ({ total: 0, byStatus: {} })),
+        procedureService.getStats(activeBranchId).catch(() => ({ total: 0, byStatus: {} })),
         followUpService.getStats().catch(() => ({ total: 0, critical: 0, avgPain: 0, avgHealth: 0 })),
-        financialRecordService.getDailyRevenue(7).catch(() => []),
-        procedureService.getAll().catch(() => []),
-        appointmentService.getAll().catch(() => []),
+        financialRecordService.getDailyRevenue(7, activeBranchId).catch(() => []),
+        procedureService.getAll(activeBranchId).catch(() => []),
+        appointmentService.getAll(activeBranchId).catch(() => []),
         financialRecordService.getInsuranceRevenue().catch(() => 0),
         financialRecordService.getCashRevenue().catch(() => 0),
       ]);
@@ -337,8 +529,37 @@ function ClinicalDashboard() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="w-8 h-8 border-2 border-[#4FD1FF] border-t-transparent rounded-full animate-spin" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => <StatSkeleton key={i} />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  <div className="animate-pulse rounded-full w-8 h-8" style={{ background: 'rgba(255,255,255,0.04)' }} />
+                  <div className="flex-1 space-y-2">
+                    <div className="animate-pulse rounded-xl h-4 w-3/4" style={{ background: 'rgba(255,255,255,0.04)' }} />
+                    <div className="animate-pulse rounded-xl h-3 w-1/2" style={{ background: 'rgba(255,255,255,0.04)' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-6">
+            <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="animate-pulse rounded-xl h-5 w-24 mb-5" style={{ background: 'rgba(255,255,255,0.04)' }} />
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="animate-pulse rounded-xl h-12 w-full" style={{ background: 'rgba(255,255,255,0.02)' }} />
+                ))}
+              </div>
+            </div>
+            <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="animate-pulse rounded-xl h-5 w-20 mb-4" style={{ background: 'rgba(255,255,255,0.04)' }} />
+              <div className="animate-pulse rounded-xl h-48 w-full" style={{ background: 'rgba(255,255,255,0.02)' }} />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -628,6 +849,8 @@ function ClinicalDashboard() {
    MANAGER DASHBOARD
    ════════════════════════════════════════════ */
 function ManagerDashboard() {
+  const { user } = useAuth();
+  const { activeBranchId } = useBranch();
   const navigate = useNavigate();
   const today = new Date().toISOString().split('T')[0];
 
@@ -644,12 +867,57 @@ function ManagerDashboard() {
     queryFn: () => deliveryService.getDeliveries(),
   });
   const { data: appointments = [] } = useQuery({
-    queryKey: ['appointments'],
-    queryFn: () => appointmentService.getAll(),
+    queryKey: ['appointments', activeBranchId],
+    queryFn: () => appointmentService.getAll(activeBranchId),
+  });
+  const { data: analytics } = useQuery({
+    queryKey: ['analytics', activeBranchId],
+    queryFn: () => financialRecordService.getAnalytics(activeBranchId),
   });
   const pendingRequests = stockRequests.filter(r => r.status === 'pending');
   const lowStockItems = branchInventory.filter(i => (i.quantity - i.reserved) <= 3);
   const todayAppts = appointments.filter(a => new Date(a.appointment_date).toISOString().split('T')[0] === today);
+
+  const { data: allProcedures = [] } = useQuery({
+    queryKey: ['procedures-all', activeBranchId],
+    queryFn: () => procedureService.getAll(activeBranchId),
+  });
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['notifications-manager', user?.id],
+    queryFn: () => user?.id ? notificationService.getByUser(user.id, 10) : Promise.resolve([]),
+    enabled: !!user?.id,
+  });
+
+  const todayProcedures = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return allProcedures.filter(p => p.procedure_date && new Date(p.procedure_date).toISOString().split('T')[0] === todayStr);
+  }, [allProcedures]);
+
+  const waitingPatients = todayAppts.filter(a => a.status === 'scheduled').length;
+  const checkedInPatients = todayAppts.filter(a => a.status === 'checked_in').length;
+  const workingPatients = todayAppts.filter(a => a.status === 'working').length;
+  const completedToday = todayAppts.filter(a => a.status === 'completed').length;
+  const noShows = todayAppts.filter(a => a.status === 'no_show').length;
+
+  const branchRevenue = useMemo(() => {
+    return analytics?.totalRevenue || 0;
+  }, [analytics]);
+
+  const inventoryValue = useMemo(() => {
+    const avgPrice = 150;
+    return branchInventory.reduce((sum, i) => sum + (i.quantity * avgPrice), 0);
+  }, [branchInventory]);
+
+  const doctorPerformance = useMemo(() => {
+    const docCounts: Record<string, { name: string; count: number }> = {};
+    allProcedures.forEach(p => {
+      if (p.doctor_name) {
+        if (!docCounts[p.doctor_name]) docCounts[p.doctor_name] = { name: p.doctor_name, count: 0 };
+        docCounts[p.doctor_name].count++;
+      }
+    });
+    return Object.values(docCounts).sort((a, b) => b.count - a.count).slice(0, 5);
+  }, [allProcedures]);
 
   return (
     <div className="space-y-6 font-sans select-auto">
@@ -688,6 +956,33 @@ function ManagerDashboard() {
           </div>
           <div className="text-2xl font-bold text-white">{todayAppts.length}</div>
           <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Today's Appointments</div>
+        </div>
+      </div>
+
+      {/* Today's Appointment Breakdown */}
+      <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-semibold text-white">Today's Appointments</h3>
+          <span className="text-sm font-bold text-[#4FD1FF]">{todayAppts.length} total</span>
+        </div>
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+          {[
+            { label: 'Scheduled', key: 'scheduled', color: '#4FD1FF' },
+            { label: 'Checked In', key: 'checked_in', color: '#FF9800' },
+            { label: 'Working', key: 'working', color: '#9C27B0' },
+            { label: 'Completed', key: 'completed', color: '#4CAF50' },
+            { label: 'No Show', key: 'no_show', color: '#F44336' },
+            { label: 'Postponed', key: 'postponed', color: '#FFC107' },
+            { label: 'Cancelled', key: 'cancelled', color: '#9E9E9E' },
+          ].map(s => {
+            const count = todayAppts.filter(a => a.status === s.key).length;
+            return (
+              <div key={s.key} className="text-center p-3 rounded-xl" style={{ background: `${s.color}10`, border: `1px solid ${s.color}20` }}>
+                <div className="text-lg font-bold" style={{ color: s.color }}>{count}</div>
+                <div className="text-[9px] mt-0.5 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>{s.label}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -737,6 +1032,150 @@ function ManagerDashboard() {
           )}
         </div>
       </div>
+
+      {/* Today's Operational Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="rounded-[18px] p-4 text-center" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="text-lg font-bold text-[#4FD1FF]">{todayProcedures.length}</div>
+          <div className="text-[9px] mt-1 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>Procedures Today</div>
+        </div>
+        <div className="rounded-[18px] p-4 text-center" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="text-lg font-bold text-[#4FD1FF]">{waitingPatients}</div>
+          <div className="text-[9px] mt-1 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>Waiting</div>
+        </div>
+        <div className="rounded-[18px] p-4 text-center" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="text-lg font-bold text-[#FF9800]">{checkedInPatients}</div>
+          <div className="text-[9px] mt-1 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>Checked In</div>
+        </div>
+        <div className="rounded-[18px] p-4 text-center" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="text-lg font-bold text-[#9C27B0]">{workingPatients}</div>
+          <div className="text-[9px] mt-1 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>Working</div>
+        </div>
+        <div className="rounded-[18px] p-4 text-center" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="text-lg font-bold text-[#4CAF50]">{completedToday}</div>
+          <div className="text-[9px] mt-1 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>Completed</div>
+        </div>
+        <div className="rounded-[18px] p-4 text-center" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="text-lg font-bold text-[#F44336]">{noShows}</div>
+          <div className="text-[9px] mt-1 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>No Shows</div>
+        </div>
+      </div>
+
+      {/* Branch Financial Overview + Doctor Performance + Notifications */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Branch Financial Overview */}
+        <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 className="text-base font-semibold text-white mb-4">Branch Financial Overview</h3>
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl" style={{ background: 'rgba(0,229,168,0.06)', border: '1px solid rgba(0,229,168,0.1)' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="w-4 h-4 text-[#00E5A8]" />
+                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Branch Revenue</span>
+              </div>
+              <div className="text-2xl font-bold text-[#00E5A8]">${branchRevenue.toLocaleString()}</div>
+            </div>
+            <div className="p-4 rounded-xl" style={{ background: 'rgba(79,209,255,0.06)', border: '1px solid rgba(79,209,255,0.1)' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <Package className="w-4 h-4 text-[#4FD1FF]" />
+                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Estimated Inventory Value</span>
+              </div>
+              <div className="text-2xl font-bold text-[#4FD1FF]">${inventoryValue.toLocaleString()}</div>
+            </div>
+            <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+              <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                * Inventory value estimated at avg. $150/unit. Actual cost may vary.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Doctor Performance */}
+        <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 className="text-base font-semibold text-white mb-4">Doctor Performance</h3>
+          {doctorPerformance.length === 0 ? (
+            <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No procedure data yet</div>
+          ) : (
+            <div className="space-y-2">
+              {doctorPerformance.map((doc, i) => (
+                <div key={doc.name} className="flex items-center justify-between p-3 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold"
+                      style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }}>
+                      {i + 1}
+                    </span>
+                    <span className="text-sm font-medium text-white">{doc.name}</span>
+                  </div>
+                  <span className="text-sm font-bold text-[#4FD1FF]">{doc.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <button onClick={() => navigate('/dashboard/cases')}
+            className="w-full mt-4 py-2.5 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(79,209,255,0.06)', color: '#4FD1FF' }}>View All Procedures</button>
+        </div>
+
+        {/* Notifications Widget */}
+        <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-semibold text-white">Notifications</h3>
+            <Bell className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.3)' }} />
+          </div>
+          {notifications.length === 0 ? (
+            <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No notifications yet</div>
+          ) : (
+            <div className="space-y-2">
+              {notifications.slice(0, 5).map(n => (
+                <div key={n.id} className="p-3 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{
+                      background: n.type === 'critical' ? '#ef4444' : n.type === 'warning' ? '#FFC107' : n.type === 'success' ? '#00E5A8' : '#4FD1FF',
+                    }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-white truncate">{n.title}</div>
+                      <div className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{n.message}</div>
+                      {n.created_at && (
+                        <div className="text-[9px] mt-0.5" style={{ color: 'rgba(255,255,255,0.2)' }}>
+                          {new Date(n.created_at).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <h3 className="text-base font-semibold text-white mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <button onClick={() => navigate('/dashboard/appointments')}
+            className="flex items-center justify-center gap-2 p-4 rounded-xl text-sm font-medium transition-all hover:-translate-y-0.5"
+            style={{ background: 'rgba(79,209,255,0.08)', border: '1px solid rgba(79,209,255,0.12)', color: '#4FD1FF' }}>
+            <Calendar className="w-5 h-5" /> New Appointment
+          </button>
+          <button onClick={() => navigate('/dashboard/inventory')}
+            className="flex items-center justify-center gap-2 p-4 rounded-xl text-sm font-medium transition-all hover:-translate-y-0.5"
+            style={{ background: 'rgba(0,229,168,0.08)', border: '1px solid rgba(0,229,168,0.12)', color: '#00E5A8' }}>
+            <Package className="w-5 h-5" /> View Inventory
+          </button>
+          <button onClick={() => navigate('/dashboard/reports')}
+            className="flex items-center justify-center gap-2 p-4 rounded-xl text-sm font-medium transition-all hover:-translate-y-0.5"
+            style={{ background: 'rgba(124,92,255,0.08)', border: '1px solid rgba(124,92,255,0.12)', color: '#7C5CFF' }}>
+            <BarChart3 className="w-5 h-5" /> Reports
+          </button>
+          <button onClick={() => navigate('/dashboard/inventory?tab=requests')}
+            className="flex items-center justify-center gap-2 p-4 rounded-xl text-sm font-medium transition-all hover:-translate-y-0.5"
+            style={{ background: 'rgba(255,193,7,0.08)', border: '1px solid rgba(255,193,7,0.12)', color: '#FFC107' }}>
+            <ArrowLeftRight className="w-5 h-5" /> Stock Request
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -746,12 +1185,13 @@ function ManagerDashboard() {
    ════════════════════════════════════════════ */
 function DoctorDashboard() {
   const { user } = useAuth();
+  const { activeBranchId } = useBranch();
   const navigate = useNavigate();
   const today = new Date().toISOString().split('T')[0];
 
   const { data: doctorAppointments = [] } = useQuery({
-    queryKey: ['doctor-appointments', user?.id],
-    queryFn: () => appointmentService.getByDoctor(user!.id, user?.branch_id),
+    queryKey: ['doctor-appointments', user?.id, activeBranchId],
+    queryFn: () => appointmentService.getByDoctor(user!.id, activeBranchId),
     enabled: !!user?.id,
   });
   const { data: upcomingAppointments = [] } = useQuery({
@@ -760,8 +1200,8 @@ function DoctorDashboard() {
     enabled: !!user?.id,
   });
   const { data: doctorProcedures = [] } = useQuery({
-    queryKey: ['doctor-procedures', user?.id],
-    queryFn: () => procedureService.getByDoctor(user!.id, user?.branch_id),
+    queryKey: ['doctor-procedures', user?.id, activeBranchId],
+    queryFn: () => procedureService.getByDoctor(user!.id, activeBranchId),
     enabled: !!user?.id,
   });
   const { data: allFollowUps = [] } = useQuery({
@@ -772,6 +1212,12 @@ function DoctorDashboard() {
   const { data: doctorRevenue } = useQuery({
     queryKey: ['doctor-revenue', user?.id],
     queryFn: () => procedureService.getRevenueByDoctor(user!.id),
+    enabled: !!user?.id,
+  });
+
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['notifications-doctor', user?.id],
+    queryFn: () => user?.id ? notificationService.getByUser(user.id, 10) : Promise.resolve([]),
     enabled: !!user?.id,
   });
 
@@ -822,6 +1268,20 @@ function DoctorDashboard() {
     });
     return map;
   }, [todayProcedures]);
+
+  const monthlyProcedures = useMemo(() => {
+    const months: Record<string, number> = {};
+    doctorProcedures.forEach(p => {
+      if (p.created_at) {
+        const m = new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        months[m] = (months[m] || 0) + 1;
+      }
+    });
+    return Object.entries(months).map(([name, count]) => ({ name, count }));
+  }, [doctorProcedures]);
+
+  const completedProcedures = doctorProcedures.filter(p => p.status === 'Completed').length;
+  const implantSuccessRate = totalProcedures > 0 ? Math.round((completedProcedures / totalProcedures) * 100) : 0;
 
   return (
     <div className="space-y-6 font-sans select-auto">
@@ -1110,6 +1570,153 @@ function DoctorDashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Monthly Procedures Chart */}
+      <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <h3 className="text-base font-semibold text-white mb-4">Monthly Procedures</h3>
+        {monthlyProcedures.length === 0 ? (
+          <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No procedure data yet</div>
+        ) : (
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height={224}>
+              <BarChart data={monthlyProcedures} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="name" stroke="rgba(255,255,255,0.15)" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={{ background: 'rgba(8,15,25,0.95)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', fontSize: '12px' }} />
+                <Bar dataKey="count" fill="#4FD1FF" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Implant Success Rate & Quick Actions & Notifications */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Success Rate Card */}
+        <div className="rounded-[22px] p-6 flex flex-col items-center justify-center" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 className="text-base font-semibold text-white mb-4">Implant Success Rate</h3>
+          <div className="relative w-28 h-28 flex items-center justify-center">
+            <svg className="w-28 h-28 -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+              <circle cx="60" cy="60" r="52" fill="none" stroke="#00E5A8" strokeWidth="8"
+                strokeDasharray={`${2 * Math.PI * 52}`}
+                strokeDashoffset={`${2 * Math.PI * 52 * (1 - implantSuccessRate / 100)}`}
+                strokeLinecap="round" />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-3xl font-bold text-white">{implantSuccessRate}%</span>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-4 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <span><span className="text-[#00E5A8] font-semibold">{completedProcedures}</span> Completed</span>
+            <span><span className="text-white font-semibold">{totalProcedures}</span> Total</span>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 className="text-base font-semibold text-white mb-4">Quick Actions</h3>
+          <div className="space-y-2">
+            <button onClick={() => navigate('/dashboard/schedule')}
+              className="w-full flex items-center gap-3 p-3 rounded-xl text-sm font-medium transition-all hover:bg-[rgba(79,209,255,0.06)]"
+              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', color: '#4FD1FF' }}>
+              <Calendar className="w-4 h-4" /> Schedule Appointment
+            </button>
+            <button onClick={() => navigate('/dashboard/cases')}
+              className="w-full flex items-center gap-3 p-3 rounded-xl text-sm font-medium transition-all hover:bg-[rgba(0,229,168,0.06)]"
+              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', color: '#00E5A8' }}>
+              <Plus className="w-4 h-4" /> Record Procedure
+            </button>
+            <button onClick={() => navigate('/dashboard/patients')}
+              className="w-full flex items-center gap-3 p-3 rounded-xl text-sm font-medium transition-all hover:bg-[rgba(124,92,255,0.06)]"
+              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', color: '#7C5CFF' }}>
+              <Users className="w-4 h-4" /> View Patients
+            </button>
+            <button onClick={() => navigate('/dashboard/schedule')}
+              className="w-full flex items-center gap-3 p-3 rounded-xl text-sm font-medium transition-all hover:bg-[rgba(255,193,7,0.06)]"
+              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', color: '#FFC107' }}>
+              <Clock className="w-4 h-4" /> View Schedule
+            </button>
+          </div>
+        </div>
+
+        {/* Notifications */}
+        <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 className="text-base font-semibold text-white mb-4">Notifications</h3>
+          {notifications.length === 0 ? (
+            <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No notifications</div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {notifications.slice(0, 6).map((n: any) => (
+                <div key={n.id} className="flex items-start gap-3 p-3 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                    style={{ background: n.read ? 'rgba(255,255,255,0.2)' : '#4FD1FF' }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-white truncate">{n.title}</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{n.message}</div>
+                    <div className="text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                      {n.created_at ? new Date(n.created_at).toLocaleDateString() : ''}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Today's Procedures Enhanced */}
+      <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <h3 className="text-base font-semibold text-white mb-4">Today's Procedures Details</h3>
+        {todayProcedures.length === 0 ? (
+          <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No procedures today</div>
+        ) : (
+          <div className="overflow-hidden">
+            <div className="flex text-[11px] font-semibold uppercase tracking-wider pb-3 border-b border-[rgba(255,255,255,0.05)]"
+              style={{ color: 'rgba(255,255,255,0.25)' }}>
+              <div className="flex-[2]">Patient</div>
+              <div className="flex-[1.5]">Procedure</div>
+              <div className="flex-[1]">Status</div>
+              <div className="flex-[0.75]">Tooth</div>
+              <div className="flex-[1]">Time</div>
+            </div>
+            <div className="divide-y divide-[rgba(255,255,255,0.04)]">
+              {todayProcedures.slice(0, 8).map(p => (
+                <div key={p.id} className="flex items-center py-3.5 transition-all hover:bg-[rgba(255,255,255,0.02)] rounded-lg px-1 -mx-1">
+                  <div className="flex-[2] flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold"
+                      style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }}>
+                      {(p.patient_id || '').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-white">Patient #{p.patient_id.slice(0, 6)}</div>
+                    </div>
+                  </div>
+                  <div className="flex-[1.5] text-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>{p.procedure_name}</div>
+                  <div className="flex-[1]">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
+                      style={{
+                        background: p.status === 'Completed' ? 'rgba(0,229,168,0.12)' : p.status === 'Surgery' ? 'rgba(79,209,255,0.12)' : 'rgba(255,193,7,0.12)',
+                        color: p.status === 'Completed' ? '#00E5A8' : p.status === 'Surgery' ? '#4FD1FF' : '#FFC107',
+                      }}>
+                      {p.status}
+                    </span>
+                  </div>
+                  <div className="flex-[0.75] text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>{p.tooth_number || '—'}</div>
+                  <div className="flex-[1] text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                    {p.created_at ? new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <button onClick={() => navigate('/dashboard/cases')}
+          className="w-full mt-4 py-2.5 rounded-xl text-xs font-medium"
+          style={{ background: 'rgba(79,209,255,0.06)', color: '#4FD1FF' }}>View All Procedures</button>
       </div>
     </div>
   );

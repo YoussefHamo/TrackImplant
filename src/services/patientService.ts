@@ -8,6 +8,7 @@ import {
 } from '../lib/storage';
 
 function patientFromRow(row: Record<string, unknown>): Patient {
+  const branchObj = row.branches as { name?: string } | null | undefined;
   return {
     id: row.id as string,
     full_name: row.full_name as string,
@@ -26,6 +27,7 @@ function patientFromRow(row: Record<string, unknown>): Patient {
     created_by: row.created_by as string | undefined,
     created_at: row.created_at as string | undefined,
     branch_id: row.branch_id as string | undefined,
+    home_branch_name: branchObj?.name ?? undefined,
   };
 }
 
@@ -33,13 +35,13 @@ const BUCKET = STORAGE_BUCKETS.PATIENT_PROFILES;
 
 export const patientService = {
   async getAll(): Promise<Patient[]> {
-    const { data, error } = await supabase.from('patients').select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id').order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('patients').select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id, branches:branch_id(name)').order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return (data || []).map(patientFromRow);
   },
 
   async getById(id: string): Promise<Patient | null> {
-    const { data, error } = await supabase.from('patients').select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id').eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('patients').select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id, branches:branch_id(name)').eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? patientFromRow(data) : null;
   },
@@ -48,7 +50,7 @@ export const patientService = {
     const q = query.trim();
     const { data, error } = await supabase
       .from('patients')
-      .select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id')
+      .select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id, branches:branch_id(name)')
       .or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,external_medical_code.ilike.%${q}%`)
       .limit(20);
     if (error) {
@@ -74,7 +76,7 @@ export const patientService = {
       external_medical_code: patient.external_medical_code,
       insurance_company: patient.insurance_company,
       branch_id: patient.branch_id || null,
-    }]).select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id').single();
+    }]).select('id, full_name, phone, email, gender, date_of_birth, address, notes, emergency_contact_name, emergency_contact_phone, profile_image_url, medical_history, chronic_disease, medication, allergies, smoking_status, external_medical_code, insurance_company, created_at, created_by, branch_id, branches:branch_id(name)').single();
     if (error) throw new Error(error.message);
 
     const actor = await getCurrentUserInfo();

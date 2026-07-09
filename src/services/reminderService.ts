@@ -45,11 +45,15 @@ export const reminderService = {
     title: string;
     message?: string;
     scheduled_for: string;
+    branch_id?: string;
   }): Promise<PatientReminder> {
     const { data: { user } } = await supabase.auth.getUser();
+    const payload: Record<string, unknown> = { ...data, created_by: user?.id };
+    delete payload.branch_id;
+    payload.branch_id = data.branch_id || null;
     const { data: inserted, error } = await supabase
       .from('patient_reminders')
-      .insert([{ ...data, created_by: user?.id }])
+      .insert([payload])
       .select()
       .single();
     if (error) throw new Error(error.message);

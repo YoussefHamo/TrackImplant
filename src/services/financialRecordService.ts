@@ -1,5 +1,6 @@
 import { supabase } from '../integrations/supabase/client';
 import { auditLogService, getCurrentUserInfo } from './auditLogService';
+import { timelineEventService } from './timelineEventService';
 import type { FinancialRecord, PaymentStatus, PaymentMethod } from '../types';
 
 function rowToRecord(row: Record<string, unknown>): FinancialRecord {
@@ -141,6 +142,16 @@ export const financialRecordService = {
       .single();
     if (error) throw new Error(error.message);
 
+    // Write timeline event
+    timelineEventService.write({
+      patient_id: data.patient_id,
+      event_type: 'invoice_created',
+      description: `Invoice: ${data.invoice_name} — $${data.total_amount.toFixed(2)} (Pending)`,
+      related_entity_type: 'financial_record',
+      related_entity_id: inserted.id,
+      metadata: { record_type: 'invoice', total_amount: data.total_amount, invoice_name: data.invoice_name },
+    }).catch(() => {});
+
     const actor = await getCurrentUserInfo();
     if (actor) {
       auditLogService.log({
@@ -191,6 +202,16 @@ export const financialRecordService = {
     if (error) throw new Error(error.message);
 
     await this.syncInvoice(data.invoice_id);
+
+    // Write timeline event
+    timelineEventService.write({
+      patient_id: data.patient_id,
+      event_type: 'payment_added',
+      description: `Payment: $${Math.abs(data.amount).toFixed(2)}${data.payment_method ? ` via ${data.payment_method}` : ''}`,
+      related_entity_type: 'financial_record',
+      related_entity_id: inserted.id,
+      metadata: { record_type: 'payment', amount: data.amount, payment_method: data.payment_method },
+    }).catch(() => {});
 
     const actor = await getCurrentUserInfo();
     if (actor) {
@@ -265,6 +286,16 @@ export const financialRecordService = {
       .eq('id', data.invoice_id);
     if (updateErr) throw updateErr;
 
+    // Write timeline event
+    timelineEventService.write({
+      patient_id: data.patient_id,
+      event_type: 'refund_created',
+      description: `Refund: $${Math.abs(data.amount).toFixed(2)} via ${data.refund_type || data.payment_method || 'cash'}`,
+      related_entity_type: 'financial_record',
+      related_entity_id: refund.id,
+      metadata: { record_type: 'payment', amount: -Math.abs(data.amount), refund_type: data.refund_type },
+    }).catch(() => {});
+
     const actor = await getCurrentUserInfo();
     if (actor) {
       await auditLogService.log({
@@ -315,7 +346,17 @@ export const financialRecordService = {
   },
 
   async deleteRecord(id: string, reason?: { change_reason?: string; reason_category?: string }): Promise<void> {
-    const { data: rec } = await supabase.from('financial_records').select('record_type, parent_invoice_id').eq('id', id).single();
+    const { data: rec } = await supabase.from('financial_records').select('record_type, parent_invoice_id, patient_id, amount, invoice_name, total_amount').eq('id', id).single();
+    if (rec?.patient_id) {
+      timelineEventService.write({
+        patient_id: rec.patient_id as string,
+        event_type: rec.record_type === 'invoice' ? 'invoice_deleted' : 'payment_removed',
+        description: rec.record_type === 'invoice' ? `Invoice deleted: ${(rec.invoice_name as string) || id}` : `${Number(rec.amount) < 0 ? 'Refund' : 'Payment'} removed: $${Math.abs(Number(rec.amount)).toFixed(2)}`,
+        related_entity_type: 'financial_record',
+        related_entity_id: id,
+        metadata: { record_type: rec.record_type, deleted: true },
+      }).catch(() => {});
+    }
     const { error } = await supabase.from('financial_records').delete().eq('id', id);
     if (error) throw new Error(error.message);
     if (rec && rec.record_type === 'payment' && rec.parent_invoice_id) {
