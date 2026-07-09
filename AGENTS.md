@@ -337,9 +337,148 @@ Only informational warnings remain (chunk size, dynamic imports — non-blocking
 - **Build**: 0 TypeScript errors, Vite build succeeds
 - **Runtime**: All DB constraints fixed and applied
 - **Notification link bug FIXED**: Trigger functions created notification links with `'/inventory'` but the React route is `/dashboard/inventory`. Clicking a notification navigated to `/inventory` (non-existent route) → catch-all redirect to `/` (login page). Fixed via migration `20260706000000_fix_notification_links.sql` which updates all existing notification links + recreates 3 trigger functions (`handle_cross_branch_request_notification`, `handle_cross_branch_delivery_notification`, `handle_return_notification`) to use `/dashboard/inventory`.
-- **Next**: Verify procedure creation works end-to-end, test ReasonDialog on all sensitive operations, test cross-branch request flow
-
 ---
+
+## Schedule & Calendar Module
+
+### New Database Changes
+
+#### `doctor_schedules` table
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID PK | Auto-generated |
+| `doctor_id` | UUID FK → `users(auth_user_id)` | On delete cascade |
+| `day_of_week` | int (0-6) | 0=Sunday, 6=Saturday |
+| `start_time` | time | Working day start |
+| `end_time` | time | Working day end |
+| `is_active` | boolean | Default true |
+| `branch_id` | UUID FK → `branches` | Nullable |
+| `UNIQUE(doctor_id, day_of_week)` | | One schedule per day per doctor |
+
+#### `appointments` extended
+- `duration_minutes` (int, default 30) — variable appointment duration
+- `end_time` (timestamptz) — computed on create/update
+- `color` (text) — status-based color
+
+#### New Appointment Statuses
+`'scheduled' | 'checked_in' | 'working' | 'completed' | 'cancelled' | 'no_show' | 'postponed'`
+
+### Status Workflow
+```
+Reception books → Scheduled
+Patient arrives → Checked In → notify doctor
+Patient enters room → Working
+Procedure finishes → Completed
+No-show (auto after 15min past appt time) → No Show
+Manual → Postponed / Cancelled
+```
+
+### Auto No-Show
+- Function `auto_mark_no_show()` runs via trigger — marks `Scheduled` → `No Show` when `now() > appointment_date + 15 min`
+
+### Notifications
+- Trigger `trg_appointment_notification`:
+  - On INSERT → notify doctor of new appointment
+  - On UPDATE to `checked_in` → notify doctor that patient arrived
+
+### Services
+
+#### `appointmentService.ts` (updated)
+| Method | Description |
+|--------|-------------|
+| `getById(id)` | Fetch single appointment with patient/doctor names |
+| `getByDateRange(from, to, branchId?)` | Fetch appointments in date range |
+| `getByPatient(patientId)` | Fetch patient's appointments |
+| `checkOverlap(doctorId, startDate, duration, excludeId?)` | Double-booking detection |
+| `update(id, updates)` | Update any fields, auto-compute end_time |
+| `getTodayStats(branchId?)` | Today's stats by status |
+
+#### `doctorScheduleService.ts` (new)
+| Method | Description |
+|--------|-------------|
+| `getByDoctor(doctorId)` | Get doctor's weekly schedule |
+| `getAll()` | Get all schedules |
+| `upsert()` | Create or update schedule entry |
+| `delete(id)` | Remove schedule entry |
+
+### Components
+
+#### `SchedulePage.tsx`
+- **View Toggle**: Day / Week / Month
+- **Navigation**: Previous/Next, Today button
+- **Filters**: Doctor dropdown, Branch dropdown, Status dropdown, Search
+- **Admin tools**: Settings button to manage doctor schedules
+- **Context Menu**: Right-click on appointment for quick actions
+- **Status Legend**: Color-coded bar at bottom
+
+#### `MonthView.tsx`
+- Month grid with day cells
+- Appointment dots per day (max 3 shown, "+N more")
+- Today highlighting
+- Click day → switches to Day view
+
+#### `WeekView.tsx`
+- 7-day columns with doctor sub-columns
+- Time rows (00:00 - 23:00)
+- Slot click to create appointment
+- Appointment blocks in correct time slot
+
+#### `DayView.tsx`
+- Single day with doctor columns
+- Full 24h timeline
+- Slot click to create appointment
+
+#### `BookingDialog.tsx`
+- Patient + Doctor + Date + Time + Duration + Notes
+- Doctor schedule validation (warning if outside working hours)
+- **Double-booking detection**: checks overlapping appointments
+- Schedule conflict warning: "Dr. X does not work on this day/time"
+
+#### `DoubleBookingWarning.tsx`
+- Shows existing patient name, time, requested time, doctor name
+- **Buttons**: Cancel (return to editing) | Continue Anyway (override)
+- Remembers user intent after override to avoid re-prompting
+
+#### `DoctorScheduleManager.tsx`
+- Doctor selector
+- Weekly grid with per-day Add/Edit/Delete
+- Time inputs for start/end
+
+#### `AppointmentBlock.tsx`
+- Reusable appointment card with status color bar
+- Shows time + patient name + doctor name
+- Compact mode for Month view
+
+#### `ContextMenu.tsx`
+- Right-click menu with actions:
+  - Open Patient (new tab)
+  - Edit Appointment
+  - Check In / Start Working / Complete / Postpone / Cancel
+  - Reschedule
+  - Delete (Admin only)
+
+### Status Color Coding
+| Status | Color |
+|--------|-------|
+| Scheduled | `#4FD1FF` (Blue) |
+| Checked In | `#FF9800` (Orange) |
+| Working | `#9C27B0` (Purple) |
+| Completed | `#4CAF50` (Green) |
+| Postponed | `#FFC107` (Yellow) |
+| Cancelled | `#9E9E9E` (Gray) |
+| No Show | `#F44336` (Red) |
+
+### Routes
+- `/dashboard/schedule` — SchedulePage (all authenticated roles)
+
+### Nav Items
+- `Schedule` — added to sidebar with Calendar icon (visible to all roles)
+- `Appointments (Legacy)` — kept for backward compatibility with CalendarDays icon
+
+### Build Status
+```bash
+npm run build  # PASS — 0 errors (tsc + vite)
+```
 
 ## Running the App
 ```bash
