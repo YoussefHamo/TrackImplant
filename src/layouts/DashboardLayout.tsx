@@ -9,7 +9,7 @@ import { searchService, type SearchResult } from "../services/searchService";
 import { notificationService } from "../services/notificationService";
 import AddPatientModal from "../components/AddPatientModal";
 import {
-  LayoutDashboard, Users, Activity, Calendar, CreditCard, Clock, Package, BarChart3,
+  LayoutDashboard, Users, Activity, Calendar, CalendarDays, CreditCard, Clock, Package, BarChart3,
   Bell, Search, Plus, Settings, LogOut, ChevronRight,
   User, FileText, Info, AlertTriangle, CheckCircle
 } from "lucide-react";
@@ -27,7 +27,8 @@ const allNavItems: { path: string; labelKey: string; icon: React.ElementType; ad
   { path: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
   { path: "/dashboard/patients", labelKey: "nav.patients", icon: Users },
   { path: "/dashboard/cases", labelKey: "nav.tracking", icon: Activity },
-  { path: "/dashboard/appointments", labelKey: "nav.appointments", icon: Calendar },
+  { path: "/dashboard/schedule", labelKey: "nav.schedule", icon: Calendar },
+  { path: "/dashboard/appointments", labelKey: "nav.appointments", icon: CalendarDays },
   { path: "/dashboard/payments", labelKey: "nav.finances", icon: CreditCard, hideForDoctor: true },
   { path: "/dashboard/follow-ups", labelKey: "nav.follow_ups", icon: Clock },
   { path: "/dashboard/reports", labelKey: "nav.reports", icon: BarChart3, hideForDoctor: true },

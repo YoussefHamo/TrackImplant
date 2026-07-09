@@ -33,9 +33,12 @@ function buildCalendar(year: number, month: number) {
 const statusStyles: Record<string, { bg: string; text: string; glow: string }> = {
   scheduled: { bg: 'rgba(79,209,255,0.15)', text: '#4FD1FF', glow: 'rgba(79,209,255,0.3)' },
   confirmed: { bg: 'rgba(0,229,168,0.15)', text: '#00E5A8', glow: 'rgba(0,229,168,0.3)' },
-  completed: { bg: 'rgba(124,92,255,0.15)', text: '#7C5CFF', glow: 'rgba(124,92,255,0.3)' },
-  cancelled: { bg: 'rgba(239,68,68,0.15)', text: '#ef4444', glow: 'rgba(239,68,68,0.3)' },
-  no_show: { bg: 'rgba(255,193,7,0.15)', text: '#FFC107', glow: 'rgba(255,193,7,0.3)' },
+  checked_in: { bg: 'rgba(255,152,0,0.15)', text: '#FF9800', glow: 'rgba(255,152,0,0.3)' },
+  working: { bg: 'rgba(156,39,176,0.15)', text: '#9C27B0', glow: 'rgba(156,39,176,0.3)' },
+  completed: { bg: 'rgba(76,175,80,0.15)', text: '#4CAF50', glow: 'rgba(76,175,80,0.3)' },
+  cancelled: { bg: 'rgba(158,158,158,0.15)', text: '#9E9E9E', glow: 'rgba(158,158,158,0.3)' },
+  no_show: { bg: 'rgba(244,67,54,0.15)', text: '#F44336', glow: 'rgba(244,67,54,0.3)' },
+  postponed: { bg: 'rgba(255,193,7,0.15)', text: '#FFC107', glow: 'rgba(255,193,7,0.3)' },
 };
 
 export default function Appointments() {

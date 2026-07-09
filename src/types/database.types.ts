@@ -27,7 +27,7 @@ export interface ChangeReason {
   approved_by?: string;
   approval_notes?: string;
 }
-export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+export type AppointmentStatus = 'scheduled' | 'checked_in' | 'working' | 'completed' | 'cancelled' | 'no_show' | 'postponed';
 export type PaymentStatus = 'Pending' | 'Partial' | 'Paid';
 export type PaymentMethod = 'cash' | 'card' | 'insurance' | 'bank_transfer';
 export type RecordType = 'invoice' | 'payment';
@@ -100,6 +100,23 @@ export interface Appointment {
   appointment_date: string;
   status: string;
   created_at?: string;
+  duration_minutes?: number;
+  end_time?: string;
+  color?: string;
+  doctor_name?: string;
+  patient_name?: string;
+  notes?: string;
+  branch_id?: string;
+}
+
+export interface DoctorSchedule {
+  id: string;
+  doctor_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_active: boolean;
+  branch_id?: string;
 }
 
 export interface ProcedureDoctor {
