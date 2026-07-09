@@ -482,6 +482,196 @@ npm run build  # PASS — 0 errors (tsc + vite)
 
 ---
 
+## Schedule UI/UX Enhancement — Professional Calendar Experience
+
+### Overview
+Complete UI/UX overhaul of the Schedule module (Day/Week/Month views, AppointmentBlock, ContextMenu, SchedulePage toolbar). All business logic, database schema, and workflows are preserved — visual-only improvements inspired by Google Calendar, Outlook, and medical practice schedulers.
+
+### 1. Current Time Indicator
+- Horizontal red line at current time position in DayView and WeekView
+- Red circle + timestamp label beside the line
+- Updates every minute via `setInterval`
+- Only shown for today's date
+- Auto-scrolls to current time on mount and when pressing "Today"
+
+### 2. Appointment Cards (AppointmentBlock.tsx)
+- **Top**: Time (mono font, colored), patient name (bold), duration badge
+- **Middle**: Doctor name with User icon
+- **Bottom**: Status badge (colored chip), optional Implant badge (from notes keyword)
+- Colored left border (3px) + light background tint from status color
+- Rounded corners (10px), box shadow, hover scale(1.02) animation
+- Selected state: ring outline + elevated shadow + scale(1.02)
+- Drag state: scale(0.98) rotate(-1deg) + deep shadow
+- Resize handle at bottom with gradient, shows duration tooltip during drag
+- Tooltip on hover: patient name, time range, duration, doctor, status, notes, branch
+- Memoized with `React.memo` for performance
+
+### 3. Doctor Headers (DayView + WeekView)
+- **Avatar**: Circular initial-letter badge with unique color per doctor
+- **Name**: Bold, truncated
+- **Hours/Status**: Working hours range or "Day Off" or "No Schedule"
+- **OFF badge**: Red chip when doctor is off
+- **Daily Statistics**: Small colored chips per header showing total/completed/waiting counts
+- Sticky headers with backdrop blur (z-20)
+
+### 4. Working Hours Visualization
+- **Working hours**: Default background
+- **Outside hours**: `rgba(0,0,0,0.12)` darker background, slightly dimmed (opacity 0.6)
+- **OFF day**: `rgba(0,0,0,0.25)` very dark, heavy dim (opacity 0.35), large "OFF" watermark text
+- **Current hour**: Subtle `rgba(79,209,255,0.03)` blue tint (DayView), `rgba(79,209,255,0.04)` (WeekView)
+
+### 5. Appointment Status Colors
+| Status | Color | Usage |
+|--------|-------|-------|
+| Scheduled | `#4FD1FF` (Blue) | Left border, bg tint, badge |
+| Checked In | `#FF9800` (Orange) | Left border, bg tint, badge |
+| Working | `#9C27B0` (Purple) | Left border, bg tint, badge |
+| Completed | `#4CAF50` (Green) | Left border, bg tint, badge |
+| Postponed | `#FFC107` (Yellow) | Left border, bg tint, badge |
+| Cancelled | `#9E9E9E` (Gray) | Left border, bg tint, badge |
+| No Show | `#F44336` (Red) | Left border, bg tint, badge |
+
+### 6. Hover Tooltip
+- Appears above appointment card on hover (CSS `group-hover:opacity-100`)
+- Dark elevated card with arrow pointer
+- Shows: Patient name (bold), time range + duration (Clock icon), doctor name (User icon), status (colored dot), notes, branch ID
+- Implemented as `PatientTooltip` memoized sub-component
+
+### 7. Context Menu (ContextMenu.tsx)
+- **Grouped sections** with separators:
+  - **Patient**: Open Profile, View History, Documents
+  - **Appointment**: Edit, Reschedule, Duplicate, Print
+  - **Status**: Check In, Start Working, Complete, Postpone
+  - **Communication**: Call, WhatsApp, Send Email
+  - **Danger Zone**: Cancel (red), Delete (red, Admin-only)
+- SVG icons from Lucide (no emoji)
+- Keyboard navigation with `role="menu"` / `role="menuitem"`
+- Escape to close, click outside to close
+- Screen-position-aware (prevents overflow)
+
+### 8. Empty State
+- Uses existing `EmptyState` component with CalendarDays icon area
+- Context-aware message: "No appointments scheduled for this period" or "Try adjusting your filters."
+- CTA button: "Create Appointment" → opens BookingDialog
+
+### 9. Doctor Daily Statistics
+- Per-doctor, per-day stats shown below each doctor header
+- Small chips: total appointments (blue), completed (green), waiting (orange)
+- WeekView shows compact stats (total + completed counts) in sub-header
+
+### 10. Zoom
+- Zoom presets: 50%, 75%, 100%, 125%, 150%, 200%
+- Dropdown button in toolbar showing current zoom percentage
+- Applies to row height: `Math.round(60 * zoomLevel)` px per hour
+- Appointment blocks resize accordingly
+
+### 11. Scroll Experience
+- Doctor headers sticky via `position: sticky` + `z-20` + backdrop blur
+- Time column sticky via `sticky left-0 z-10`
+- Scroll container uses `scroll-behavior: smooth`
+- WeekView has two sticky rows: day headers + doctor sub-headers
+
+### 12. Weekend Highlight
+- Saturday/Sunday columns get a slightly darker background (`rgba(255,255,255,0.015)`)
+- Today column gets blue tint (`rgba(79,209,255,0.06)`)
+- Today's date number colored blue + dot indicator
+
+### 13. Loading Skeleton
+- Timeline skeleton shown while `apptsLoading` is true
+- Uses existing `Skeleton` component with placeholder rows matching time grid layout
+- No layout shift — same container dimensions as calendar views
+
+### 14. Search
+- Search input in toolbar with Search icon
+- Filters by: patient name, doctor name, notes content, appointment ID
+- Results update instantly via `filteredAppointments` useMemo
+- Search term shown as removable chip in filter chips bar
+
+### 15. Filters
+- Filter toggle button in toolbar
+- Expanded filter panel: Doctor dropdown, Branch dropdown, Status dropdown
+- Active filters shown as removable chips below toolbar (colored pills with X button)
+- Reset All button (RotateCcw icon)
+- `F` keyboard shortcut to toggle filter panel
+
+### 16. Calendar Header (Toolbar)
+- **View selector**: Day/Week/Month radio group with active highlight
+- **Navigation**: Prev/Today/Next buttons
+- **Date label**: Current view range, `aria-live="polite"`
+- **Zoom**: Dropdown with preset values
+- **Print**: Printer icon button
+- **Mini Calendar**: Calendar icon toggle
+- **Search**: Input with Search icon
+- **Filter**: Filter icon toggle
+- **Settings** (Admin only): Schedule manager gear icon
+- **New**: Gradient "New" button with Plus icon
+- All buttons `role="toolbar"` with `aria-label` attributes
+
+### 17. Mini Calendar
+- Toggle button in toolbar (Calendar icon)
+- Sidebar mini calendar component shown/hidden via state
+- Month navigation (prev/next arrows)
+- Month/year label
+- Day grid with today/selected highlighting
+- Click day → navigates to that date
+- Hidden on screens <lg (responsive)
+
+### 18. Performance
+- All callbacks use `useCallback`
+- Derived data uses `useMemo` (doctors, schedules, dateRange, filteredAppointments, activeFilters)
+- `AppointmentBlock` wrapped with `React.memo`
+- `PatientTooltip` memoized as separate component
+- Virtual filtering via useMemo instead of inline .filter()
+
+### 19. Accessibility
+- `role="toolbar"` on toolbar container, `aria-label="Schedule toolbar"`
+- `role="radiogroup"` + `role="radio"` on view selector with `aria-checked`
+- `role="menu"` + `role="menuitem"` on context menu
+- `role="columnheader"` on doctor headers with `aria-label`
+- `role="gridcell"` on time slots with `aria-label`
+- `role="status"` + `aria-live="polite"` on appointment count
+- All icon buttons have `aria-label`
+- Keyboard navigation: Tab order, Enter to activate, Escape to close menus
+- Focus states with `focus-visible:outline-none focus-visible:ring-1`
+- `aria-live="polite"` on date label for screen reader updates
+- `role="separator"` on menu dividers
+- High contrast: semantic color tokens, minimum 4.5:1 contrast ratios
+
+### 20. Responsive Layout
+- **Desktop** (≥1024px): Full toolbar, mini calendar sidebar visible
+- **Tablet** (768-1023px): Compact columns, search hidden (shown on focus), filters in panel
+- **Mobile** (<768px): Toolbar wraps with `flex-wrap`, search hidden behind icon, stacked layout
+- Mini calendar hidden on <lg breakpoint
+- `hidden sm:block` on search input for responsive behavior
+
+### Files Changed
+| File | Changes |
+|------|---------|
+| `AppointmentBlock.tsx` | Full redesign: tooltip, badges, animations, selected/drag states, rich layout |
+| `ContextMenu.tsx` | New grouped sections format with Lucide icons, improved keyboard/accessibility |
+| `DayView.tsx` | Current time indicator, doctor headers with avatar+stats, working hours viz, sticky headers |
+| `WeekView.tsx` | Same as DayView + weekend highlight, two-row sticky headers, compact doctor stats |
+| `SchedulePage.tsx` | Toolbar overhaul, zoom presets, mini calendar, search, filter chips, empty state, skeleton loading, accessibility, responsive |
+
+### Build Status
+```bash
+npm run build  # PASS — 0 errors (tsc + vite)
+```
+
+### Fixes Applied
+| Issue | Fix |
+|-------|-----|
+| Auto-scroll to current time when clicking Today | Added `date`/`startDate` to DayView/WeekView scroll `useEffect` deps |
+| Sticky time column while scrolling | Time labels rendered per-row with `sticky left-0 z-10`; header spacer also sticky; `overflow-auto` (x+y) on scroll container; `min-w-[200px]`/`min-w-[140px]` on doctor columns enabling horizontal scroll |
+| Export button | Added CSV export `handleExportSchedule()` with Download icon button beside Print |
+| Doctor Header stats: all 5 metrics | Added `working` (purple) and `cancelled` (red) chips to DayView + `working` chip to WeekView |
+| Mini Calendar day navigation | `onDateSelect` now syncs `miniYear`/`miniMonth` in all views (not just Month) |
+| Working hours vs outside hours contrast | Outside hours: `rgba(0,0,0,0.2)` + `opacity: 0.45`; OFF day: `rgba(0,0,0,0.35)` + `opacity: 0.25` |
+| Current hour highlight | Renders inline in grid — stays visible during natural scroll |
+| 12-hour AM/PM format | Changed from 24h `String(hour).padStart(2,'0'):00` to `toLocaleTimeString` with `hour12: true` via `formatHour()` function |
+
+---
+
 ## Phase 3 — ERP Completion
 
 ### Overview

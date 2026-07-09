@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, memo } from 'react';
+import { Clock, User, Syringe, MapPin } from 'lucide-react';
 import type { Appointment } from '../../../types';
 
-const STATUS_COLORS: Record<string, string> = {
+export const STATUS_COLORS: Record<string, string> = {
   scheduled: '#4FD1FF',
   checked_in: '#FF9800',
   working: '#9C27B0',
@@ -11,22 +12,79 @@ const STATUS_COLORS: Record<string, string> = {
   postponed: '#FFC107',
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  scheduled: 'Scheduled',
+  checked_in: 'Checked In',
+  working: 'Working',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  no_show: 'No Show',
+  postponed: 'Postponed',
+};
+
 interface AppointmentBlockProps {
   appointment: Appointment;
   onClick: (app: Appointment) => void;
   onContextMenu: (e: React.MouseEvent, app: Appointment) => void;
   compact?: boolean;
+  selected?: boolean;
   onDrop?: (appointmentId: string, newDate: string, doctorId?: string) => void;
   onResize?: (appointmentId: string, newDuration: number) => void;
 }
 
-export default function AppointmentBlock({ appointment, onClick, onContextMenu, compact, onDrop, onResize }: AppointmentBlockProps) {
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+const PatientTooltip = memo(function PatientTooltip({ appointment }: { appointment: Appointment }) {
+  const start = new Date(appointment.appointment_date);
+  const end = appointment.duration_minutes ? new Date(start.getTime() + appointment.duration_minutes * 60000) : undefined;
+  return (
+    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[999] opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+      style={{ filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.4))' }}>
+      <div className="rounded-xl py-2.5 px-3.5 min-w-[200px]" style={{ background: 'rgba(15,28,46,0.98)', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <div className="text-sm font-bold text-white mb-1.5">{appointment.patient_name || 'Unknown'}</div>
+        <div className="space-y-1 text-[11px]">
+          <div className="flex items-center gap-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            <Clock className="w-3 h-3" />
+            <span>{formatTime(start)}{end ? ` - ${formatTime(end)}` : ''} ({appointment.duration_minutes || 30} min)</span>
+          </div>
+          {appointment.doctor_name && (
+            <div className="flex items-center gap-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <User className="w-3 h-3" />
+              <span>{appointment.doctor_name}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ background: STATUS_COLORS[appointment.status] || '#4FD1FF' }} />
+            <span style={{ color: 'rgba(255,255,255,0.6)' }}>{STATUS_LABELS[appointment.status] || appointment.status}</span>
+          </div>
+          {appointment.notes && (
+            <div className="flex items-start gap-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <span className="text-[10px] leading-tight line-clamp-2">{appointment.notes}</span>
+            </div>
+          )}
+          {appointment.branch_id && (
+            <div className="flex items-center gap-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <MapPin className="w-3 h-3" />
+              <span>Branch: {appointment.branch_id.slice(0, 8)}...</span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="w-3 h-3 rotate-45 mx-auto -mt-1.5" style={{ background: 'rgba(15,28,46,0.98)', borderRight: '1px solid rgba(255,255,255,0.1)', borderBottom: '1px solid rgba(255,255,255,0.1)' }} />
+    </div>
+  );
+});
+
+const AppointmentBlock = memo(function AppointmentBlock({ appointment, onClick, onContextMenu, compact, selected, onDrop, onResize }: AppointmentBlockProps) {
   const color = STATUS_COLORS[appointment.status] || '#4FD1FF';
   const start = new Date(appointment.appointment_date);
-  const timeStr = start.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const timeStr = formatTime(start);
 
   const [isResizing, setIsResizing] = useState(false);
   const [dragDuration, setDragDuration] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const blockRef = useRef<HTMLDivElement>(null);
 
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
@@ -61,10 +119,36 @@ export default function AppointmentBlock({ appointment, onClick, onContextMenu, 
     document.addEventListener('mouseup', handleMouseUp);
   }, [appointment, onResize]);
 
-  const handleDragStart = (e: React.DragEvent) => {
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    setIsDragging(true);
     e.dataTransfer.setData('text/plain', JSON.stringify({ id: appointment.id, doctor_id: appointment.doctor_id, duration: appointment.duration_minutes || 30 }));
     e.dataTransfer.effectAllowed = 'move';
-  };
+  }, [appointment]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  if (compact) {
+    return (
+      <div
+        ref={blockRef}
+        className="relative group cursor-pointer select-none mb-0.5"
+        onClick={() => onClick(appointment)}
+        onContextMenu={(e) => onContextMenu(e, appointment)}
+        style={{ borderLeft: `2px solid ${color}` }}
+        role="button"
+        tabIndex={0}
+        aria-label={`${appointment.patient_name || 'Unknown'} - ${STATUS_LABELS[appointment.status] || appointment.status}`}
+        onKeyDown={(e) => { if (e.key === 'Enter') onClick(appointment); }}
+      >
+        <PatientTooltip appointment={appointment} />
+        <span className="block text-[10px] text-white/90 font-medium truncate px-1 py-0.5 rounded-sm" style={{ background: `${color}15` }}>
+          {appointment.patient_name || 'Unknown'}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -73,36 +157,77 @@ export default function AppointmentBlock({ appointment, onClick, onContextMenu, 
       onClick={() => onClick(appointment)}
       onContextMenu={(e) => onContextMenu(e, appointment)}
       onDragStart={handleDragStart}
-      style={{ borderLeft: `3px solid ${color}`, background: `${color}15`, cursor: onDrop ? 'grab' : 'pointer', position: 'relative' }}
-      className="rounded-lg px-2 py-1 text-xs hover:brightness-110 transition-all truncate select-none mb-0.5"
+      onDragEnd={handleDragEnd}
+      className="relative group cursor-pointer select-none mb-1 transition-all duration-150"
+      style={{
+        borderLeft: `3px solid ${color}`,
+        background: selected ? `${color}25` : `${color}12`,
+        borderRadius: '10px',
+        boxShadow: selected
+          ? `0 0 0 2px ${color}, 0 4px 12px ${color}30`
+          : isDragging
+            ? '0 8px 24px rgba(0,0,0,0.3)'
+            : '0 1px 3px rgba(0,0,0,0.15)',
+        transform: isDragging ? 'scale(0.98) rotate(-1deg)' : selected ? 'scale(1.02)' : 'scale(1)',
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={`${appointment.patient_name || 'Unknown'} - ${STATUS_LABELS[appointment.status] || appointment.status} - ${timeStr}`}
+      onKeyDown={(e) => { if (e.key === 'Enter') onClick(appointment); }}
+      onMouseEnter={(e) => { if (!isDragging && !selected) { e.currentTarget.style.boxShadow = `0 4px 16px rgba(0,0,0,0.25)`; e.currentTarget.style.transform = 'scale(1.02)'; } }}
+      onMouseLeave={(e) => { if (!isDragging && !selected) { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.15)'; e.currentTarget.style.transform = 'scale(1)'; } }}
     >
-      {compact ? (
-        <span className="text-white/90 font-medium truncate">{appointment.patient_name || 'Unknown'}</span>
-      ) : (
-        <>
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] font-mono" style={{ color }}>{timeStr}</span>
-            <span className="text-white/80 font-medium truncate">{appointment.patient_name || 'Unknown'}</span>
-          </div>
-          {appointment.doctor_name && (
-            <div className="text-[10px] text-white/40 truncate">{appointment.doctor_name}</div>
-          )}
-        </>
+      {/* Tooltip */}
+      <PatientTooltip appointment={appointment} />
+
+      {/* Top row: Time + Patient */}
+      <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-0.5">
+        <span className="text-[10px] font-mono font-semibold shrink-0" style={{ color }}>{timeStr}</span>
+        {appointment.duration_minutes && appointment.duration_minutes !== 30 && (
+          <span className="text-[9px] font-mono px-1 rounded" style={{ background: `${color}20`, color: 'rgba(255,255,255,0.5)' }}>
+            {appointment.duration_minutes}m
+          </span>
+        )}
+        <span className="text-[11px] font-bold text-white truncate flex-1">{appointment.patient_name || 'Unknown'}</span>
+      </div>
+
+      {/* Doctor name */}
+      {appointment.doctor_name && (
+        <div className="flex items-center gap-1 px-2 pb-0.5">
+          <User className="w-2.5 h-2.5 shrink-0" style={{ color: 'rgba(255,255,255,0.35)' }} />
+          <span className="text-[9px] truncate" style={{ color: 'rgba(255,255,255,0.45)' }}>{appointment.doctor_name}</span>
+        </div>
       )}
+
+      {/* Badges */}
+      <div className="flex flex-wrap gap-1 px-2 pb-1.5 mt-0.5">
+        <span className="text-[8px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: `${color}25`, color }}>
+          {STATUS_LABELS[appointment.status] || appointment.status}
+        </span>
+        {appointment.notes?.toLowerCase().includes('implant') && (
+          <span className="text-[8px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-full flex items-center gap-0.5" style={{ background: 'rgba(255,107,107,0.2)', color: '#FF6B6B' }}>
+            <Syringe className="w-2 h-2" />Implant
+          </span>
+        )}
+      </div>
+
+      {/* Resize handle */}
       <div
-        className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize opacity-0 hover:opacity-100 transition-opacity rounded-b-lg"
-        style={{ background: `${color}40` }}
+        className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize opacity-0 group-hover:opacity-100 transition-opacity rounded-b-lg"
+        style={{ background: `linear-gradient(transparent, ${color}50)` }}
         onMouseDown={handleResizeMouseDown}
         title="Drag to resize duration"
       />
+
+      {/* Resize indicator */}
       {isResizing && dragDuration && (
-        <div className="absolute -top-6 right-0 px-2 py-0.5 rounded-lg text-[10px] font-mono"
+        <div className="absolute -top-7 right-2 px-2 py-0.5 rounded-lg text-[10px] font-mono shadow-lg"
           style={{ background: '#0D1B2A', border: '1px solid rgba(255,255,255,0.1)', color: '#4FD1FF', zIndex: 10 }}>
           {dragDuration}min
         </div>
       )}
     </div>
   );
-}
+});
 
-export { STATUS_COLORS };
+export default AppointmentBlock;
