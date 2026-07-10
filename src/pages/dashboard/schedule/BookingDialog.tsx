@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { patientService } from '../../../services/patientService';
 import { userService } from '../../../services/userService';
 import { appointmentService } from '../../../services/appointmentService';
@@ -103,15 +104,17 @@ export default function BookingDialog({ isOpen, onClose, onSave, appointment, de
 
     const appointmentDate = new Date(`${date}T${time}:00`).toISOString();
 
-    // Check overlap
-    const { hasOverlap, appointments: conflicts } = await appointmentService.checkOverlap(doctorId, appointmentDate, duration, appointment?.id);
-    if (hasOverlap) {
-      setConflictApps(conflicts);
-      setShowWarning(true);
-      return;
+    try {
+      const { hasOverlap, appointments: conflicts } = await appointmentService.checkOverlap(doctorId, appointmentDate, duration, appointment?.id);
+      if (hasOverlap) {
+        setConflictApps(conflicts);
+        setShowWarning(true);
+        return;
+      }
+      await doSave(appointmentDate);
+    } catch (err) {
+      toast.error('Failed to check scheduling conflicts');
     }
-
-    await doSave(appointmentDate);
   }
 
   async function handleContinueAnyway() {

@@ -133,7 +133,7 @@ export default function ImplantFormDialog({ open, patient, editForm, onClose, on
       setUploading(true);
       const resolvedManufacturer = manufacturer === CUSTOM_MANUFACTURER ? customManufacturer : manufacturer;
 
-      let allAttachments = [...attachments];
+      const allAttachments = [...attachments];
 
       for (const file of pendingFiles) {
         const att = await implantFormService.uploadAttachment(patient.id, editForm?.id || 'new', file);

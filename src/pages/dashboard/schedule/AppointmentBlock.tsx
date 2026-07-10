@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, memo } from 'react';
+import { useState, useRef, useCallback, memo, useEffect } from 'react';
 import { Clock, User, Syringe, MapPin, Phone } from 'lucide-react';
 import type { Appointment } from '../../../types';
 
@@ -34,7 +34,7 @@ interface AppointmentBlockProps {
 }
 
 function formatTime(date: Date): string {
-  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 const PatientTooltip = memo(function PatientTooltip({ appointment }: { appointment: Appointment }) {
@@ -92,6 +92,34 @@ const AppointmentBlock = memo(function AppointmentBlock({ appointment, onClick, 
   const [isResizing, setIsResizing] = useState(false);
   const [dragDuration, setDragDuration] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (clickTimer.current) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+      return;
+    }
+    clickTimer.current = setTimeout(() => {
+      clickTimer.current = null;
+      onClick(appointment);
+    }, 200);
+  }, [onClick, appointment]);
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (clickTimer.current) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+    }
+    onDoubleClick?.(appointment);
+  }, [onDoubleClick, appointment]);
+
+  useEffect(() => {
+    return () => { if (clickTimer.current) clearTimeout(clickTimer.current); };
+  }, []);
   const blockRef = useRef<HTMLDivElement>(null);
 
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
@@ -141,8 +169,8 @@ const AppointmentBlock = memo(function AppointmentBlock({ appointment, onClick, 
       <div
         ref={blockRef}
         className="relative group cursor-pointer select-none mb-0.5"
-        onClick={() => onClick(appointment)}
-        onDoubleClick={() => onDoubleClick?.(appointment)}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
         onContextMenu={(e) => onContextMenu(e, appointment)}
         style={{ borderLeft: `2px solid ${color}` }}
         role="button"
@@ -162,8 +190,8 @@ const AppointmentBlock = memo(function AppointmentBlock({ appointment, onClick, 
     <div
       ref={blockRef}
       draggable={!!onDrop}
-      onClick={() => onClick(appointment)}
-      onDoubleClick={() => onDoubleClick?.(appointment)}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onContextMenu={(e) => onContextMenu(e, appointment)}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
@@ -176,15 +204,17 @@ const AppointmentBlock = memo(function AppointmentBlock({ appointment, onClick, 
           ? `0 0 0 2px ${color}, 0 4px 12px ${color}30`
           : isDragging
             ? '0 8px 24px rgba(0,0,0,0.3)'
-            : '0 1px 3px rgba(0,0,0,0.15)',
-        transform: isDragging ? 'scale(0.98) rotate(-1deg)' : selected ? 'scale(1.02)' : 'scale(1)',
+            : isHovered
+              ? '0 4px 16px rgba(0,0,0,0.25)'
+              : '0 1px 3px rgba(0,0,0,0.15)',
+        transform: isDragging ? 'scale(0.98) rotate(-1deg)' : (selected || isHovered) ? 'scale(1.02)' : 'scale(1)',
       }}
       role="button"
       tabIndex={0}
       aria-label={`${appointment.patient_name || 'Unknown'} - ${STATUS_LABELS[appointment.status] || appointment.status} - ${timeStr}`}
       onKeyDown={(e) => { if (e.key === 'Enter') onClick(appointment); }}
-      onMouseEnter={(e) => { if (!isDragging && !selected) { e.currentTarget.style.boxShadow = `0 4px 16px rgba(0,0,0,0.25)`; e.currentTarget.style.transform = 'scale(1.02)'; } }}
-      onMouseLeave={(e) => { if (!isDragging && !selected) { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.15)'; e.currentTarget.style.transform = 'scale(1)'; } }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Tooltip */}
       <PatientTooltip appointment={appointment} />

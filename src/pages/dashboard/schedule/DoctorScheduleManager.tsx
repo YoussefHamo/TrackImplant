@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Trash2 } from 'lucide-react';
 import { userService } from '../../../services/userService';
 import { doctorScheduleService } from '../../../services/doctorScheduleService';
@@ -14,6 +14,7 @@ interface DoctorScheduleManagerProps {
 }
 
 export default function DoctorScheduleManager({ isOpen, onClose }: DoctorScheduleManagerProps) {
+  const queryClient = useQueryClient();
   const [schedules, setSchedules] = useState<Record<string, DoctorSchedule[]>>({});
   const [selectedDoctor, setSelectedDoctor] = useState('');
   const [editingDay, setEditingDay] = useState<number | null>(null);
@@ -45,6 +46,7 @@ export default function DoctorScheduleManager({ isOpen, onClose }: DoctorSchedul
       await doctorScheduleService.upsert({ doctor_id: selectedDoctor, day_of_week: editingDay, start_time: editStart + ':00', end_time: editEnd + ':00', is_active: true } as any);
     }
     setEditingDay(null);
+    await queryClient.invalidateQueries({ queryKey: ['doctor-schedules-all'] });
     const updated = await doctorScheduleService.getAll();
     const grouped: Record<string, DoctorSchedule[]> = {};
     updated.forEach(s => { if (!grouped[s.doctor_id]) grouped[s.doctor_id] = []; grouped[s.doctor_id].push(s); });
@@ -53,6 +55,7 @@ export default function DoctorScheduleManager({ isOpen, onClose }: DoctorSchedul
 
   async function deleteSchedule(scheduleId: string) {
     await doctorScheduleService.delete(scheduleId);
+    await queryClient.invalidateQueries({ queryKey: ['doctor-schedules-all'] });
     const updated = await doctorScheduleService.getAll();
     const grouped: Record<string, DoctorSchedule[]> = {};
     updated.forEach(s => { if (!grouped[s.doctor_id]) grouped[s.doctor_id] = []; grouped[s.doctor_id].push(s); });

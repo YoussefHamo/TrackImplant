@@ -325,29 +325,34 @@ export default function SchedulePage() {
   const handleAppointmentDrop = useCallback(async (appointmentId: string, newDate: string, doctorId?: string) => {
     const updates: Partial<Appointment> = { appointment_date: newDate };
     if (doctorId) updates.doctor_id = doctorId;
-    try { await updateMut.mutateAsync({ id: appointmentId, updates }); } catch { /* */ }
+    try { await updateMut.mutateAsync({ id: appointmentId, updates }); } catch (e) { console.error('Drop failed', e); }
   }, [updateMut]);
 
   // Resize
   const handleResizeAppointment = useCallback(async (appointmentId: string, newDuration: number) => {
-    try { await updateMut.mutateAsync({ id: appointmentId, updates: { duration_minutes: newDuration } }); } catch { /* */ }
+    try { await updateMut.mutateAsync({ id: appointmentId, updates: { duration_minutes: newDuration } }); } catch (e) { console.error('Resize failed', e); }
   }, [updateMut]);
 
   // Navigation
-  function navigate(dir: number) {
-    const d = new Date(currentDate);
-    if (view === 'Day') d.setDate(d.getDate() + dir);
-    else if (view === 'Week') d.setDate(d.getDate() + dir * 7);
-    else d.setMonth(d.getMonth() + dir);
-    setCurrentDate(d);
-  }
+  const viewRef = useRef(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
 
-  function goToday() {
+  const navigate = useCallback((dir: number) => {
+    setCurrentDate(prev => {
+      const d = new Date(prev);
+      if (viewRef.current === 'Day') d.setDate(d.getDate() + dir);
+      else if (viewRef.current === 'Week') d.setDate(d.getDate() + dir * 7);
+      else d.setMonth(d.getMonth() + dir);
+      return d;
+    });
+  }, []);
+
+  const goToday = useCallback(() => {
     setCurrentDate(new Date());
     const now = new Date();
     setMiniYear(now.getFullYear());
     setMiniMonth(now.getMonth());
-  }
+  }, []);
 
   // Export as CSV
   function handleExportSchedule() {
@@ -524,8 +529,8 @@ export default function SchedulePage() {
     },
     {
       items: [
-        { label: 'Call Patient', icon: <Phone className="w-3.5 h-3.5" />, onClick: () => { if (app.patient_name) window.open(`tel:${app.patient_name}`, '_blank'); }, disabled: !app.patient_name },
-        { label: 'WhatsApp', icon: <MessageSquare className="w-3.5 h-3.5" />, onClick: () => { if (app.patient_name) window.open(`https://wa.me/${app.patient_name}`, '_blank'); }, disabled: !app.patient_name },
+        { label: 'Call Patient', icon: <Phone className="w-3.5 h-3.5" />, onClick: () => { if (app.patient_phone) window.open(`tel:${app.patient_phone}`, '_blank'); }, disabled: !app.patient_phone },
+        { label: 'WhatsApp', icon: <MessageSquare className="w-3.5 h-3.5" />, onClick: () => { if (app.patient_phone) window.open(`https://wa.me/${app.patient_phone}`, '_blank'); }, disabled: !app.patient_phone },
         { label: 'Send Email', icon: <Mail className="w-3.5 h-3.5" />, onClick: () => { if (app.patient_name) window.open(`mailto:${app.patient_name}`); }, disabled: !app.patient_name },
       ],
     },
@@ -787,7 +792,6 @@ export default function SchedulePage() {
                   appointments={isMobile && mobileDoctor ? filteredAppointments.filter(a => a.doctor_id === mobileDoctor) : filteredAppointments}
                   doctors={isMobile ? doctors.filter(d => d.id === mobileDoctor) : doctors}
                   doctorSchedules={doctorSchedulesMap}
-                  onAppointmentClick={handleAppointmentClick}
                   onAppointmentDoubleClick={handleAppointmentDoubleClick}
                   onAppointmentContextMenu={(e, app) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, appointment: app }); }}
                   onSlotClick={handleSlotClick}
@@ -804,7 +808,6 @@ export default function SchedulePage() {
                   appointments={isMobile && mobileDoctor ? filteredAppointments.filter(a => a.doctor_id === mobileDoctor) : filteredAppointments}
                   doctors={isMobile ? doctors.filter(d => d.id === mobileDoctor) : doctors}
                   doctorSchedules={doctorSchedulesMap}
-                  onAppointmentClick={handleAppointmentClick}
                   onAppointmentDoubleClick={handleAppointmentDoubleClick}
                   onAppointmentContextMenu={(e, app) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, appointment: app }); }}
                   onSlotClick={handleSlotClick}

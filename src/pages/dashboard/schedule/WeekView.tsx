@@ -7,7 +7,6 @@ interface WeekViewProps {
   appointments: Appointment[];
   doctors: { id: string; name: string }[];
   doctorSchedules?: Record<string, DoctorSchedule[]>;
-  onAppointmentClick: (app: Appointment) => void;
   onAppointmentDoubleClick: (app: Appointment) => void;
   onAppointmentContextMenu: (e: React.MouseEvent, app: Appointment) => void;
   onSlotClick: (date: string, doctorId: string) => void;
@@ -80,7 +79,7 @@ function getInitials(name: string): string {
 const DOCTOR_COLORS = ['#4FD1FF', '#FF9800', '#9C27B0', '#4CAF50', '#FF6B6B', '#FFC107', '#E040FB', '#00BCD4'];
 
 export default function WeekView({
-  startDate, appointments, doctors, doctorSchedules, onAppointmentClick: _ac, onAppointmentDoubleClick,
+  startDate, appointments, doctors, doctorSchedules, onAppointmentDoubleClick,
   onAppointmentContextMenu, onSlotClick, onAppointmentDrop, onResize, zoomLevel = 1,
   selectedAppointmentId, onSelectAppointment,
 }: WeekViewProps) {
@@ -150,29 +149,27 @@ export default function WeekView({
 
   const handleDrop = useCallback((e: React.DragEvent, day: Date, doctorId: string) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!onAppointmentDrop || !scrollRef.current) return;
     try {
       const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-      const y = e.clientY - (e.currentTarget as HTMLElement).getBoundingClientRect().top + scrollRef.current.scrollTop;
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const y = e.clientY - rect.top;
       const minutesFromMidnight = Math.floor(y / pxPerMinute);
       const newDate = new Date(day);
       newDate.setHours(Math.floor(minutesFromMidnight / 60), minutesFromMidnight % 60, 0, 0);
       onAppointmentDrop(data.id, newDate.toISOString(), doctorId);
-    } catch { /* */ }
+    } catch (e) { console.error('Drop failed', e); }
   }, [onAppointmentDrop, pxPerMinute]);
 
-  const handleSlotClickWithPos = useCallback((e: React.MouseEvent, day: Date, doctorIdx: number) => {
-    if (!scrollRef.current) return;
-    const colEl = (e.currentTarget as HTMLElement);
-    const rect = colEl.getBoundingClientRect();
-    const y = e.clientY - rect.top + scrollRef.current.scrollTop;
-    const minutesFromMidnight = Math.floor(y / pxPerMinute);
-    const hour = Math.min(23, Math.max(0, Math.floor(minutesFromMidnight / 60)));
-    const minute = Math.min(59, minutesFromMidnight % 60);
+  const handleSlotClickWithPos = useCallback((e: React.MouseEvent, day: Date, doctorIdx: number, slotHour: number) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const offsetMinutes = Math.floor((e.clientY - rect.top) / pxPerMinute);
+    const minute = Math.min(59, Math.max(0, offsetMinutes));
     const doctorId = doctors[doctorIdx]?.id;
     if (!doctorId) return;
     const slotDate = new Date(day);
-    slotDate.setHours(hour, minute, 0, 0);
+    slotDate.setHours(slotHour, minute, 0, 0);
     onSlotClick(slotDate.toISOString(), doctorId);
   }, [doctors, pxPerMinute, onSlotClick]);
 
@@ -297,7 +294,7 @@ export default function WeekView({
                                     : 'transparent',
                               opacity: off ? 0.25 : isOff ? 0.45 : 1,
                             }}
-                            onClick={(e) => handleSlotClickWithPos(e, day, docIdx)}
+                            onClick={(e) => handleSlotClickWithPos(e, day, docIdx, hour)}
                           />
                         );
                       })}
@@ -312,6 +309,7 @@ export default function WeekView({
                       {/* Appointments */}
                       {dayAppts.map(app => {
                         const start = new Date(app.appointment_date);
+                        if (isNaN(start.getTime())) return null;
                         const mins = start.getHours() * 60 + start.getMinutes();
                         const dur = app.duration_minutes || 30;
                         return (

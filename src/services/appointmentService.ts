@@ -86,6 +86,7 @@ export const appointmentService = {
       ...rowToAppointment(r),
       patient_name: r.patients?.full_name,
       doctor_name: r.doctor_id?.full_name,
+      patient_phone: r.patients?.phone,
     }));
   },
 
@@ -133,14 +134,19 @@ export const appointmentService = {
       .eq('doctor_id', doctorId)
       .neq('status', 'cancelled')
       .neq('status', 'no_show')
-      .lt('appointment_date', endIso)
-      .gte('appointment_date', start.toISOString());
+      .lt('appointment_date', endIso);
 
     if (excludeAppointmentId) q = q.neq('id', excludeAppointmentId);
 
     const { data, error } = await q;
     if (error) throw new Error(error.message);
-    const apps = (data || []).map((r: any) => ({
+    const apps = (data || []).filter((r: any) => {
+      const existingStart = new Date(r.appointment_date);
+      const existingEnd = r.end_time
+        ? new Date(r.end_time)
+        : new Date(existingStart.getTime() + (r.duration_minutes || 30) * 60000);
+      return existingStart < end && existingEnd > start;
+    }).map((r: any) => ({
       ...rowToAppointment(r),
       patient_name: r.patients?.full_name,
       doctor_name: r.doctor_id?.full_name,
@@ -215,9 +221,11 @@ export const appointmentService = {
 
   async update(id: string, updates: Partial<Appointment>, change_reason?: string, reason_category?: string): Promise<void> {
     const payload: Record<string, unknown> = { ...updates };
-    if (updates.appointment_date && updates.duration_minutes) {
+    const fetchDuration = updates.appointment_date && !updates.duration_minutes;
+    if (updates.appointment_date) {
+      const dur = updates.duration_minutes || (fetchDuration ? (await this.getById(id).catch(() => null))?.duration_minutes || 30 : 30);
       const start = new Date(updates.appointment_date);
-      const end = new Date(start.getTime() + updates.duration_minutes * 60000);
+      const end = new Date(start.getTime() + dur * 60000);
       payload.end_time = end.toISOString();
     }
     if (change_reason !== undefined) payload.change_reason = change_reason;

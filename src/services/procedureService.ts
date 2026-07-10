@@ -186,7 +186,7 @@ export const procedureService = {
   },
 
   async getRevenueByDoctor(doctorId: string, fromDate?: string, toDate?: string): Promise<{ totalRevenue: number; collected: number; pending: number }> {
-    let pdQuery = supabase
+    const pdQuery = supabase
       .from('procedure_doctors')
       .select('procedure_id, revenue_percentage')
       .eq('doctor_id', doctorId);

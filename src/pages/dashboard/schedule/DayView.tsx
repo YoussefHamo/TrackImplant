@@ -7,7 +7,6 @@ interface DayViewProps {
   appointments: Appointment[];
   doctors: { id: string; name: string }[];
   doctorSchedules?: Record<string, DoctorSchedule[]>;
-  onAppointmentClick: (app: Appointment) => void;
   onAppointmentDoubleClick: (app: Appointment) => void;
   onAppointmentContextMenu: (e: React.MouseEvent, app: Appointment) => void;
   onSlotClick: (date: string, doctorId: string) => void;
@@ -85,7 +84,7 @@ function getInitials(name: string): string {
 const DOCTOR_COLORS = ['#4FD1FF', '#FF9800', '#9C27B0', '#4CAF50', '#FF6B6B', '#FFC107', '#E040FB', '#00BCD4'];
 
 export default function DayView({
-  date, appointments, doctors, doctorSchedules, onAppointmentClick: _ac, onAppointmentDoubleClick,
+  date, appointments, doctors, doctorSchedules, onAppointmentDoubleClick,
   onAppointmentContextMenu, onSlotClick, onAppointmentDrop, onResize, zoomLevel = 1,
   selectedAppointmentId, onSelectAppointment,
 }: DayViewProps) {
@@ -117,7 +116,7 @@ export default function DayView({
     if (!gridRef.current || !scrollRef.current) return;
     const rect = gridRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top + scrollRef.current.scrollTop;
+    const y = e.clientY - rect.top;
     const minutesFromMidnight = Math.floor(y / pxPerMinute);
     const hour = Math.min(23, Math.max(0, Math.floor(minutesFromMidnight / 60)));
     const minute = Math.min(59, minutesFromMidnight % 60);
@@ -150,17 +149,18 @@ export default function DayView({
 
   const handleDrop = useCallback((e: React.DragEvent, doctorId: string) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!onAppointmentDrop || !scrollRef.current) return;
     try {
       const data = JSON.parse(e.dataTransfer.getData('text/plain'));
       const rect = gridRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const y = e.clientY - rect.top + scrollRef.current.scrollTop;
+      const y = e.clientY - rect.top;
       const minutesFromMidnight = Math.floor(y / pxPerMinute);
       const newDate = new Date(date);
       newDate.setHours(Math.floor(minutesFromMidnight / 60), minutesFromMidnight % 60, 0, 0);
       onAppointmentDrop(data.id, newDate.toISOString(), doctorId);
-    } catch { /* */ }
+    } catch (e) { console.error('Drop parse failed', e); }
   }, [date, onAppointmentDrop, pxPerMinute]);
 
   const timeIndicatorTop = currentTime * 60 * pxPerMinute;
@@ -300,6 +300,7 @@ export default function DayView({
                 {/* Appointments - absolute positioned within doctor column */}
                 {docAppts.map(app => {
                   const start = new Date(app.appointment_date);
+                  if (isNaN(start.getTime())) return null;
                   const mins = start.getHours() * 60 + start.getMinutes();
                   const dur = app.duration_minutes || 30;
                   return (
