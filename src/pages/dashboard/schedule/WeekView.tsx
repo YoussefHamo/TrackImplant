@@ -208,7 +208,7 @@ export default function WeekView({
                 const dayAppts = getAppts(di, doc.id);
                 const stats = getDoctorStats(dayAppts);
                 return (
-                  <div key={doc.id} className="min-w-[140px] flex-1 px-1.5 py-1.5 relative" style={{ opacity: off ? 0.45 : 1, borderLeft: docIdx > 0 ? '1px solid rgba(255,255,255,0.02)' : 'none' }}>
+                  <div key={doc.id} className="flex-1 px-1.5 py-1.5 relative min-w-0" style={{ opacity: off ? 0.45 : 1, borderLeft: docIdx > 0 ? '1px solid rgba(255,255,255,0.02)' : 'none' }}>
                     <div className="flex items-center gap-1.5">
                       <div className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0" style={{ background: `${docColor}20`, color: docColor }}>
                         {getInitials(doc.name)}
@@ -235,7 +235,7 @@ export default function WeekView({
       </div>
 
       {/* Time Grid */}
-      <div ref={scrollRef} className="overflow-auto relative" style={{ maxHeight: 'calc(100vh - 360px)', scrollBehavior: 'smooth' }}>
+      <div ref={scrollRef} className="overflow-y-auto relative" style={{ maxHeight: 'calc(100vh - 360px)', scrollBehavior: 'smooth' }}>
         <div className="flex" style={{ height: totalHeight }}>
           {/* Sticky Time Labels */}
           <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.96)' }}>
@@ -260,7 +260,7 @@ export default function WeekView({
                   return (
                     <div
                       key={doc.id}
-                      className="min-w-[140px] flex-1 relative"
+                      className="flex-1 relative min-w-0"
                       style={{
                         height: '100%',
                         borderLeft: '1px solid rgba(255,255,255,0.015)',

@@ -196,7 +196,7 @@ export default function DayView({
             const docColor = DOCTOR_COLORS[di % DOCTOR_COLORS.length];
             const stats = getDoctorStats(doc.id, appointments, date);
             return (
-              <div key={doc.id} id={`dayview-header-${doc.id}`} className="min-w-[200px] flex-1 px-2 py-2.5 relative" style={{ borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none', opacity: off ? 0.5 : 1 }}>
+              <div key={doc.id} id={`dayview-header-${doc.id}`} className="flex-1 px-2 py-2.5 relative min-w-0" style={{ borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none', opacity: off ? 0.5 : 1 }}>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style={{ background: `${docColor}20`, color: docColor }}>
                     {getInitials(doc.name)}
@@ -227,7 +227,7 @@ export default function DayView({
       </div>
 
       {/* Time Grid */}
-      <div ref={scrollRef} className="overflow-auto" style={{ maxHeight: 'calc(100vh - 320px)', scrollBehavior: 'smooth', position: 'relative' }}>
+      <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 320px)', scrollBehavior: 'smooth', position: 'relative' }}>
         <div ref={gridRef} className="flex relative" style={{ height: totalHeight }} onClick={handleGridClick} onDragOver={handleDragOver}>
           {/* Sticky Time Labels */}
           <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.96)' }}>
@@ -251,7 +251,7 @@ export default function DayView({
               <div
                 key={doc.id}
                 id={`dayview-col-${doc.id}`}
-                className="min-w-[200px] flex-1 relative"
+                className="flex-1 relative min-w-0"
                 style={{
                   height: '100%',
                   borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.02)' : 'none',
