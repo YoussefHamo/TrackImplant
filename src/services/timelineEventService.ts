@@ -1,5 +1,4 @@
 import { supabase } from '../integrations/supabase/client';
-import { getCurrentUserInfo } from './auditLogService';
 
 export interface PatientTimelineEvent {
   id: string;
@@ -32,15 +31,24 @@ export interface TimelineEventWrite {
 
 export const timelineEventService = {
   async write(event: TimelineEventWrite): Promise<void> {
-    const actor = await getCurrentUserInfo().catch(() => null);
+    if (!event.user_id) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        event.user_id = user.id;
+        if (!event.user_name) {
+          const { data: userData } = await supabase.from('users').select('username').eq('auth_user_id', user.id).maybeSingle();
+          if (userData) event.user_name = userData.username as string;
+        }
+      }
+    }
     const { error } = await supabase
       .from('patient_timeline_events')
       .insert([{
         patient_id: event.patient_id,
         event_type: event.event_type,
         description: event.description,
-        user_id: event.user_id || actor?.user_id || null,
-        user_name: event.user_name || actor?.user_name || null,
+        user_id: event.user_id || null,
+        user_name: event.user_name || null,
         branch_id: event.branch_id || null,
         branch_name: event.branch_name || null,
         related_entity_type: event.related_entity_type || null,

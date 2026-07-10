@@ -27,9 +27,9 @@ function rowToLog(row: Record<string, unknown>): AuditLog {
 export async function getCurrentUserInfo(): Promise<{ user_id: string; user_name: string } | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data } = await supabase.from('users').select('auth_user_id, username, role, branch_id').eq('auth_user_id', user.id).maybeSingle();
+  const { data } = await supabase.from('users').select('id, username, role, branch_id').eq('auth_user_id', user.id).maybeSingle();
   if (!data) return null;
-  return { user_id: data.auth_user_id as string, user_name: data.username as string };
+  return { user_id: data.id as string, user_name: data.username as string };
 }
 
 /** Get extended user info for audit logging */
@@ -41,10 +41,10 @@ export async function getCurrentUserExtendedInfo(): Promise<{
 } | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data } = await supabase.from('users').select('auth_user_id, username, role, branch_id').eq('auth_user_id', user.id).maybeSingle();
+  const { data } = await supabase.from('users').select('id, username, role, branch_id').eq('auth_user_id', user.id).maybeSingle();
   if (!data) return null;
   return {
-    user_id: data.auth_user_id as string,
+    user_id: data.id as string,
     user_name: data.username as string,
     role: data.role as string | undefined,
     branch_id: data.branch_id as string | undefined,
