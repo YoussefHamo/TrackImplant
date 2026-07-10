@@ -231,7 +231,7 @@ export default function DayView({
 
       {/* Time Grid */}
       <div ref={scrollRef} className="overflow-auto" style={{ maxHeight: 'calc(100vh - 320px)', scrollBehavior: 'smooth', position: 'relative' }}>
-        <div ref={gridRef} className="flex relative" style={{ minHeight: totalHeight }} onClick={handleGridClick} onDragOver={handleDragOver}>
+        <div ref={gridRef} className="flex relative" style={{ height: totalHeight }} onClick={handleGridClick} onDragOver={handleDragOver}>
           {/* Sticky Time Labels */}
           <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.96)' }}>
             {HOURS.map(hour => {
@@ -256,6 +256,7 @@ export default function DayView({
                 id={`dayview-col-${doc.id}`}
                 className="min-w-[200px] flex-1 relative"
                 style={{
+                  height: '100%',
                   borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.02)' : 'none',
                   background: off ? 'rgba(0,0,0,0.35)' : 'transparent',
                   opacity: off ? 0.25 : 1,

@@ -241,7 +241,7 @@ export default function WeekView({
 
       {/* Time Grid */}
       <div ref={scrollRef} className="overflow-auto relative" style={{ maxHeight: 'calc(100vh - 360px)', scrollBehavior: 'smooth' }}>
-        <div className="flex" style={{ minHeight: totalHeight }}>
+        <div className="flex" style={{ height: totalHeight }}>
           {/* Sticky Time Labels */}
           <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.96)' }}>
             {HOURS.map(hour => (
@@ -267,6 +267,7 @@ export default function WeekView({
                       key={doc.id}
                       className="min-w-[140px] flex-1 relative"
                       style={{
+                        height: '100%',
                         borderLeft: '1px solid rgba(255,255,255,0.015)',
                         background: off ? 'rgba(0,0,0,0.35)' : 'transparent',
                         opacity: off ? 0.25 : 1,
