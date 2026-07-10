@@ -111,21 +111,29 @@ export default function BookingDialog({ isOpen, onClose, onSave, appointment, de
         setShowWarning(true);
         return;
       }
-      await doSave(appointmentDate);
-    } catch (err) {
-      toast.error('Failed to check scheduling conflicts');
+    } catch {
+      toast.error('Could not verify schedule — please try again');
+      return;
+    }
+
+    try {
+      await onSave({ patient_id: patientId, doctor_id: doctorId, appointment_date: appointmentDate, duration_minutes: duration, status: appointment?.status || 'scheduled', procedure_name: procedureName || undefined, notes, branch_id: activeBranchId || undefined });
+      resetForm();
+      onClose();
+    } catch {
+      // onError handled by mutation's onError callback
     }
   }
 
   async function handleContinueAnyway() {
     setShowWarning(false);
-    await doSave(new Date(`${date}T${time}:00`).toISOString());
-  }
-
-  async function doSave(appointmentDate: string) {
-    await onSave({ patient_id: patientId, doctor_id: doctorId, appointment_date: appointmentDate, duration_minutes: duration, status: appointment?.status || 'scheduled', procedure_name: procedureName || undefined, notes, branch_id: activeBranchId || undefined });
-    resetForm();
-    onClose();
+    try {
+      await onSave({ patient_id: patientId, doctor_id: doctorId, appointment_date: new Date(`${date}T${time}:00`).toISOString(), duration_minutes: duration, status: appointment?.status || 'scheduled', procedure_name: procedureName || undefined, notes, branch_id: activeBranchId || undefined });
+      resetForm();
+      onClose();
+    } catch {
+      // onError handled by mutation's onError callback
+    }
   }
 
   const inputClass = 'w-full h-10 px-3 rounded-xl text-sm outline-none transition-all bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500';
