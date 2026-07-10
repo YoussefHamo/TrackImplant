@@ -27,12 +27,16 @@ function rowToPref(row: Record<string, unknown>): NotificationPreference {
 
 export const notificationPreferenceService = {
   async getAll(userId: string): Promise<NotificationPreference[]> {
-    const { data, error } = await supabase
-      .from('notification_preferences')
-      .select('*')
-      .eq('user_id', userId);
-    if (error) throw new Error(error.message);
-    return (data || []).map(rowToPref);
+    try {
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', userId);
+      if (error) throw new Error(error.message);
+      return (data || []).map(rowToPref);
+    } catch {
+      return [];
+    }
   },
 
   async getEnabledCategories(userId: string): Promise<NotificationCategory[]> {
