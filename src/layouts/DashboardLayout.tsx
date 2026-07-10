@@ -247,23 +247,6 @@ export default function DashboardLayout() {
           })}
         </nav>
 
-        {/* New Procedure Button */}
-        <div className="px-4 mb-4">
-          <button
-            className="w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98]"
-            style={{
-              background: 'linear-gradient(135deg, #45D6FF, #53C7F0)',
-              color: '#050B14',
-              boxShadow: '0 4px 20px rgba(69,214,255,0.2)',
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 6px 30px rgba(69,214,255,0.35)'}
-            onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 4px 20px rgba(69,214,255,0.2)'}
-          >
-            <Plus className="w-4 h-4" />
-            {t('nav.new_procedure')}
-          </button>
-        </div>
-
         {/* Bottom Actions */}
         <div className="px-3 pb-4 space-y-0.5 border-t border-[rgba(255,255,255,0.04)] pt-3">
           {user?.role === 'Admin' && (
