@@ -100,12 +100,14 @@ export const appointmentService = {
     if (branchId) q = q.eq('branch_id', branchId);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
-    return (data || []).map((r: any) => ({
+    const result = (data || []).map((r: any) => ({
       ...rowToAppointment(r),
       patient_name: r.patients?.full_name,
       doctor_name: r.doctor_id?.full_name,
       patient_phone: r.patients?.phone,
     }));
+    console.log('[getByDateRange]', from, to, 'got', result.length, 'appts');
+    return result;
   },
 
   async getByPatient(patientId: string): Promise<Appointment[]> {
