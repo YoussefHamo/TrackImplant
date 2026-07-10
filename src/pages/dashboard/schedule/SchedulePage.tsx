@@ -196,8 +196,8 @@ export default function SchedulePage() {
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: () => branchService.getAll() });
 
   const { data: allSchedules } = useQuery({
-    queryKey: ['doctor-schedules-all'],
-    queryFn: () => doctorScheduleService.getAll(),
+    queryKey: ['doctor-schedules-all', activeBranchId],
+    queryFn: () => doctorScheduleService.getAll(activeBranchId),
   });
 
   const doctorSchedulesMap: Record<string, DoctorSchedule[]> = useMemo(() => {
@@ -825,7 +825,7 @@ export default function SchedulePage() {
         defaultDoctorId={defaultSlotDoctorId}
       />
 
-      <DoctorScheduleManager isOpen={scheduleOpen} onClose={() => setScheduleOpen(false)} />
+      <DoctorScheduleManager isOpen={scheduleOpen} onClose={() => setScheduleOpen(false)} branchId={activeBranchId} />
 
       {/* ===== CONTEXT MENU ===== */}
       {contextMenu && (

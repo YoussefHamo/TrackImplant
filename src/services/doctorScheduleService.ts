@@ -25,11 +25,13 @@ export const doctorScheduleService = {
     return (data || []).map(rowToSchedule);
   },
 
-  async getAll(): Promise<DoctorSchedule[]> {
-    const { data, error } = await supabase
+  async getAll(branchId?: string | null): Promise<DoctorSchedule[]> {
+    let q = supabase
       .from('doctor_schedules')
       .select('*')
       .order('day_of_week');
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data, error } = await q;
     if (error) throw new Error(error.message);
     return (data || []).map(rowToSchedule);
   },

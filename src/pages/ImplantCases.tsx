@@ -427,6 +427,7 @@ export function ImplantCases() {
       implant_decision: (form.implant_decision || undefined) as Procedure['implant_decision'],
       extraction_needed: form.extraction_needed || undefined,
       abutment_type: form.abutment_type || undefined,
+      branch_id: userBranchId || null,
     };
 
     if (editProcId) {

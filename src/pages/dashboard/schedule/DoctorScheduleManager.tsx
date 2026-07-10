@@ -11,9 +11,10 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 interface DoctorScheduleManagerProps {
   isOpen: boolean;
   onClose: () => void;
+  branchId?: string | null;
 }
 
-export default function DoctorScheduleManager({ isOpen, onClose }: DoctorScheduleManagerProps) {
+export default function DoctorScheduleManager({ isOpen, onClose, branchId }: DoctorScheduleManagerProps) {
   const queryClient = useQueryClient();
   const [schedules, setSchedules] = useState<Record<string, DoctorSchedule[]>>({});
   const [selectedDoctor, setSelectedDoctor] = useState('');
@@ -22,7 +23,7 @@ export default function DoctorScheduleManager({ isOpen, onClose }: DoctorSchedul
   const [editEnd, setEditEnd] = useState('17:00');
 
   const { data: doctors } = useQuery({ queryKey: ['doctors'], queryFn: () => userService.getAll().then(users => users.filter(u => u.role === 'Doctor')) });
-  const { data: allSchedules } = useQuery({ queryKey: ['doctor-schedules-all'], queryFn: () => doctorScheduleService.getAll(), enabled: isOpen });
+  const { data: allSchedules } = useQuery({ queryKey: ['doctor-schedules-all', branchId], queryFn: () => doctorScheduleService.getAll(branchId), enabled: isOpen });
 
   useEffect(() => {
     if (allSchedules) {
@@ -43,11 +44,11 @@ export default function DoctorScheduleManager({ isOpen, onClose }: DoctorSchedul
     if (exists) {
       await doctorScheduleService.upsert({ ...exists, start_time: editStart + ':00', end_time: editEnd + ':00' });
     } else {
-      await doctorScheduleService.upsert({ doctor_id: selectedDoctor, day_of_week: editingDay, start_time: editStart + ':00', end_time: editEnd + ':00', is_active: true } as any);
+      await doctorScheduleService.upsert({ doctor_id: selectedDoctor, day_of_week: editingDay, start_time: editStart + ':00', end_time: editEnd + ':00', is_active: true, branch_id: branchId || null } as any);
     }
     setEditingDay(null);
     await queryClient.invalidateQueries({ queryKey: ['doctor-schedules-all'] });
-    const updated = await doctorScheduleService.getAll();
+    const updated = await doctorScheduleService.getAll(branchId);
     const grouped: Record<string, DoctorSchedule[]> = {};
     updated.forEach(s => { if (!grouped[s.doctor_id]) grouped[s.doctor_id] = []; grouped[s.doctor_id].push(s); });
     setSchedules(grouped);
@@ -56,7 +57,7 @@ export default function DoctorScheduleManager({ isOpen, onClose }: DoctorSchedul
   async function deleteSchedule(scheduleId: string) {
     await doctorScheduleService.delete(scheduleId);
     await queryClient.invalidateQueries({ queryKey: ['doctor-schedules-all'] });
-    const updated = await doctorScheduleService.getAll();
+    const updated = await doctorScheduleService.getAll(branchId);
     const grouped: Record<string, DoctorSchedule[]> = {};
     updated.forEach(s => { if (!grouped[s.doctor_id]) grouped[s.doctor_id] = []; grouped[s.doctor_id].push(s); });
     setSchedules(grouped);
