@@ -49,14 +49,12 @@ function getWorkingHours(doctorId: string, schedules: Record<string, DoctorSched
 }
 
 function isOffDay(doctorId: string, schedules: Record<string, DoctorSchedule[]>, dayOfWeek: number): boolean {
-  const hours = getWorkingHours(doctorId, schedules, dayOfWeek);
-  if (hours) return false;
-  return (schedules[doctorId]?.length || 0) > 0;
+  return !getWorkingHours(doctorId, schedules, dayOfWeek);
 }
 
 function isWorkingHour(doctorId: string, schedules: Record<string, DoctorSchedule[]>, dayOfWeek: number, hour: number): boolean {
   const hours = getWorkingHours(doctorId, schedules, dayOfWeek);
-  if (!hours) return true;
+  if (!hours) return false;
   const startH = parseInt(hours.start.split(':')[0]);
   const endH = parseInt(hours.end.split(':')[0]);
   return hour >= startH && hour < endH;
