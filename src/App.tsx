@@ -15,7 +15,6 @@ import { Patients } from "./pages/Patients";
 import { ImplantCases } from "./pages/ImplantCases";
 import DashboardLayout from "./layouts/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
-import Appointments from "./pages/dashboard/Appointments";
 import SchedulePage from "./pages/dashboard/schedule/SchedulePage";
 import Payments from "./pages/dashboard/Payments";
 import PatientProfile from "./pages/dashboard/PatientProfile";
@@ -51,7 +50,6 @@ export default function App() {
             <Route path="patients" element={<Patients />} />
             <Route path="patients/:id/profile" element={<PatientProfile />} />
             <Route path="cases" element={<ImplantCases />} />
-            <Route path="appointments" element={<Appointments />} />
             <Route path="schedule" element={<SchedulePage />} />
             <Route path="follow-ups" element={<FollowUps />} />
             <Route path="inventory" element={

@@ -19,6 +19,7 @@ interface BookingDialogProps {
     appointment_date: string;
     duration_minutes: number;
     status: string;
+    procedure_name?: string;
     notes?: string;
     branch_id?: string;
   }) => Promise<void>;
@@ -34,6 +35,7 @@ export default function BookingDialog({ isOpen, onClose, onSave, appointment, de
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [duration, setDuration] = useState(30);
+  const [procedureName, setProcedureName] = useState('');
   const [notes, setNotes] = useState('');
   const [showWarning, setShowWarning] = useState(false);
   const [conflictApps, setConflictApps] = useState<Appointment[]>([]);
@@ -56,6 +58,7 @@ export default function BookingDialog({ isOpen, onClose, onSave, appointment, de
       setDate(d.toISOString().split('T')[0]);
       setTime(d.toTimeString().slice(0, 5));
       setDuration(appointment.duration_minutes || 30);
+      setProcedureName(appointment.procedure_name || '');
       setNotes(appointment.notes || '');
     } else {
       resetForm();
@@ -68,6 +71,7 @@ export default function BookingDialog({ isOpen, onClose, onSave, appointment, de
     setDate(defaultDate || new Date().toISOString().split('T')[0]);
     setTime('09:00');
     setDuration(30);
+    setProcedureName('');
     setNotes('');
     setScheduleWarning(null);
     setShowWarning(false);
@@ -116,7 +120,7 @@ export default function BookingDialog({ isOpen, onClose, onSave, appointment, de
   }
 
   async function doSave(appointmentDate: string) {
-    await onSave({ patient_id: patientId, doctor_id: doctorId, appointment_date: appointmentDate, duration_minutes: duration, status: appointment?.status || 'scheduled', notes, branch_id: activeBranchId || undefined });
+    await onSave({ patient_id: patientId, doctor_id: doctorId, appointment_date: appointmentDate, duration_minutes: duration, status: appointment?.status || 'scheduled', procedure_name: procedureName || undefined, notes, branch_id: activeBranchId || undefined });
     resetForm();
     onClose();
   }
@@ -176,6 +180,11 @@ export default function BookingDialog({ isOpen, onClose, onSave, appointment, de
                   <option key={m} value={m} style={{ background: '#0D1B2A', color: 'white' }}>{m} min</option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'rgba(255,255,255,0.3)' }}>Procedure</label>
+              <input type="text" value={procedureName} onChange={e => setProcedureName(e.target.value)} placeholder="e.g. Implant, Crown, Cleaning..." className={inputClass} />
             </div>
 
             <div>

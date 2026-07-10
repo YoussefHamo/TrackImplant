@@ -106,6 +106,8 @@ export interface Appointment {
   color?: string;
   doctor_name?: string;
   patient_name?: string;
+  patient_phone?: string;
+  procedure_name?: string;
   notes?: string;
   branch_id?: string;
 }

@@ -8,12 +8,14 @@ interface WeekViewProps {
   doctors: { id: string; name: string }[];
   doctorSchedules?: Record<string, DoctorSchedule[]>;
   onAppointmentClick: (app: Appointment) => void;
+  onAppointmentDoubleClick: (app: Appointment) => void;
   onAppointmentContextMenu: (e: React.MouseEvent, app: Appointment) => void;
   onSlotClick: (date: string, doctorId: string) => void;
   onAppointmentDrop?: (appointmentId: string, newDate: string, doctorId?: string) => void;
   onResize?: (appointmentId: string, newDuration: number) => void;
   zoomLevel?: number;
   selectedAppointmentId?: string;
+  onSelectAppointment?: (app: Appointment | null) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -61,7 +63,7 @@ function isWorkingHour(doctorId: string, schedules: Record<string, DoctorSchedul
   return hour >= startH && hour < endH;
 }
 
-function getDoctorStats(_doctorId: string, dayAppts: Appointment[]) {
+function getDoctorStats(dayAppts: Appointment[]) {
   return {
     total: dayAppts.length,
     completed: dayAppts.filter(a => a.status === 'completed').length,
@@ -78,8 +80,9 @@ function getInitials(name: string): string {
 const DOCTOR_COLORS = ['#4FD1FF', '#FF9800', '#9C27B0', '#4CAF50', '#FF6B6B', '#FFC107', '#E040FB', '#00BCD4'];
 
 export default function WeekView({
-  startDate, appointments, doctors, doctorSchedules, onAppointmentClick, onAppointmentContextMenu,
-  onSlotClick, onAppointmentDrop, onResize, zoomLevel = 1, selectedAppointmentId,
+  startDate, appointments, doctors, doctorSchedules, onAppointmentClick: _ac, onAppointmentDoubleClick,
+  onAppointmentContextMenu, onSlotClick, onAppointmentDrop, onResize, zoomLevel = 1,
+  selectedAppointmentId, onSelectAppointment,
 }: WeekViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(getCurrentTimePosition());
@@ -97,6 +100,10 @@ export default function WeekView({
   // Today index for current time indicator
   const todayIndex = useMemo(() => days.findIndex(d => isToday(d)), [days]);
 
+  const rowHeight = Math.round(60 * zoomLevel);
+  const pxPerMinute = rowHeight / 60;
+  const totalHeight = 24 * rowHeight;
+
   // Update current time
   useEffect(() => {
     if (todayIndex === -1) return;
@@ -104,29 +111,36 @@ export default function WeekView({
     return () => clearInterval(interval);
   }, [todayIndex]);
 
-  // Scroll to current time (re-triggers on startDate change, e.g. clicking Today)
+  // Scroll to working hours
   useEffect(() => {
-    if (todayIndex === -1 || !scrollRef.current) return;
-    const rowHeight = Math.round(60 * zoomLevel);
-    scrollRef.current.scrollTop = Math.max(0, new Date().getHours() * rowHeight - 100);
-  }, [todayIndex, zoomLevel, startDate]);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 8 * rowHeight - 60;
+    }
+  }, [startDate, zoomLevel, rowHeight]);
 
+  // Build appointment map: key = "dayIdx-doctorId"
   const apptsByDayDoctor = useMemo(() => {
     const map: Record<string, Appointment[]> = {};
     appointments.forEach(a => {
       const d = new Date(a.appointment_date);
-      const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      let dayIdx = -1;
+      for (let i = 0; i < days.length; i++) {
+        if (d.getDate() === days[i].getDate() && d.getMonth() === days[i].getMonth() && d.getFullYear() === days[i].getFullYear()) {
+          dayIdx = i;
+          break;
+        }
+      }
+      if (dayIdx === -1) return;
       const docKey = a.doctor_id || 'none';
-      const key = `${dayKey}-${docKey}`;
+      const key = `${dayIdx}-${docKey}`;
       if (!map[key]) map[key] = [];
       map[key].push(a);
     });
     return map;
-  }, [appointments]);
+  }, [appointments, days]);
 
-  function getAppts(day: Date, doctorId: string) {
-    const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}-${doctorId}`;
-    return apptsByDayDoctor[key] || [];
+  function getAppts(dayIdx: number, doctorId: string) {
+    return apptsByDayDoctor[`${dayIdx}-${doctorId}`] || [];
   }
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -134,25 +148,40 @@ export default function WeekView({
     e.dataTransfer.dropEffect = 'move';
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent, day: Date, doctorId: string, hour: number) => {
+  const handleDrop = useCallback((e: React.DragEvent, day: Date, doctorId: string) => {
     e.preventDefault();
-    if (!onAppointmentDrop) return;
+    if (!onAppointmentDrop || !scrollRef.current) return;
     try {
       const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+      const y = e.clientY - (e.currentTarget as HTMLElement).getBoundingClientRect().top + scrollRef.current.scrollTop;
+      const minutesFromMidnight = Math.floor(y / pxPerMinute);
       const newDate = new Date(day);
-      newDate.setHours(hour, 0, 0, 0);
+      newDate.setHours(Math.floor(minutesFromMidnight / 60), minutesFromMidnight % 60, 0, 0);
       onAppointmentDrop(data.id, newDate.toISOString(), doctorId);
-    } catch { /* ignore */ }
-  }, [onAppointmentDrop]);
+    } catch { /* */ }
+  }, [onAppointmentDrop, pxPerMinute]);
 
-  const rowHeight = Math.round(60 * zoomLevel);
-  const timeIndicatorTop = currentTime * rowHeight;
+  const handleSlotClickWithPos = useCallback((e: React.MouseEvent, day: Date, doctorIdx: number) => {
+    if (!scrollRef.current) return;
+    const colEl = (e.currentTarget as HTMLElement);
+    const rect = colEl.getBoundingClientRect();
+    const y = e.clientY - rect.top + scrollRef.current.scrollTop;
+    const minutesFromMidnight = Math.floor(y / pxPerMinute);
+    const hour = Math.min(23, Math.max(0, Math.floor(minutesFromMidnight / 60)));
+    const minute = Math.min(59, minutesFromMidnight % 60);
+    const doctorId = doctors[doctorIdx]?.id;
+    if (!doctorId) return;
+    const slotDate = new Date(day);
+    slotDate.setHours(hour, minute, 0, 0);
+    onSlotClick(slotDate.toISOString(), doctorId);
+  }, [doctors, pxPerMinute, onSlotClick]);
+
+  const timeIndicatorTop = currentTime * 60 * pxPerMinute;
 
   return (
     <div className="rounded-[20px] overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
       {/* Day Headers */}
       <div className="sticky top-0 z-20 flex" style={{ background: 'rgba(5,11,20,0.98)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        {/* Sticky time column spacer */}
         <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.98)' }} />
         {days.map((day, i) => {
           const today = isToday(day);
@@ -164,9 +193,7 @@ export default function WeekView({
             }}>
               <div className="text-[9px] uppercase tracking-wider" style={{ color: today ? '#4FD1FF' : 'rgba(255,255,255,0.4)' }}>{DAY_NAMES[day.getDay()]}</div>
               <div className={`text-sm font-bold ${today ? 'text-[#4FD1FF]' : 'text-white'}`}>{day.getDate()}</div>
-              {today && (
-                <div className="w-1.5 h-1.5 rounded-full mx-auto mt-0.5" style={{ background: '#4FD1FF' }} />
-              )}
+              {today && <div className="w-1.5 h-1.5 rounded-full mx-auto mt-0.5" style={{ background: '#4FD1FF' }} />}
             </div>
           );
         })}
@@ -174,7 +201,6 @@ export default function WeekView({
 
       {/* Doctor Sub-headers per Day */}
       <div className="sticky top-[52px] z-20 flex" style={{ background: 'rgba(5,11,20,0.96)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-        {/* Sticky time column spacer */}
         <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.96)' }} />
         {days.map((day, di) => {
           const isWeekend = day.getDay() === 0 || day.getDay() === 6;
@@ -184,10 +210,10 @@ export default function WeekView({
                 const off = isOffDay(doc.id, doctorSchedules || {}, day.getDay());
                 const hours = getWorkingHours(doc.id, doctorSchedules || {}, day.getDay());
                 const docColor = DOCTOR_COLORS[docIdx % DOCTOR_COLORS.length];
-                const dayAppts = getAppts(day, doc.id);
-                const stats = getDoctorStats(doc.id, dayAppts);
+                const dayAppts = getAppts(di, doc.id);
+                const stats = getDoctorStats(dayAppts);
                 return (
-                  <div key={doc.id} className="min-w-[140px] flex-1 px-1.5 py-1.5 relative" style={{ opacity: off ? 0.45 : 1, borderLeft: docIdx > 0 ? '1px solid rgba(255,255,255,0.02)' : 'none' }} role="columnheader" aria-label={`${doc.name} - ${DAY_NAMES[day.getDay()]}`}>
+                  <div key={doc.id} className="min-w-[140px] flex-1 px-1.5 py-1.5 relative" style={{ opacity: off ? 0.45 : 1, borderLeft: docIdx > 0 ? '1px solid rgba(255,255,255,0.02)' : 'none' }}>
                     <div className="flex items-center gap-1.5">
                       <div className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0" style={{ background: `${docColor}20`, color: docColor }}>
                         {getInitials(doc.name)}
@@ -215,76 +241,115 @@ export default function WeekView({
 
       {/* Time Grid */}
       <div ref={scrollRef} className="overflow-auto relative" style={{ maxHeight: 'calc(100vh - 360px)', scrollBehavior: 'smooth' }}>
-        {HOURS.map(hour => (
-          <div key={hour} className="flex relative" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', minHeight: rowHeight }}>
-            {/* Sticky Time Label */}
-            <div className="w-16 shrink-0 sticky left-0 z-10 flex items-start justify-center pt-1" style={{ background: 'rgba(5,11,20,0.96)' }}>
-              <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                {formatHour(hour)}
-              </span>
-            </div>
-
-            {days.map((day, di) => {
-              const today = isToday(day);
-              const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-              const currentHour = today && hour === Math.floor(getCurrentTimePosition());
-              return (
-                <div key={di} className="flex-1 flex" style={{ borderLeft: '1px solid rgba(255,255,255,0.04)', background: currentHour ? 'rgba(79,209,255,0.04)' : isWeekend ? 'rgba(255,255,255,0.015)' : 'transparent' }}>
-                  {doctors.map(doc => {
-                    const slotDate = new Date(day);
-                    slotDate.setHours(hour, 0, 0, 0);
-                    const appts = getAppts(day, doc.id).filter(a => new Date(a.appointment_date).getHours() === hour);
-                    const isOff = !isWorkingHour(doc.id, doctorSchedules || {}, day.getDay(), hour);
-                    const isDocOffDay = isOffDay(doc.id, doctorSchedules || {}, day.getDay());
-
-                    return (
-                      <div
-                        key={doc.id}
-                        className="min-w-[140px] flex-1 relative transition-colors"
-                        style={{
-                          borderLeft: '1px solid rgba(255,255,255,0.015)',
-                          background: isDocOffDay ? 'rgba(0,0,0,0.35)' : isOff ? 'rgba(0,0,0,0.2)' : 'transparent',
-                          opacity: isDocOffDay ? 0.25 : isOff ? 0.45 : 1,
-                          cursor: 'pointer',
-                        }}
-                        onClick={() => onSlotClick(slotDate.toISOString(), doc.id)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, day, doc.id, hour)}
-                        role="gridcell"
-                        aria-label={`${doc.name} ${DAY_NAMES[day.getDay()]} at ${formatHour(hour)}`}
-                      >
-                        {isDocOffDay && (
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                            <span className="text-[36px] font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.02)' }}>OFF</span>
-                          </div>
-                        )}
-                        {appts.map(app => (
-                          <AppointmentBlock
-                            key={app.id}
-                            appointment={app}
-                            onClick={onAppointmentClick}
-                            onContextMenu={onAppointmentContextMenu}
-                            onDrop={onAppointmentDrop}
-                            onResize={onResize}
-                            selected={app.id === selectedAppointmentId}
-                          />
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+        <div className="flex" style={{ minHeight: totalHeight }}>
+          {/* Sticky Time Labels */}
+          <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.96)' }}>
+            {HOURS.map(hour => (
+              <div key={hour} className="flex items-start justify-center pt-1" style={{ height: rowHeight, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  {formatHour(hour)}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
 
-        {/* Current Time Indicator (in today's column area) */}
+          {/* Day columns with doctor sub-columns */}
+          {days.map((day, di) => {
+            const today = isToday(day);
+            const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+            return (
+              <div key={di} className="flex-1 flex" style={{ borderLeft: '1px solid rgba(255,255,255,0.04)', background: isWeekend ? 'rgba(255,255,255,0.015)' : 'transparent' }}>
+                {doctors.map((doc, docIdx) => {
+                  const off = isOffDay(doc.id, doctorSchedules || {}, day.getDay());
+                  const dayAppts = getAppts(di, doc.id);
+                  return (
+                    <div
+                      key={doc.id}
+                      className="min-w-[140px] flex-1 relative"
+                      style={{
+                        borderLeft: '1px solid rgba(255,255,255,0.015)',
+                        background: off ? 'rgba(0,0,0,0.35)' : 'transparent',
+                        opacity: off ? 0.25 : 1,
+                      }}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, day, doc.id)}
+                    >
+                      {/* Hour grid lines */}
+                      {HOURS.map(hour => {
+                        const currentHour = today && hour === Math.floor(currentTime);
+                        const isOff = !isWorkingHour(doc.id, doctorSchedules || {}, day.getDay(), hour);
+                        return (
+                          <div
+                            key={hour}
+                            className="w-full cursor-pointer"
+                            style={{
+                              position: 'absolute',
+                              top: hour * rowHeight,
+                              height: rowHeight,
+                              borderBottom: '1px solid rgba(255,255,255,0.03)',
+                              background: off
+                                ? 'rgba(0,0,0,0.35)'
+                                : isOff
+                                  ? 'rgba(0,0,0,0.2)'
+                                  : currentHour
+                                    ? 'rgba(79,209,255,0.04)'
+                                    : 'transparent',
+                              opacity: off ? 0.25 : isOff ? 0.45 : 1,
+                            }}
+                            onClick={(e) => handleSlotClickWithPos(e, day, docIdx)}
+                          />
+                        );
+                      })}
+
+                      {/* OFF watermark */}
+                      {off && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none" style={{ zIndex: 1 }}>
+                          <span className="text-[36px] font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.02)' }}>OFF</span>
+                        </div>
+                      )}
+
+                      {/* Appointments */}
+                      {dayAppts.map(app => {
+                        const start = new Date(app.appointment_date);
+                        const mins = start.getHours() * 60 + start.getMinutes();
+                        const dur = app.duration_minutes || 30;
+                        return (
+                          <div
+                            key={app.id}
+                            className="absolute left-0.5 right-0.5"
+                            style={{
+                              top: mins * (rowHeight / 60),
+                              height: Math.max(18, dur * (rowHeight / 60)),
+                              zIndex: 5,
+                            }}
+                          >
+                            <AppointmentBlock
+                              appointment={app}
+                              onClick={(a) => { onSelectAppointment?.(a); }}
+                              onDoubleClick={(a) => onAppointmentDoubleClick(a)}
+                              onContextMenu={onAppointmentContextMenu}
+                              onDrop={onAppointmentDrop}
+                              onResize={onResize}
+                              selected={app.id === selectedAppointmentId}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Current Time Indicator */}
         {todayIndex >= 0 && (
           <div className="absolute left-0 right-0 pointer-events-none z-10" style={{ top: timeIndicatorTop }}>
             <div className="flex items-center">
               <div className="w-2 h-2 rounded-full shrink-0 ml-[62px]" style={{ background: '#F44336', boxShadow: '0 0 6px rgba(244,67,54,0.8)' }} />
               <div className="flex-1" style={{ height: '2px', background: '#F44336' }} />
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-l-none rounded-r ml-0 shrink-0" style={{ background: '#F44336', color: 'white' }}>
+              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 shrink-0" style={{ background: '#F44336', color: 'white' }}>
                 {formatCurrentTime()}
               </span>
             </div>

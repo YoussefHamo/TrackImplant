@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, memo } from 'react';
-import { Clock, User, Syringe, MapPin } from 'lucide-react';
+import { Clock, User, Syringe, MapPin, Phone } from 'lucide-react';
 import type { Appointment } from '../../../types';
 
 export const STATUS_COLORS: Record<string, string> = {
@@ -25,6 +25,7 @@ const STATUS_LABELS: Record<string, string> = {
 interface AppointmentBlockProps {
   appointment: Appointment;
   onClick: (app: Appointment) => void;
+  onDoubleClick?: (app: Appointment) => void;
   onContextMenu: (e: React.MouseEvent, app: Appointment) => void;
   compact?: boolean;
   selected?: boolean;
@@ -44,6 +45,12 @@ const PatientTooltip = memo(function PatientTooltip({ appointment }: { appointme
       style={{ filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.4))' }}>
       <div className="rounded-xl py-2.5 px-3.5 min-w-[200px]" style={{ background: 'rgba(15,28,46,0.98)', border: '1px solid rgba(255,255,255,0.1)' }}>
         <div className="text-sm font-bold text-white mb-1.5">{appointment.patient_name || 'Unknown'}</div>
+          {appointment.patient_phone && (
+            <div className="flex items-center gap-2 mb-1.5" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <Phone className="w-3 h-3" />
+              <span>{appointment.patient_phone}</span>
+            </div>
+          )}
         <div className="space-y-1 text-[11px]">
           <div className="flex items-center gap-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
             <Clock className="w-3 h-3" />
@@ -77,7 +84,7 @@ const PatientTooltip = memo(function PatientTooltip({ appointment }: { appointme
   );
 });
 
-const AppointmentBlock = memo(function AppointmentBlock({ appointment, onClick, onContextMenu, compact, selected, onDrop, onResize }: AppointmentBlockProps) {
+const AppointmentBlock = memo(function AppointmentBlock({ appointment, onClick, onDoubleClick, onContextMenu, compact, selected, onDrop, onResize }: AppointmentBlockProps) {
   const color = STATUS_COLORS[appointment.status] || '#4FD1FF';
   const start = new Date(appointment.appointment_date);
   const timeStr = formatTime(start);
@@ -135,6 +142,7 @@ const AppointmentBlock = memo(function AppointmentBlock({ appointment, onClick, 
         ref={blockRef}
         className="relative group cursor-pointer select-none mb-0.5"
         onClick={() => onClick(appointment)}
+        onDoubleClick={() => onDoubleClick?.(appointment)}
         onContextMenu={(e) => onContextMenu(e, appointment)}
         style={{ borderLeft: `2px solid ${color}` }}
         role="button"
@@ -155,6 +163,7 @@ const AppointmentBlock = memo(function AppointmentBlock({ appointment, onClick, 
       ref={blockRef}
       draggable={!!onDrop}
       onClick={() => onClick(appointment)}
+      onDoubleClick={() => onDoubleClick?.(appointment)}
       onContextMenu={(e) => onContextMenu(e, appointment)}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
@@ -191,6 +200,24 @@ const AppointmentBlock = memo(function AppointmentBlock({ appointment, onClick, 
         <span className="text-[11px] font-bold text-white truncate flex-1">{appointment.patient_name || 'Unknown'}</span>
       </div>
 
+      {/* Phone + Procedure row */}
+      {(appointment.patient_phone || appointment.procedure_name) && (
+        <div className="flex items-center gap-2 px-2 pb-0.5">
+          {appointment.patient_phone && (
+            <div className="flex items-center gap-1">
+              <Phone className="w-2 h-2 shrink-0" style={{ color: 'rgba(255,255,255,0.35)' }} />
+              <span className="text-[9px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{appointment.patient_phone}</span>
+            </div>
+          )}
+          {appointment.procedure_name && (
+            <div className="flex items-center gap-1">
+              <Syringe className="w-2.5 h-2.5 shrink-0" style={{ color: 'rgba(255,107,107,0.6)' }} />
+              <span className="text-[9px] truncate" style={{ color: 'rgba(255,255,255,0.55)' }}>{appointment.procedure_name}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Doctor name */}
       {appointment.doctor_name && (
         <div className="flex items-center gap-1 px-2 pb-0.5">
@@ -204,11 +231,6 @@ const AppointmentBlock = memo(function AppointmentBlock({ appointment, onClick, 
         <span className="text-[8px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: `${color}25`, color }}>
           {STATUS_LABELS[appointment.status] || appointment.status}
         </span>
-        {appointment.notes?.toLowerCase().includes('implant') && (
-          <span className="text-[8px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-full flex items-center gap-0.5" style={{ background: 'rgba(255,107,107,0.2)', color: '#FF6B6B' }}>
-            <Syringe className="w-2 h-2" />Implant
-          </span>
-        )}
       </div>
 
       {/* Resize handle */}

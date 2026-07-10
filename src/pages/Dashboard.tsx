@@ -227,7 +227,7 @@ function ReceptionDashboard() {
                 {t('dashboard.appointments_scheduled', { count: todayAppointments.length })}
               </p>
             </div>
-            <Link to="/dashboard/appointments"
+            <Link to="/dashboard/schedule"
               className="flex items-center gap-1.5 text-xs font-medium" style={{ color: '#4FD1FF' }}>
               {t('dashboard.view_all')} <ChevronRight className="w-3.5 h-3.5" />
             </Link>
@@ -284,7 +284,7 @@ function ReceptionDashboard() {
                 style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', color: '#4FD1FF' }}>
                 <User className="w-4 h-4" /> {t('dashboard.find_patient')}
               </button>
-              <button onClick={() => navigate('/dashboard/appointments')}
+              <button onClick={() => navigate('/dashboard/schedule')}
                 className="w-full flex items-center gap-3 p-3 rounded-xl text-sm font-medium transition-all hover:bg-[rgba(255,193,7,0.06)]"
                 style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', color: '#FFC107' }}>
                 <Calendar className="w-4 h-4" /> {t('dashboard.schedule_appointment')}
@@ -469,7 +469,7 @@ function ReceptionDashboard() {
             <User className="w-5 h-5" />
             <span>Quick Patient Reg.</span>
           </button>
-          <button onClick={() => navigate('/dashboard/appointments')}
+          <button onClick={() => navigate('/dashboard/schedule')}
             className="flex items-center gap-3 p-4 rounded-xl text-sm font-medium transition-all hover:bg-[rgba(255,193,7,0.06)]"
             style={{ background: 'rgba(255,193,7,0.04)', border: '1px solid rgba(255,193,7,0.1)', color: '#FFC107' }}>
             <Calendar className="w-5 h-5" />
@@ -798,7 +798,7 @@ function ClinicalDashboard() {
                 ))}
               </div>
             )}
-            <Link to="/dashboard/appointments"
+            <Link to="/dashboard/schedule"
               className="flex items-center justify-center w-full mt-4 py-2.5 rounded-xl text-xs font-medium transition-all duration-200"
               style={{ background: 'rgba(79,209,255,0.06)', border: '1px solid rgba(79,209,255,0.1)', color: '#4FD1FF' }}>
               {t('dashboard.view_full_calendar')}
@@ -1154,7 +1154,7 @@ function ManagerDashboard() {
       <div className="rounded-[22px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
         <h3 className="text-base font-semibold text-white mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <button onClick={() => navigate('/dashboard/appointments')}
+          <button onClick={() => navigate('/dashboard/schedule')}
             className="flex items-center justify-center gap-2 p-4 rounded-xl text-sm font-medium transition-all hover:-translate-y-0.5"
             style={{ background: 'rgba(79,209,255,0.08)', border: '1px solid rgba(79,209,255,0.12)', color: '#4FD1FF' }}>
             <Calendar className="w-5 h-5" /> New Appointment
@@ -1383,7 +1383,7 @@ function DoctorDashboard() {
               ))}
             </div>
           )}
-          <button onClick={() => navigate('/dashboard/appointments')}
+          <button onClick={() => navigate('/dashboard/schedule')}
             className="w-full mt-4 py-2.5 rounded-xl text-xs font-medium"
             style={{ background: 'rgba(79,209,255,0.06)', color: '#4FD1FF' }}>View All Appointments</button>
         </div>

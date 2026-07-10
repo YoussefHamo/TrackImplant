@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
 import AppointmentBlock from './AppointmentBlock';
 import type { Appointment, DoctorSchedule } from '../../../types';
 
@@ -8,12 +8,15 @@ interface DayViewProps {
   doctors: { id: string; name: string }[];
   doctorSchedules?: Record<string, DoctorSchedule[]>;
   onAppointmentClick: (app: Appointment) => void;
+  onAppointmentDoubleClick: (app: Appointment) => void;
   onAppointmentContextMenu: (e: React.MouseEvent, app: Appointment) => void;
   onSlotClick: (date: string, doctorId: string) => void;
   onAppointmentDrop?: (appointmentId: string, newDate: string, doctorId?: string) => void;
   onResize?: (appointmentId: string, newDuration: number) => void;
   zoomLevel?: number;
   selectedAppointmentId?: string;
+  onSelectAppointment?: (app: Appointment | null) => void;
+  onQuickAction?: (id: string, action: string) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -82,51 +85,97 @@ function getInitials(name: string): string {
 const DOCTOR_COLORS = ['#4FD1FF', '#FF9800', '#9C27B0', '#4CAF50', '#FF6B6B', '#FFC107', '#E040FB', '#00BCD4'];
 
 export default function DayView({
-  date, appointments, doctors, doctorSchedules, onAppointmentClick, onAppointmentContextMenu,
-  onSlotClick, onAppointmentDrop, onResize, zoomLevel = 1, selectedAppointmentId,
+  date, appointments, doctors, doctorSchedules, onAppointmentClick: _ac, onAppointmentDoubleClick,
+  onAppointmentContextMenu, onSlotClick, onAppointmentDrop, onResize, zoomLevel = 1,
+  selectedAppointmentId, onSelectAppointment,
 }: DayViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(getCurrentTimePosition());
   const today = isToday(date);
   const dayOfWeek = date.getDay();
 
+  const rowHeight = Math.round(60 * zoomLevel);
+  const pxPerMinute = rowHeight / 60;
+  const totalHeight = 24 * rowHeight;
+
   // Update current time every minute
   useEffect(() => {
     if (!today) return;
-    const interval = setInterval(() => {
-      setCurrentTime(getCurrentTimePosition());
-    }, 60000);
+    const interval = setInterval(() => { setCurrentTime(getCurrentTimePosition()); }, 60000);
     return () => clearInterval(interval);
   }, [today]);
 
-  // Scroll to current time on mount if today (re-triggers when date changes, e.g. clicking Today)
+  // Scroll to working hours (08:00) on mount
   useEffect(() => {
-    if (!today || !scrollRef.current) return;
-    const currentHour = new Date().getHours();
-    const rowHeight = Math.round(60 * zoomLevel);
-    scrollRef.current.scrollTop = Math.max(0, currentHour * rowHeight - 100);
-  }, [today, zoomLevel, date]);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 8 * rowHeight - 60;
+    }
+  }, [date, zoomLevel, rowHeight]);
+
+  const handleGridClick = useCallback((e: React.MouseEvent) => {
+    if (!gridRef.current || !scrollRef.current) return;
+    const rect = gridRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top + scrollRef.current.scrollTop;
+    const minutesFromMidnight = Math.floor(y / pxPerMinute);
+    const hour = Math.min(23, Math.max(0, Math.floor(minutesFromMidnight / 60)));
+    const minute = Math.min(59, minutesFromMidnight % 60);
+
+    // Determine doctor from column hit-test
+    let cumulative = 0;
+    let doctorIndex = -1;
+    for (let i = 0; i < doctors.length; i++) {
+      const colEl = document.getElementById(`dayview-col-${doctors[i].id}`);
+      if (colEl) {
+        const colW = colEl.offsetWidth;
+        if (x >= cumulative && x < cumulative + colW) {
+          doctorIndex = i;
+          break;
+        }
+        cumulative += colW;
+      }
+    }
+    if (doctorIndex === -1) return;
+    const doctorId = doctors[doctorIndex].id;
+    const slotDate = new Date(date);
+    slotDate.setHours(hour, minute, 0, 0);
+    onSlotClick(slotDate.toISOString(), doctorId);
+  }, [date, doctors, pxPerMinute, onSlotClick]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent, doctorId: string, hour: number) => {
+  const handleDrop = useCallback((e: React.DragEvent, doctorId: string) => {
     e.preventDefault();
-    if (!onAppointmentDrop) return;
+    if (!onAppointmentDrop || !scrollRef.current) return;
     try {
       const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+      const rect = gridRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const y = e.clientY - rect.top + scrollRef.current.scrollTop;
+      const minutesFromMidnight = Math.floor(y / pxPerMinute);
       const newDate = new Date(date);
-      newDate.setHours(hour, 0, 0, 0);
+      newDate.setHours(Math.floor(minutesFromMidnight / 60), minutesFromMidnight % 60, 0, 0);
       onAppointmentDrop(data.id, newDate.toISOString(), doctorId);
-    } catch { /* ignore */ }
-  }, [date, onAppointmentDrop]);
+    } catch { /* */ }
+  }, [date, onAppointmentDrop, pxPerMinute]);
 
-  const rowHeight = Math.round(60 * zoomLevel);
-  const timeIndicatorTop = currentTime * rowHeight;
-
+  const timeIndicatorTop = currentTime * 60 * pxPerMinute;
   const dateStr = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  // Group appointments by doctor for rendering
+  const apptsByDoctor = useMemo(() => {
+    const map: Record<string, Appointment[]> = {};
+    appointments.forEach(a => {
+      const aid = a.doctor_id || 'none';
+      if (!map[aid]) map[aid] = [];
+      map[aid].push(a);
+    });
+    return map;
+  }, [appointments]);
 
   return (
     <div className="rounded-[20px] overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -143,7 +192,6 @@ export default function DayView({
       {/* Doctor Headers with Stats */}
       <div className="sticky top-0 z-20" style={{ background: 'rgba(5,11,20,0.98)', backdropFilter: 'blur(12px)' }}>
         <div className="flex" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-          {/* Sticky time column spacer in header */}
           <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.98)' }} />
           {doctors.map((doc, di) => {
             const off = isOffDay(doc.id, doctorSchedules || {}, dayOfWeek);
@@ -151,7 +199,7 @@ export default function DayView({
             const docColor = DOCTOR_COLORS[di % DOCTOR_COLORS.length];
             const stats = getDoctorStats(doc.id, appointments, date);
             return (
-              <div key={doc.id} className="min-w-[200px] flex-1 px-2 py-2.5 relative" style={{ borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none', opacity: off ? 0.5 : 1 }} role="columnheader" aria-label={`Doctor: ${doc.name}`}>
+              <div key={doc.id} id={`dayview-header-${doc.id}`} className="min-w-[200px] flex-1 px-2 py-2.5 relative" style={{ borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none', opacity: off ? 0.5 : 1 }}>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style={{ background: `${docColor}20`, color: docColor }}>
                     {getInitials(doc.name)}
@@ -182,84 +230,116 @@ export default function DayView({
       </div>
 
       {/* Time Grid */}
-      <div ref={scrollRef} className="overflow-auto relative" style={{ maxHeight: 'calc(100vh - 320px)', scrollBehavior: 'smooth' }}>
-        {HOURS.map(hour => {
-          const isCurrentHour = today && hour === Math.floor(currentTime);
-          return (
-            <div key={hour} className="flex relative" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', minHeight: rowHeight }}>
-              {/* Sticky Time Label */}
-              <div className="w-16 shrink-0 sticky left-0 z-10 flex items-start justify-center pt-1" style={{ background: 'rgba(5,11,20,0.96)' }}>
-                <span className="text-[10px] font-mono" style={{ color: isCurrentHour ? '#4FD1FF' : 'rgba(255,255,255,0.3)', fontWeight: isCurrentHour ? 700 : 400 }}>
-                  {formatHour(hour)}
-                </span>
-              </div>
+      <div ref={scrollRef} className="overflow-auto" style={{ maxHeight: 'calc(100vh - 320px)', scrollBehavior: 'smooth', position: 'relative' }}>
+        <div ref={gridRef} className="flex relative" style={{ minHeight: totalHeight }} onClick={handleGridClick} onDragOver={handleDragOver}>
+          {/* Sticky Time Labels */}
+          <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.96)' }}>
+            {HOURS.map(hour => {
+              const isCurrentHour = today && hour === Math.floor(currentTime);
+              return (
+                <div key={hour} className="flex items-start justify-center pt-1" style={{ height: rowHeight, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                  <span className="text-[10px] font-mono" style={{ color: isCurrentHour ? '#4FD1FF' : 'rgba(255,255,255,0.3)', fontWeight: isCurrentHour ? 700 : 400 }}>
+                    {formatHour(hour)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
 
-              {/* Doctor Columns */}
-              {doctors.map((doc, di) => {
-                const isOff = !isWorkingHour(doc.id, doctorSchedules || {}, dayOfWeek, hour);
-                const isDocOffDay = isOffDay(doc.id, doctorSchedules || {}, dayOfWeek);
-                const appts = appointments.filter(a => {
-                  const d = new Date(a.appointment_date);
-                  return d.getDate() === date.getDate() && d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear() && d.getHours() === hour && a.doctor_id === doc.id;
-                });
+          {/* Doctor Columns */}
+          {doctors.map((doc, di) => {
+            const off = isOffDay(doc.id, doctorSchedules || {}, dayOfWeek);
+            const docAppts = apptsByDoctor[doc.id] || [];
+            return (
+              <div
+                key={doc.id}
+                id={`dayview-col-${doc.id}`}
+                className="min-w-[200px] flex-1 relative"
+                style={{
+                  borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.02)' : 'none',
+                  background: off ? 'rgba(0,0,0,0.35)' : 'transparent',
+                  opacity: off ? 0.25 : 1,
+                }}
+                onDrop={(e) => handleDrop(e, doc.id)}
+              >
+                {/* Hour grid lines + slot click zones */}
+                {HOURS.map(hour => {
+                  const isOff = !isWorkingHour(doc.id, doctorSchedules || {}, dayOfWeek, hour);
+                  const isCurrentHour = today && hour === Math.floor(currentTime);
+                  return (
+                    <div
+                      key={hour}
+                      className="w-full"
+                      style={{
+                        position: 'absolute',
+                        top: hour * rowHeight,
+                        height: rowHeight,
+                        borderBottom: '1px solid rgba(255,255,255,0.03)',
+                        background: off
+                          ? 'rgba(0,0,0,0.35)'
+                          : isOff
+                            ? 'rgba(0,0,0,0.2)'
+                            : isCurrentHour
+                              ? 'rgba(79,209,255,0.04)'
+                              : 'transparent',
+                        opacity: off ? 0.25 : isOff ? 0.45 : 1,
+                        cursor: 'pointer',
+                      }}
+                    />
+                  );
+                })}
 
-                return (
-                  <div
-                    key={doc.id}
-                    className="min-w-[200px] flex-1 relative transition-colors"
-                    style={{
-                      borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.02)' : 'none',
-                      background: isDocOffDay
-                        ? 'rgba(0,0,0,0.35)'
-                        : isOff
-                          ? 'rgba(0,0,0,0.2)'
-                          : isCurrentHour
-                            ? 'rgba(79,209,255,0.04)'
-                            : 'transparent',
-                      opacity: isDocOffDay ? 0.25 : isOff ? 0.45 : 1,
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => onSlotClick(new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour).toISOString(), doc.id)}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, doc.id, hour)}
-                    role="gridcell"
-                    aria-label={`${doc.name} at ${formatHour(hour)}`}
-                  >
-                    {isDocOffDay && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                        <span className="text-[48px] font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.03)' }}>OFF</span>
-                      </div>
-                    )}
-                    {appts.map(app => (
+                {/* OFF badge for full day off */}
+                {off && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none" style={{ zIndex: 1 }}>
+                    <span className="text-[48px] font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.03)' }}>OFF</span>
+                  </div>
+                )}
+
+                {/* Appointments - absolute positioned within doctor column */}
+                {docAppts.map(app => {
+                  const start = new Date(app.appointment_date);
+                  const mins = start.getHours() * 60 + start.getMinutes();
+                  const dur = app.duration_minutes || 30;
+                  return (
+                    <div
+                      key={app.id}
+                      className="absolute left-0.5 right-0.5"
+                      style={{
+                        top: mins * pxPerMinute,
+                        height: Math.max(18, dur * pxPerMinute),
+                        zIndex: 5,
+                      }}
+                    >
                       <AppointmentBlock
-                        key={app.id}
                         appointment={app}
-                        onClick={onAppointmentClick}
+                        onClick={(a) => { onSelectAppointment?.(a); }}
+                        onDoubleClick={(a) => onAppointmentDoubleClick(a)}
                         onContextMenu={onAppointmentContextMenu}
                         onDrop={onAppointmentDrop}
                         onResize={onResize}
                         selected={app.id === selectedAppointmentId}
                       />
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
 
-        {/* Current Time Indicator */}
-        {today && (
-          <div className="absolute left-0 right-0 pointer-events-none z-10" style={{ top: timeIndicatorTop }}>
-            <div className="flex items-center">
-              <div className="w-2 h-2 rounded-full shrink-0 ml-1" style={{ background: '#F44336', boxShadow: '0 0 6px rgba(244,67,54,0.8)' }} />
-              <div className="flex-1" style={{ height: '2px', background: '#F44336' }} />
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-l-none rounded-r ml-0" style={{ background: '#F44336', color: 'white' }}>
-                {formatCurrentTime()}
-              </span>
+          {/* Current Time Indicator */}
+          {today && (
+            <div className="absolute left-0 right-0 pointer-events-none z-10" style={{ top: timeIndicatorTop }}>
+              <div className="flex items-center">
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ background: '#F44336', boxShadow: '0 0 6px rgba(244,67,54,0.8)', marginLeft: '1px' }} />
+                <div className="flex-1" style={{ height: '2px', background: '#F44336' }} />
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5" style={{ background: '#F44336', color: 'white' }}>
+                  {formatCurrentTime()}
+                </span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

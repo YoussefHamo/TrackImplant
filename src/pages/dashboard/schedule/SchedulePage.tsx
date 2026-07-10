@@ -14,6 +14,7 @@ import DayView from './DayView';
 import BookingDialog from './BookingDialog';
 import DoctorScheduleManager from './DoctorScheduleManager';
 import ContextMenu from './ContextMenu';
+import AppointmentDetailsPanel from './AppointmentDetailsPanel';
 import EmptyState from '../../../components/ui/EmptyState';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import type { Appointment, DoctorSchedule } from '../../../types';
@@ -91,6 +92,7 @@ export default function SchedulePage() {
   const [view, setView] = useState<'Day' | 'Week' | 'Month'>('Week');
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [detailsPanelAppointment, setDetailsPanelAppointment] = useState<Appointment | null>(null);
   const mainRef = useRef<HTMLDivElement>(null);
 
   // Filters
@@ -98,7 +100,11 @@ export default function SchedulePage() {
   const [filterBranch, setFilterBranch] = useState(activeBranchId || '');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
+  const [filterProcedure, setFilterProcedure] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [mobileDoctor, setMobileDoctor] = useState('');
 
   // Mini calendar
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
@@ -109,6 +115,15 @@ export default function SchedulePage() {
   useEffect(() => {
     setFilterBranch(activeBranchId || '');
   }, [activeBranchId]);
+
+  // Responsive
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth < 768);
+    }
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Dialogs
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -127,6 +142,11 @@ export default function SchedulePage() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (bookingOpen || scheduleOpen || contextMenu) return;
+      if (e.key === 'Escape') {
+        setSelectedAppointment(null);
+        setSelectedAppointmentId(null);
+        return;
+      }
       switch (e.key) {
         case 'n':
         case 'N':
@@ -164,6 +184,13 @@ export default function SchedulePage() {
   // Fetch data
   const { data: allUsers } = useQuery({ queryKey: ['users'], queryFn: () => userService.getAll() });
   const doctors = useMemo(() => (allUsers || []).filter(u => u.role === 'Doctor').map(d => ({ id: d.auth_user_id || d.id, name: d.full_name || d.username })), [allUsers]);
+
+  // Auto-select mobile doctor after doctors are loaded
+  useEffect(() => {
+    if (isMobile && !mobileDoctor && doctors.length > 0) {
+      setMobileDoctor(doctors[0].id);
+    }
+  }, [isMobile, doctors, mobileDoctor]);
 
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: () => branchService.getAll() });
 
@@ -216,16 +243,18 @@ export default function SchedulePage() {
   const filteredAppointments = useMemo(() => appointments.filter(a => {
     if (filterDoctor && a.doctor_id !== filterDoctor) return false;
     if (filterStatus && a.status !== filterStatus) return false;
+    if (filterProcedure && !a.procedure_name?.toLowerCase().includes(filterProcedure.toLowerCase())) return false;
     if (filterSearch) {
       const q = filterSearch.toLowerCase();
       const patientMatch = a.patient_name?.toLowerCase().includes(q);
       const doctorMatch = a.doctor_name?.toLowerCase().includes(q);
       const notesMatch = a.notes?.toLowerCase().includes(q);
       const idMatch = a.id?.toLowerCase().includes(q);
-      return patientMatch || doctorMatch || notesMatch || idMatch;
+      const procMatch = a.procedure_name?.toLowerCase().includes(q);
+      return patientMatch || doctorMatch || notesMatch || idMatch || procMatch;
     }
     return true;
-  }), [appointments, filterDoctor, filterStatus, filterSearch]);
+  }), [appointments, filterDoctor, filterStatus, filterSearch, filterProcedure]);
 
   // Active filter chips
   const activeFilters = useMemo(() => {
@@ -241,15 +270,19 @@ export default function SchedulePage() {
     if (filterStatus) {
       chips.push({ key: 'status', label: filterStatus.replace('_', ' ') });
     }
+    if (filterProcedure) {
+      chips.push({ key: 'procedure', label: `Proc: ${filterProcedure}` });
+    }
     if (filterSearch) chips.push({ key: 'search', label: `"${filterSearch}"` });
     return chips;
-  }, [filterDoctor, filterBranch, filterStatus, filterSearch, doctors, branches, activeBranchId]);
+  }, [filterDoctor, filterBranch, filterStatus, filterSearch, filterProcedure, doctors, branches, activeBranchId]);
 
   function clearFilter(key: string) {
     switch (key) {
       case 'doctor': setFilterDoctor(''); break;
       case 'branch': setFilterBranch(activeBranchId || ''); break;
       case 'status': setFilterStatus(''); break;
+      case 'procedure': setFilterProcedure(''); break;
       case 'search': setFilterSearch(''); break;
     }
   }
@@ -258,6 +291,7 @@ export default function SchedulePage() {
     setFilterDoctor('');
     setFilterBranch(activeBranchId || '');
     setFilterStatus('');
+    setFilterProcedure('');
     setFilterSearch('');
   }
 
@@ -368,7 +402,7 @@ export default function SchedulePage() {
   }
 
   // Booking
-  async function handleSave(data: { patient_id: string; doctor_id: string; appointment_date: string; duration_minutes: number; status: string; notes?: string; branch_id?: string }) {
+  async function handleSave(data: { patient_id: string; doctor_id: string; appointment_date: string; duration_minutes: number; status: string; procedure_name?: string; notes?: string; branch_id?: string }) {
     if (editingAppointment) {
       await updateMut.mutateAsync({ id: editingAppointment.id, updates: data });
     } else {
@@ -384,6 +418,32 @@ export default function SchedulePage() {
 
   function handleAppointmentClick(app: Appointment) {
     setSelectedAppointmentId(app.id);
+    setDetailsPanelAppointment(app);
+  }
+
+  function handleAppointmentSelect(app: Appointment | null) {
+    if (app) {
+      setSelectedAppointmentId(app.id);
+      setSelectedAppointment(app);
+    } else {
+      setSelectedAppointment(null);
+      setSelectedAppointmentId(null);
+    }
+  }
+
+  function handleAppointmentDoubleClick(app: Appointment) {
+    setSelectedAppointmentId(app.id);
+    setDetailsPanelAppointment(app);
+  }
+
+  function handleSelectionQuickAction(id: string, action: string) {
+    updateStatusMut.mutate({ id, status: action });
+    setSelectedAppointment(null);
+    setSelectedAppointmentId(null);
+  }
+
+  function handleEditFromPanel(app: Appointment) {
+    setDetailsPanelAppointment(null);
     setEditingAppointment(app);
     setDefaultSlotDate(undefined);
     setBookingOpen(true);
@@ -446,8 +506,8 @@ export default function SchedulePage() {
     },
     {
       items: [
-        { label: 'Edit Appointment', icon: <Calendar className="w-3.5 h-3.5" />, onClick: () => handleAppointmentClick(app) },
-        { label: 'Reschedule', icon: <ArrowRight className="w-3.5 h-3.5" />, onClick: () => handleAppointmentClick(app) },
+        { label: 'Edit Appointment', icon: <Calendar className="w-3.5 h-3.5" />, onClick: () => { setContextMenu(null); setDetailsPanelAppointment(app); } },
+        { label: 'Reschedule', icon: <ArrowRight className="w-3.5 h-3.5" />, onClick: () => { setContextMenu(null); setEditingAppointment(app); setDefaultSlotDate(undefined); setBookingOpen(true); } },
         { label: 'Duplicate', icon: <Copy className="w-3.5 h-3.5" />, onClick: () => handleDuplicateAppointment(app) },
         { label: 'Print', icon: <Printer className="w-3.5 h-3.5" />, onClick: () => handlePrintAppointment(app) },
       ],
@@ -641,10 +701,32 @@ export default function SchedulePage() {
               <option key={s} value={s} style={{ background: '#0D1B2A', color: 'white' }}>{s.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
             ))}
           </select>
+          <input
+            type="text"
+            placeholder="Procedure..."
+            value={filterProcedure}
+            onChange={e => setFilterProcedure(e.target.value)}
+            className={inputCls + ' w-32'}
+            aria-label="Filter by procedure"
+          />
           <button onClick={resetAllFilters} className={`${btnCls} h-8`} style={{ color: 'rgba(255,255,255,0.5)' }}>
             <RotateCcw className="w-3 h-3" /> Reset
           </button>
         </div>
+      )}
+
+      {/* ===== MOBILE DOCTOR SELECTOR ===== */}
+      {isMobile && (view === 'Day' || view === 'Week') && doctors.length > 1 && (
+        <select
+          value={mobileDoctor}
+          onChange={e => setMobileDoctor(e.target.value)}
+          className={inputCls + ' w-full'}
+          aria-label="Select doctor"
+        >
+          {doctors.map(d => (
+            <option key={d.id} value={d.id} style={{ background: '#0D1B2A', color: 'white' }}>{d.name}</option>
+          ))}
+        </select>
       )}
 
       {/* ===== MAIN CONTENT ===== */}
@@ -700,31 +782,35 @@ export default function SchedulePage() {
               {view === 'Week' && (
                 <WeekView
                   startDate={new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() - currentDate.getDay())}
-                  appointments={filteredAppointments}
-                  doctors={doctors}
+                  appointments={isMobile && mobileDoctor ? filteredAppointments.filter(a => a.doctor_id === mobileDoctor) : filteredAppointments}
+                  doctors={isMobile ? doctors.filter(d => d.id === mobileDoctor) : doctors}
                   doctorSchedules={doctorSchedulesMap}
                   onAppointmentClick={handleAppointmentClick}
+                  onAppointmentDoubleClick={handleAppointmentDoubleClick}
                   onAppointmentContextMenu={(e, app) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, appointment: app }); }}
                   onSlotClick={handleSlotClick}
                   onAppointmentDrop={handleAppointmentDrop}
                   onResize={handleResizeAppointment}
                   zoomLevel={zoomLevel}
                   selectedAppointmentId={selectedAppointmentId || undefined}
+                  onSelectAppointment={handleAppointmentSelect}
                 />
               )}
               {view === 'Day' && (
                 <DayView
                   date={currentDate}
-                  appointments={filteredAppointments}
-                  doctors={doctors}
+                  appointments={isMobile && mobileDoctor ? filteredAppointments.filter(a => a.doctor_id === mobileDoctor) : filteredAppointments}
+                  doctors={isMobile ? doctors.filter(d => d.id === mobileDoctor) : doctors}
                   doctorSchedules={doctorSchedulesMap}
                   onAppointmentClick={handleAppointmentClick}
+                  onAppointmentDoubleClick={handleAppointmentDoubleClick}
                   onAppointmentContextMenu={(e, app) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, appointment: app }); }}
                   onSlotClick={handleSlotClick}
                   onAppointmentDrop={handleAppointmentDrop}
                   onResize={handleResizeAppointment}
                   zoomLevel={zoomLevel}
                   selectedAppointmentId={selectedAppointmentId || undefined}
+                  onSelectAppointment={handleAppointmentSelect}
                 />
               )}
             </>
@@ -735,7 +821,7 @@ export default function SchedulePage() {
       {/* ===== DIALOGS ===== */}
       <BookingDialog
         isOpen={bookingOpen}
-        onClose={() => { setBookingOpen(false); setEditingAppointment(null); }}
+        onClose={() => { setBookingOpen(false); setEditingAppointment(null); setSelectedAppointment(null); setSelectedAppointmentId(null); }}
         onSave={handleSave}
         appointment={editingAppointment}
         defaultDate={defaultSlotDate ? new Date(defaultSlotDate).toISOString().split('T')[0] : undefined}
@@ -751,6 +837,63 @@ export default function SchedulePage() {
           onClose={() => setContextMenu(null)}
           sections={contextSections}
           isAdmin={isAdmin}
+        />
+      )}
+
+      {/* ===== QUICK ACTION BAR ===== */}
+      {selectedAppointment && !detailsPanelAppointment && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-3" style={{ zIndex: 100 }}>
+          <div className="max-w-3xl mx-auto rounded-2xl p-3 flex items-center gap-3 flex-wrap shadow-2xl" style={{ background: 'rgba(13,24,40,0.98)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)' }}>
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="text-sm font-bold text-white truncate">{selectedAppointment.patient_name || 'Unknown'}</div>
+              {selectedAppointment.status && (
+                <span className="text-[9px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0" style={{
+                  background: selectedAppointment.status === 'scheduled' ? 'rgba(79,209,255,0.15)' : selectedAppointment.status === 'checked_in' ? 'rgba(255,152,0,0.15)' : selectedAppointment.status === 'working' ? 'rgba(156,39,176,0.15)' : 'rgba(76,175,80,0.15)',
+                  color: selectedAppointment.status === 'scheduled' ? '#4FD1FF' : selectedAppointment.status === 'checked_in' ? '#FF9800' : selectedAppointment.status === 'working' ? '#9C27B0' : '#4CAF50',
+                }}>
+                  {selectedAppointment.status.replace('_', ' ')}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {selectedAppointment.status === 'scheduled' && (
+                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'checked_in')} className="h-9 px-3 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center gap-1.5" style={{ background: 'rgba(255,152,0,0.15)', color: '#FF9800' }}>
+                  <ChevronRight className="w-3 h-3" /> Check In
+                </button>
+              )}
+              {selectedAppointment.status === 'checked_in' && (
+                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'working')} className="h-9 px-3 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center gap-1.5" style={{ background: 'rgba(156,39,176,0.15)', color: '#9C27B0' }}>
+                  <Clock className="w-3 h-3" /> Start
+                </button>
+              )}
+              {selectedAppointment.status === 'working' && (
+                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'completed')} className="h-9 px-3 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center gap-1.5" style={{ background: 'rgba(76,175,80,0.15)', color: '#4CAF50' }}>
+                  <CalendarDays className="w-3 h-3" /> Complete
+                </button>
+              )}
+              {!['completed', 'cancelled', 'no_show'].includes(selectedAppointment.status) && (
+                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'cancelled')} className="h-9 px-3 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center gap-1.5" style={{ background: 'rgba(244,67,54,0.12)', color: '#F44336' }}>
+                  <XCircle className="w-3 h-3" /> Cancel
+                </button>
+              )}
+              <button onClick={() => { setSelectedAppointment(null); setSelectedAppointmentId(null); setEditingAppointment(selectedAppointment); setDefaultSlotDate(undefined); setBookingOpen(true); }} className="h-9 px-3 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center gap-1.5" style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }}>
+                <Calendar className="w-3 h-3" /> Edit
+              </button>
+              <button onClick={() => { setSelectedAppointment(null); setSelectedAppointmentId(null); }} className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== DETAILS PANEL ===== */}
+      {detailsPanelAppointment && (
+        <AppointmentDetailsPanel
+          appointment={detailsPanelAppointment}
+          onClose={() => { setDetailsPanelAppointment(null); setSelectedAppointmentId(null); }}
+          onEdit={handleEditFromPanel}
+          onStatusUpdate={(id, status) => updateStatusMut.mutate({ id, status })}
         />
       )}
 

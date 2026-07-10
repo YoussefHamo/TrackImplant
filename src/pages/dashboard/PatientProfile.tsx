@@ -1077,7 +1077,7 @@ export default function PatientProfile() {
               {timelineEvents.map(event => (
                 <div key={event.id} className="flex items-start gap-4 p-4 rounded-xl transition-colors hover:bg-[rgba(255,255,255,0.03)] cursor-pointer"
                   onClick={() => {
-                    if (event.related_entity_type === 'appointment') navigate(`/dashboard/appointments`);
+                    if (event.related_entity_type === 'appointment') navigate(`/dashboard/schedule`);
                     else if (event.related_entity_type === 'procedure') navigate(`/dashboard/cases`);
                     else if (event.related_entity_type === 'financial_record') navigate(`/dashboard/payments`);
                   }}
