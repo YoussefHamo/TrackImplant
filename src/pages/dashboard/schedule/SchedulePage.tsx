@@ -15,7 +15,7 @@ import BookingDialog from './BookingDialog';
 import DoctorScheduleManager from './DoctorScheduleManager';
 import ContextMenu from './ContextMenu';
 import AppointmentDetailsPanel from './AppointmentDetailsPanel';
-import EmptyState from '../../../components/ui/EmptyState';
+
 import { Skeleton } from '../../../components/ui/Skeleton';
 import type { Appointment, DoctorSchedule } from '../../../types';
 
@@ -765,14 +765,6 @@ export default function SchedulePage() {
                   </div>
                 ))}
               </div>
-            </div>
-          ) : filteredAppointments.length === 0 && !apptsLoading ? (
-            <div className="rounded-[20px]" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-              <EmptyState
-                title="No appointments"
-                description={filterSearch || filterDoctor || filterStatus ? 'Try adjusting your filters.' : 'No appointments scheduled for this period.'}
-                action={{ label: 'Create Appointment', onClick: () => { setEditingAppointment(null); setDefaultSlotDate(undefined); setDefaultSlotDoctorId(undefined); setBookingOpen(true); } }}
-              />
             </div>
           ) : (
             <>
