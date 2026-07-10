@@ -300,25 +300,25 @@ export default function SchedulePage() {
   const createMut = useMutation({
     mutationFn: (data: Parameters<typeof appointmentService.create>[0]) => appointmentService.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['appointments-schedule'] }); toast.success('Appointment created'); },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => { console.error('createMut error:', err); toast.error(err?.message || 'Failed to create appointment'); },
   });
 
   const updateMut = useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Appointment> }) => appointmentService.update(id, updates),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['appointments-schedule'] }); toast.success('Appointment updated'); },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => { console.error('updateMut error:', err); toast.error(err?.message || 'Failed to update appointment'); },
   });
 
   const updateStatusMut = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => appointmentService.updateStatus(id, status),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['appointments-schedule'] }); queryClient.invalidateQueries({ queryKey: ['appointments-today'] }); toast.success('Status updated'); },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => { console.error('updateStatusMut error:', err); toast.error(err?.message || 'Failed to update status'); },
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => appointmentService.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['appointments-schedule'] }); toast.success('Appointment deleted'); },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => { console.error('deleteMut error:', err); toast.error(err?.message || 'Failed to delete appointment'); },
   });
 
   // Drag & Drop
