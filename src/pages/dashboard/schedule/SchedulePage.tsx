@@ -130,6 +130,7 @@ export default function SchedulePage() {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [defaultSlotDate, setDefaultSlotDate] = useState<string | undefined>();
+  const [defaultSlotDoctorId, setDefaultSlotDoctorId] = useState<string | undefined>();
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; appointment: Appointment } | null>(null);
@@ -150,7 +151,7 @@ export default function SchedulePage() {
       switch (e.key) {
         case 'n':
         case 'N':
-          setEditingAppointment(null); setDefaultSlotDate(undefined); setBookingOpen(true);
+          setEditingAppointment(null); setDefaultSlotDate(undefined); setDefaultSlotDoctorId(undefined); setBookingOpen(true);
           break;
         case 't':
         case 'T':
@@ -410,9 +411,10 @@ export default function SchedulePage() {
     }
   }
 
-  function handleSlotClick(date: string, _doctorId: string) {
+  function handleSlotClick(date: string, doctorId: string) {
     setEditingAppointment(null);
     setDefaultSlotDate(date);
+    setDefaultSlotDoctorId(doctorId);
     setBookingOpen(true);
   }
 
@@ -654,7 +656,7 @@ export default function SchedulePage() {
 
         {/* New Appointment */}
         <button
-          onClick={() => { setEditingAppointment(null); setDefaultSlotDate(undefined); setBookingOpen(true); }}
+          onClick={() => { setEditingAppointment(null); setDefaultSlotDate(undefined); setDefaultSlotDoctorId(undefined); setBookingOpen(true); }}
           className={`${btnCls} h-9 px-4 font-bold`}
           style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}
           aria-label="Create new appointment"
@@ -764,7 +766,7 @@ export default function SchedulePage() {
               <EmptyState
                 title="No appointments"
                 description={filterSearch || filterDoctor || filterStatus ? 'Try adjusting your filters.' : 'No appointments scheduled for this period.'}
-                action={{ label: 'Create Appointment', onClick: () => { setEditingAppointment(null); setDefaultSlotDate(undefined); setBookingOpen(true); } }}
+                action={{ label: 'Create Appointment', onClick: () => { setEditingAppointment(null); setDefaultSlotDate(undefined); setDefaultSlotDoctorId(undefined); setBookingOpen(true); } }}
               />
             </div>
           ) : (
@@ -821,10 +823,11 @@ export default function SchedulePage() {
       {/* ===== DIALOGS ===== */}
       <BookingDialog
         isOpen={bookingOpen}
-        onClose={() => { setBookingOpen(false); setEditingAppointment(null); setSelectedAppointment(null); setSelectedAppointmentId(null); }}
+        onClose={() => { setBookingOpen(false); setEditingAppointment(null); setSelectedAppointment(null); setSelectedAppointmentId(null); setDefaultSlotDoctorId(undefined); }}
         onSave={handleSave}
         appointment={editingAppointment}
         defaultDate={defaultSlotDate ? new Date(defaultSlotDate).toISOString().split('T')[0] : undefined}
+        defaultDoctorId={defaultSlotDoctorId}
       />
 
       <DoctorScheduleManager isOpen={scheduleOpen} onClose={() => setScheduleOpen(false)} />
