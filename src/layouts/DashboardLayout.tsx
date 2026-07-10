@@ -12,7 +12,7 @@ import AddPatientModal from "../components/AddPatientModal";
 import {
   LayoutDashboard, Users, Activity, Calendar, CreditCard, Clock, Package, BarChart3,
   Bell, Search, Plus, Settings, LogOut, ChevronRight,
-  User, FileText, Info, AlertTriangle, CheckCircle
+  User, FileText, Info, AlertTriangle, CheckCircle, Menu, X
 } from "lucide-react";
 
 function BranchSelector() {
@@ -46,13 +46,12 @@ function BranchSelector() {
           color: open ? '#4FD1FF' : 'rgba(255,255,255,0.6)',
         }}
       >
-        <span className="text-[10px] uppercase tracking-wider opacity-50 mr-0.5">Branch:</span>
-        {currentBranchName || 'Select branch'}
+        <span className="hidden sm:inline text-[10px] uppercase tracking-wider opacity-50 mr-0.5">Branch:</span>
+        <span className="text-xs">{currentBranchName || 'Select branch'}</span>
         <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-
       {open && (
         <div className="absolute top-full left-0 mt-2 w-[200px] rounded-xl overflow-hidden"
           style={{
@@ -115,6 +114,7 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useLanguage();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -157,6 +157,9 @@ export default function DashboardLayout() {
     if (notifOpen) { document.addEventListener('mousedown', handler); return () => document.removeEventListener('mousedown', handler); }
   }, [notifOpen]);
 
+  // Close sidebar on route change (mobile)
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+
   const notifColors: Record<string, { bg: string; icon: typeof Info; iconColor: string }> = {
     info: { bg: 'rgba(79,209,255,0.1)', icon: Info, iconColor: '#4FD1FF' },
     warning: { bg: 'rgba(255,193,7,0.1)', icon: AlertTriangle, iconColor: '#FFC107' },
@@ -194,20 +197,9 @@ export default function DashboardLayout() {
     navigate(r.url);
   };
 
-  return (
-    <div className="min-h-screen flex" style={{ background: 'var(--app-bg)' }}>
-      {/* Background tech grid + glow */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 'var(--z-base)' }}>
-        <div className="absolute inset-0 opacity-[0.03]" style={{
-          backgroundImage: 'linear-gradient(rgba(79,209,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(79,209,255,0.3) 1px, transparent 1px)',
-          backgroundSize: '60px 60px',
-        }} />
-        <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-[#4FD1FF] opacity-[0.03] rounded-full blur-[150px]" />
-      </div>
-
-      {/* ================= SIDEBAR ================= */}
-      <aside className="relative w-[240px] flex flex-col flex-shrink-0" style={{ zIndex: 'var(--z-sidebar)', borderRight: '1px solid var(--app-border)', background: 'var(--app-sidebar-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
-        
+  function SidebarContent() {
+    return (
+      <>
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-6 border-b border-[rgba(255,255,255,0.04)]">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(79,209,255,0.12)', border: '1px solid rgba(79,209,255,0.2)' }}>
@@ -220,7 +212,7 @@ export default function DashboardLayout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {allNavItems.filter(item => (!item.adminOnly || user?.role === 'Admin') && !(item.hideForDoctor && user?.role === 'Doctor')).map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -278,16 +270,54 @@ export default function DashboardLayout() {
             <span>{t('nav.logout')}</span>
           </button>
         </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex" style={{ background: 'var(--app-bg)' }}>
+      {/* Background tech grid + glow */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 'var(--z-base)' }}>
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: 'linear-gradient(rgba(79,209,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(79,209,255,0.3) 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+        }} />
+        <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-[#4FD1FF] opacity-[0.03] rounded-full blur-[150px]" />
+      </div>
+
+      {/* ================= MOBILE OVERLAY ================= */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* ================= SIDEBAR ================= */}
+      <aside className={`
+        fixed lg:relative inset-y-0 left-0 z-40 w-[260px] flex flex-col
+        transition-transform duration-300 ease-in-out
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `} style={{ borderRight: '1px solid var(--app-border)', background: 'var(--app-sidebar-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+        {/* Close button for mobile */}
+        <div className="absolute top-3 right-3 lg:hidden">
+          <button onClick={() => setSidebarOpen(false)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <SidebarContent />
       </aside>
 
       {/* ================= MAIN AREA ================= */}
       <div className="relative flex-1 flex flex-col min-w-0" style={{ zIndex: 'var(--z-content)' }}>
 
         {/* Top Navbar */}
-        <header className="h-16 flex items-center gap-4 px-6" style={{ position: 'relative', zIndex: 'var(--z-header)', borderBottom: '1px solid var(--app-border)', background: 'var(--app-header-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+        <header className="h-16 flex items-center gap-2 sm:gap-4 px-3 sm:px-6" style={{ position: 'relative', zIndex: 'var(--z-header)', borderBottom: '1px solid var(--app-border)', background: 'var(--app-header-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
           
+          {/* Hamburger for mobile */}
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            <Menu className="w-5 h-5" />
+          </button>
+
           {/* Search Bar with suggestions */}
-          <div ref={searchRef} className="flex-1 max-w-lg relative">
+          <div ref={searchRef} className="flex-1 max-w-lg relative hidden sm:block">
             <div className="relative group">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: searchFocused ? '#4FD1FF' : 'rgba(255,255,255,0.25)' }} />
               <input
@@ -354,15 +384,20 @@ export default function DashboardLayout() {
             )}
           </div>
 
+          {/* Mobile search icon */}
+          <button className="sm:hidden w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ color: 'rgba(255,255,255,0.5)' }} aria-label="Search">
+            <Search className="w-4 h-4" />
+          </button>
+
           {/* Branch Selector (Admin only) */}
-          {user?.role === 'Admin' && <BranchSelector />}
+          {user?.role === 'Admin' && <div className="hidden sm:block"><BranchSelector /></div>}
 
           {/* Right Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3">
             {/* Notification Bell with Dropdown */}
             <div ref={notifRef} className="relative">
               <button onClick={() => setNotifOpen(o => !o)}
-                className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200"
+                className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all duration-200"
                 style={{ background: notifOpen ? 'rgba(79,209,255,0.1)' : 'rgba(255,255,255,0.03)', border: notifOpen ? '1px solid rgba(79,209,255,0.2)' : '1px solid rgba(255,255,255,0.06)' }}>
                 <Bell className="w-[18px] h-[18px]" style={{ color: notifOpen ? '#4FD1FF' : 'rgba(255,255,255,0.6)' }} />
                 {unreadCount > 0 && (
@@ -375,7 +410,7 @@ export default function DashboardLayout() {
 
               {/* Dropdown */}
               {notifOpen && (
-                <div className="absolute top-full right-0 mt-2 w-[380px] rounded-2xl overflow-hidden"
+                <div className="absolute top-full right-0 mt-2 w-[340px] sm:w-[380px] rounded-2xl overflow-hidden"
                   style={{
                     zIndex: 'var(--z-notification)',
                     background: 'rgba(10,20,35,0.98)',
@@ -432,7 +467,7 @@ export default function DashboardLayout() {
             {/* Add Patient */}
             <button
               onClick={() => setAddPatientOpen(true)}
-              className="h-10 px-4 rounded-xl flex items-center gap-2 text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+              className="h-9 sm:h-10 px-3 sm:px-4 rounded-xl flex items-center gap-2 text-sm font-medium transition-all duration-200 active:scale-[0.98]"
               style={{
                 background: 'linear-gradient(135deg, #45D6FF, #53C7F0)',
                 color: '#050B14',
@@ -442,17 +477,17 @@ export default function DashboardLayout() {
               onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 4px 15px rgba(69,214,255,0.2)'}
             >
               <Plus className="w-4 h-4" />
-              {t('nav.add_patient')}
+              <span className="hidden sm:inline">{t('nav.add_patient')}</span>
             </button>
 
-            {/* Role & Name */}
-            <div className="flex items-center gap-2 text-[10px] font-mono px-2.5 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
-              {user?.full_name && <span className="text-white/70">{user.full_name}</span>}
+            {/* Role & Name — hidden on mobile */}
+            <div className="hidden md:flex items-center gap-2 text-[10px] font-mono px-2.5 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
+              {user?.full_name && <span className="text-white/70 max-w-[80px] truncate">{user.full_name}</span>}
               <span className="text-[#4FD1FF] font-bold">{user?.role || t('nav.na')}</span>
             </div>
 
-            {/* Profile */}
-            <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold cursor-pointer"
+            {/* Profile — always visible */}
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm font-bold cursor-pointer shrink-0"
               style={{ background: 'linear-gradient(135deg, rgba(79,209,255,0.2), rgba(79,209,255,0.1))', border: '1px solid rgba(79,209,255,0.2)', color: '#4FD1FF' }}
               title={user?.full_name || user?.username}>
               {(user?.full_name || user?.username || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -461,7 +496,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
           <Outlet />
         </main>
       </div>

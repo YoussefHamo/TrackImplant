@@ -736,7 +736,8 @@ function ClinicalDashboard() {
           {procedures.length === 0 ? (
             <div className="py-12 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('dashboard.no_procedures_recorded')}</div>
           ) : (
-            <div className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <div className="min-w-[500px]">
               <div className="flex text-[11px] font-semibold uppercase tracking-wider pb-3 border-b border-[rgba(255,255,255,0.05)]"
                 style={{ color: 'rgba(255,255,255,0.25)' }}>
                 <div className="flex-[2]">{t('dashboard.patient_id_header')}</div>
@@ -762,6 +763,7 @@ function ClinicalDashboard() {
                   </div>
                 ))}
               </div>
+            </div>
             </div>
           )}
         </div>

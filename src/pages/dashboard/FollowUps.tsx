@@ -275,8 +275,9 @@ export default function FollowUps() {
       </div>
 
       {/* Follow-ups List */}
-      <div className="rounded-[22px] overflow-hidden"
+      <div className="overflow-x-auto rounded-[22px]"
         style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
+        <div className="min-w-[700px]">
         <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
           style={{ color: 'rgba(255,255,255,0.25)' }}>
           <div className="flex-[2]">{t('follow_ups.table_patient')}</div>
@@ -344,6 +345,7 @@ export default function FollowUps() {
               </div>
             </div>
           ))}
+        </div>
         </div>
       </div>
 

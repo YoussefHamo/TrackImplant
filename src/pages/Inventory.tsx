@@ -586,8 +586,9 @@ export default function Inventory() {
 
       {/* ─── IMPLANTS TABLE ─── */}
       {tab === 'implants' && (
-        <div className="rounded-[22px] overflow-hidden"
+        <div className="overflow-x-auto rounded-[22px]"
           style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+            <div className="min-w-[500px]">
           <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
             style={{ color: 'rgba(255,255,255,0.25)' }}>
             <div className="flex-[2]">{t('inventory.implants_brand')}</div>
@@ -632,14 +633,15 @@ export default function Inventory() {
                 </div>
               );
             })}
+            </div>
           </div>
         </div>
       )}
 
-      {/* ─── ABUTMENTS TABLE ─── */}
       {tab === 'abutments' && (
-        <div className="rounded-[22px] overflow-hidden"
+        <div className="overflow-x-auto rounded-[22px]"
           style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+            <div className="min-w-[500px]">
           <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
             style={{ color: 'rgba(255,255,255,0.25)' }}>
             <div className="flex-[3]">{t('inventory.abutments_type')}</div>
@@ -683,13 +685,14 @@ export default function Inventory() {
               );
             })}
           </div>
+          </div>
         </div>
       )}
 
-      {/* ─── PROSTHETIC TABLE ─── */}
       {tab === 'prosthetic' && (
-        <div className="rounded-[22px] overflow-hidden"
+        <div className="overflow-x-auto rounded-[22px]"
           style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+          <div className="min-w-[600px]">
           <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
             style={{ color: 'rgba(255,255,255,0.25)' }}>
             <div className="flex-[2]">{t('inventory.abutments_type')}</div>
@@ -735,13 +738,15 @@ export default function Inventory() {
               );
             })}
           </div>
+          </div>
         </div>
       )}
 
       {/* ─── MATERIALS TABLE ─── */}
       {tab === 'materials' && (
-        <div className="rounded-[22px] overflow-hidden"
+        <div className="overflow-x-auto rounded-[22px]"
           style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+          <div className="min-w-[600px]">
           <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
             style={{ color: 'rgba(255,255,255,0.25)' }}>
             <div className="flex-[2]">{t('inventory.abutments_type')}</div>
@@ -787,13 +792,15 @@ export default function Inventory() {
               );
             })}
           </div>
+          </div>
         </div>
       )}
 
       {/* ─── TRANSACTIONS TABLE ─── */}
       {tab === 'transactions' && (
-        <div className="rounded-[22px] overflow-hidden"
+        <div className="overflow-x-auto rounded-[22px]"
           style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+          <div className="min-w-[600px]">
           <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
             style={{ color: 'rgba(255,255,255,0.25)' }}>
             <div className="flex-[1.5]">{t('inventory.col_item')}</div>
@@ -847,7 +854,8 @@ export default function Inventory() {
               </div>
             </div>
           )}
-
+        
+        </div>
         </div>
       )}
 
@@ -861,8 +869,9 @@ export default function Inventory() {
               <Send className="w-3.5 h-3.5" /> New Request
             </button>
           </div>
-          <div className="rounded-[22px] overflow-hidden"
+          <div className="overflow-x-auto rounded-[22px]"
             style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+            <div className="min-w-[800px]">
             <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
               style={{ color: 'rgba(255,255,255,0.25)' }}>
               <div className="flex-[1.5]">From Branch</div>
@@ -913,6 +922,7 @@ export default function Inventory() {
                 );
               })}
             </div>
+            </div>
           </div>
         </div>
       )}
@@ -939,8 +949,9 @@ export default function Inventory() {
             <input value={branchSearch} onChange={e => setBranchSearch(e.target.value)}
               placeholder={t('branches.search_placeholder')} className={inputCls + ' pl-10'} />
           </div>
-          <div className="rounded-[22px] overflow-hidden"
+          <div className="overflow-x-auto rounded-[22px]"
             style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+            <div className="min-w-[700px]">
             <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
               style={{ color: 'rgba(255,255,255,0.25)' }}>
               <div className="flex-[2]">{t('branches.col_branch')}</div>
@@ -981,6 +992,7 @@ export default function Inventory() {
                 });
               })()}
             </div>
+            </div>
           </div>
         </div>
       )}
@@ -997,8 +1009,9 @@ export default function Inventory() {
               </button>
             </div>
           )}
-          <div className="rounded-[22px] overflow-hidden"
+          <div className="overflow-x-auto rounded-[22px]"
             style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+            <div className="min-w-[700px]">
             <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
               style={{ color: 'rgba(255,255,255,0.25)' }}>
               <div className="flex-[1.5]">{t('delivery.col_item')}</div>
@@ -1027,12 +1040,13 @@ export default function Inventory() {
                 </div>
               ))}
             </div>
+            </div>
           </div>
-
           {/* Cross-branch deliveries */}
           {warehouseDeliveries.length > 0 && (
-            <div className="rounded-[22px] overflow-hidden"
+            <div className="overflow-x-auto rounded-[22px]"
               style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+              <div className="min-w-[800px]">
               <div className="flex items-center gap-2 px-6 py-3 border-b border-[rgba(255,255,255,0.05)]">
                 <Building2 className="w-3.5 h-3.5 text-[#4FD1FF]" />
                 <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.25)' }}>Cross-Branch Deliveries</span>
@@ -1100,6 +1114,7 @@ export default function Inventory() {
                   );
                 })}
               </div>
+              </div>
             </div>
           )}
         </div>
@@ -1117,8 +1132,9 @@ export default function Inventory() {
               </button>
             </div>
           )}
-          <div className="rounded-[22px] overflow-hidden"
+          <div className="overflow-x-auto rounded-[22px]"
             style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+            <div className="min-w-[700px]">
             <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
               style={{ color: 'rgba(255,255,255,0.25)' }}>
               <div className="flex-[1.5]">{t('returns.col_item')}</div>
@@ -1147,11 +1163,11 @@ export default function Inventory() {
                 </div>
               ))}
             </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ─── INVENTORY COUNT TAB ─── */}
       {tab === 'count' && (
         <div className="space-y-4">
           {(isAdmin || isManager) && (
@@ -1163,8 +1179,9 @@ export default function Inventory() {
               </button>
             </div>
           )}
-          <div className="rounded-[22px] overflow-hidden"
+          <div className="overflow-x-auto rounded-[22px]"
             style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
+            <div className="min-w-[600px]">
             <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
               style={{ color: 'rgba(255,255,255,0.25)' }}>
               <div className="flex-[2]">Session Name</div>
@@ -1252,6 +1269,7 @@ export default function Inventory() {
                   )}
                 </div>
               ))}
+            </div>
             </div>
           </div>
         </div>

@@ -556,8 +556,9 @@ export function ImplantCases() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-5">
         {/* LEFT — Procedures List */}
-        <div className="rounded-[22px] overflow-hidden"
+        <div className="overflow-x-auto rounded-[22px]"
           style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
+          <div className="min-w-[600px]">
           <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
             style={{ color: 'rgba(255,255,255,0.25)' }}>
             <div className="flex-[2.5]">{t('cases.table_patient')}</div>
@@ -608,6 +609,7 @@ export function ImplantCases() {
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
 
