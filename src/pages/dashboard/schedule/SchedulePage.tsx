@@ -89,7 +89,7 @@ export default function SchedulePage() {
   const { activeBranchId } = useBranch();
   const today = useMemo(() => new Date(), []);
 
-  const [view, setView] = useState<'Day' | 'Week' | 'Month'>('Week');
+  const [view, setView] = useState<'Day' | 'Week' | 'Month'>('Day');
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
   const [detailsPanelAppointment, setDetailsPanelAppointment] = useState<Appointment | null>(null);
