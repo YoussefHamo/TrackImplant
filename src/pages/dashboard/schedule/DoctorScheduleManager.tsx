@@ -12,9 +12,10 @@ interface DoctorScheduleManagerProps {
   isOpen: boolean;
   onClose: () => void;
   branchId?: string | null;
+  readOnly?: boolean;
 }
 
-export default function DoctorScheduleManager({ isOpen, onClose, branchId }: DoctorScheduleManagerProps) {
+export default function DoctorScheduleManager({ isOpen, onClose, branchId, readOnly }: DoctorScheduleManagerProps) {
   const queryClient = useQueryClient();
   const [schedules, setSchedules] = useState<Record<string, DoctorSchedule[]>>({});
   const [selectedDoctor, setSelectedDoctor] = useState('');
@@ -115,11 +116,13 @@ export default function DoctorScheduleManager({ isOpen, onClose, branchId }: Doc
                           ) : (
                             <span className="text-sm text-white/30 italic">Not set</span>
                           )}
-                          <button onClick={() => { setEditingDay(dayIdx); setEditStart(sch?.start_time.slice(0, 5) || '09:00'); setEditEnd(sch?.end_time.slice(0, 5) || '17:00'); }}
-                            className="ml-auto px-3 py-1.5 rounded-lg text-xs" style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }}>
-                            {sch ? 'Edit' : 'Add'}
-                          </button>
-                          {sch && (
+                          {!readOnly && (
+                            <button onClick={() => { setEditingDay(dayIdx); setEditStart(sch?.start_time.slice(0, 5) || '09:00'); setEditEnd(sch?.end_time.slice(0, 5) || '17:00'); }}
+                              className="ml-auto px-3 py-1.5 rounded-lg text-xs" style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }}>
+                              {sch ? 'Edit' : 'Add'}
+                            </button>
+                          )}
+                          {sch && !readOnly && (
                             <button onClick={() => deleteSchedule(sch.id)} className="p-1.5 rounded-lg" style={{ color: 'rgba(239,68,68,0.6)' }}>
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>

@@ -652,8 +652,8 @@ export default function SchedulePage() {
           <Filter className="w-3.5 h-3.5" />
         </button>
 
-        {/* Settings (Admin/Manager) */}
-        {(isAdmin || user?.role === 'Manager') && (
+        {/* Settings (Admin/Manager edit, Reception view) */}
+        {(isAdmin || user?.role === 'Manager' || user?.role === 'Receptionist') && (
           <button onClick={() => setScheduleOpen(true)} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }} aria-label="Doctor schedule settings">
             <Settings2 className="w-4 h-4" />
           </button>
@@ -825,7 +825,7 @@ export default function SchedulePage() {
         defaultDoctorId={defaultSlotDoctorId}
       />
 
-      <DoctorScheduleManager isOpen={scheduleOpen} onClose={() => setScheduleOpen(false)} branchId={activeBranchId} />
+      <DoctorScheduleManager isOpen={scheduleOpen} onClose={() => setScheduleOpen(false)} branchId={activeBranchId} readOnly={user?.role === 'Receptionist'} />
 
       {/* ===== CONTEXT MENU ===== */}
       {contextMenu && (
