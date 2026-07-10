@@ -4,6 +4,7 @@ import { X, Trash2 } from 'lucide-react';
 import { userService } from '../../../services/userService';
 import { doctorScheduleService } from '../../../services/doctorScheduleService';
 import Portal from '../../../components/ui/Portal';
+import TimePicker from '../../../components/ui/TimePicker';
 import type { DoctorSchedule } from '../../../types';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -101,9 +102,9 @@ export default function DoctorScheduleManager({ isOpen, onClose, branchId, readO
                       <div className="w-24 text-sm text-white/80 font-medium">{dayName}</div>
                       {isEditing ? (
                         <div className="flex items-center gap-2 flex-1">
-                          <input type="time" value={editStart} onChange={e => setEditStart(e.target.value)} className={inputClass + ' w-28'} />
-                          <span className="text-white/40">→</span>
-                          <input type="time" value={editEnd} onChange={e => setEditEnd(e.target.value)} className={inputClass + ' w-28'} />
+                          <TimePicker value={editStart} onChange={setEditStart} />
+                          <span className="text-white/40 text-sm">→</span>
+                          <TimePicker value={editEnd} onChange={setEditEnd} />
                           <button onClick={addSchedule} className="px-3 h-9 rounded-xl text-xs font-bold" style={{ background: '#4FD1FF', color: '#050B14' }}>Save</button>
                           <button onClick={() => setEditingDay(null)} className="px-3 h-9 rounded-xl text-xs" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Cancel</button>
                         </div>

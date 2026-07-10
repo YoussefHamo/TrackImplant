@@ -9,6 +9,7 @@ import { doctorScheduleService } from '../../../services/doctorScheduleService';
 import Portal from '../../../components/ui/Portal';
 import { useBranch } from '../../../context/BranchContext';
 import DoubleBookingWarning from './DoubleBookingWarning';
+import TimePicker from '../../../components/ui/TimePicker';
 import type { Appointment } from '../../../types';
 
 interface BookingDialogProps {
@@ -180,7 +181,7 @@ export default function BookingDialog({ isOpen, onClose, onSave, appointment, de
               </div>
               <div className="flex-1">
                 <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'rgba(255,255,255,0.3)' }}>Time *</label>
-                <input type="time" value={time} onChange={e => setTime(e.target.value)} className={inputClass} />
+                <TimePicker value={time} onChange={setTime} />
               </div>
             </div>
 
