@@ -412,7 +412,6 @@ export default function SchedulePage() {
     if (editingAppointment) {
       await updateMut.mutateAsync({ id: editingAppointment.id, updates: data });
     } else {
-      console.log('[handleSave] creating appointment:', data.appointment_date, data.doctor_id, data.duration_minutes);
       await createMut.mutateAsync(data);
     }
   }

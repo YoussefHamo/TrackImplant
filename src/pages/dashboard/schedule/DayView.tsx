@@ -174,9 +174,8 @@ export default function DayView({
       if (!map[aid]) map[aid] = [];
       map[aid].push(a);
     });
-    console.log('[DayView] doctors:', doctors.map(d => d.id), 'appt doctor_ids:', Object.keys(map), 'doctors with appts:', Object.keys(map).filter(k => map[k].length));
     return map;
-  }, [appointments, doctors]);
+  }, [appointments]);
 
   return (
     <div className="rounded-[20px] overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>

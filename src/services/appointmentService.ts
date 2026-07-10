@@ -27,7 +27,7 @@ export const appointmentService = {
   async getAll(branchId?: string | null): Promise<Appointment[]> {
     let q = supabase
       .from('appointments')
-      .select('*, patients!inner(full_name, phone), doctor_id:users!fk_appointments_doctor_id(full_name)')
+      .select('*, patients!inner(full_name, phone), doctor:users!fk_appointments_doctor_id(full_name)')
       .order('appointment_date', { ascending: true });
     if (branchId) q = q.eq('branch_id', branchId);
     const { data, error } = await q;
@@ -35,7 +35,7 @@ export const appointmentService = {
     return (data || []).map((r: any) => ({
       ...rowToAppointment(r),
       patient_name: r.patients?.full_name,
-      doctor_name: r.doctor_id?.full_name,
+      doctor_name: r.doctor?.full_name,
       patient_phone: r.patients?.phone,
     }));
   },
@@ -43,7 +43,7 @@ export const appointmentService = {
   async getById(id: string): Promise<Appointment | null> {
     const { data, error } = await supabase
       .from('appointments')
-      .select('*, patients!inner(full_name, phone), doctor_id:users!fk_appointments_doctor_id(full_name)')
+      .select('*, patients!inner(full_name, phone), doctor:users!fk_appointments_doctor_id(full_name)')
       .eq('id', id)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -51,7 +51,7 @@ export const appointmentService = {
     return {
       ...rowToAppointment(data),
       patient_name: (data as any).patients?.full_name,
-      doctor_name: (data as any).doctor_id?.full_name,
+      doctor_name: (data as any).doctor?.full_name,
       patient_phone: (data as any).patients?.phone,
     };
   },
@@ -59,7 +59,7 @@ export const appointmentService = {
   async getByDoctor(doctorId: string, branchId?: string | null): Promise<Appointment[]> {
     let q = supabase
       .from('appointments')
-      .select('*, patients!inner(full_name, phone), doctor_id:users!fk_appointments_doctor_id(full_name)')
+      .select('*, patients!inner(full_name, phone), doctor:users!fk_appointments_doctor_id(full_name)')
       .eq('doctor_id', doctorId)
       .order('appointment_date', { ascending: true });
     if (branchId) q = q.eq('branch_id', branchId);
@@ -68,7 +68,7 @@ export const appointmentService = {
     return (data || []).map((r: any) => ({
       ...rowToAppointment(r),
       patient_name: r.patients?.full_name,
-      doctor_name: r.doctor_id?.full_name,
+      doctor_name: r.doctor?.full_name,
       patient_phone: r.patients?.phone,
     }));
   },
@@ -76,7 +76,7 @@ export const appointmentService = {
   async getUpcomingByDoctor(doctorId: string, limit = 10): Promise<Appointment[]> {
     const { data, error } = await supabase
       .from('appointments')
-      .select('*, patients!inner(full_name, phone), doctor_id:users!fk_appointments_doctor_id(full_name)')
+      .select('*, patients!inner(full_name, phone), doctor:users!fk_appointments_doctor_id(full_name)')
       .eq('doctor_id', doctorId)
       .gte('appointment_date', new Date().toISOString())
       .order('appointment_date', { ascending: true })
@@ -85,7 +85,7 @@ export const appointmentService = {
     return (data || []).map((r: any) => ({
       ...rowToAppointment(r),
       patient_name: r.patients?.full_name,
-      doctor_name: r.doctor_id?.full_name,
+      doctor_name: r.doctor?.full_name,
       patient_phone: r.patients?.phone,
     }));
   },
@@ -93,34 +93,32 @@ export const appointmentService = {
   async getByDateRange(from: string, to: string, branchId?: string | null): Promise<Appointment[]> {
     let q = supabase
       .from('appointments')
-      .select('*, patients!inner(full_name, phone), doctor_id:users!fk_appointments_doctor_id(full_name)')
+      .select('*, patients!inner(full_name, phone), doctor:users!fk_appointments_doctor_id(full_name)')
       .gte('appointment_date', from)
       .lte('appointment_date', to)
       .order('appointment_date', { ascending: true });
     if (branchId) q = q.eq('branch_id', branchId);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
-    const result = (data || []).map((r: any) => ({
+    return (data || []).map((r: any) => ({
       ...rowToAppointment(r),
       patient_name: r.patients?.full_name,
-      doctor_name: r.doctor_id?.full_name,
+      doctor_name: r.doctor?.full_name,
       patient_phone: r.patients?.phone,
     }));
-    console.log('[getByDateRange]', from, to, 'got', result.length, 'appts');
-    return result;
   },
 
   async getByPatient(patientId: string): Promise<Appointment[]> {
     const { data, error } = await supabase
       .from('appointments')
-      .select('*, patients!inner(full_name, phone), doctor_id:users!fk_appointments_doctor_id(full_name)')
+      .select('*, patients!inner(full_name, phone), doctor:users!fk_appointments_doctor_id(full_name)')
       .eq('patient_id', patientId)
       .order('appointment_date', { ascending: true });
     if (error) throw new Error(error.message);
     return (data || []).map((r: any) => ({
       ...rowToAppointment(r),
       patient_name: r.patients?.full_name,
-      doctor_name: r.doctor_id?.full_name,
+      doctor_name: r.doctor?.full_name,
       patient_phone: r.patients?.phone,
     }));
   },
@@ -132,7 +130,7 @@ export const appointmentService = {
 
     let q = supabase
       .from('appointments')
-      .select('*, patients!inner(full_name, phone), doctor_id:users!fk_appointments_doctor_id(full_name)')
+      .select('*, patients!inner(full_name, phone), doctor:users!fk_appointments_doctor_id(full_name)')
       .eq('doctor_id', doctorId)
       .neq('status', 'cancelled')
       .neq('status', 'no_show')
@@ -151,7 +149,7 @@ export const appointmentService = {
     }).map((r: any) => ({
       ...rowToAppointment(r),
       patient_name: r.patients?.full_name,
-      doctor_name: r.doctor_id?.full_name,
+      doctor_name: r.doctor?.full_name,
       patient_phone: r.patients?.phone,
     }));
     return { hasOverlap: apps.length > 0, appointments: apps };
