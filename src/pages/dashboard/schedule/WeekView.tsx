@@ -94,38 +94,29 @@ export default function WeekView({
     return result;
   }, [startDate]);
 
-  // Today index for current time indicator
   const todayIndex = useMemo(() => days.findIndex(d => isToday(d)), [days]);
 
   const rowHeight = Math.round(60 * zoomLevel);
   const pxPerMinute = rowHeight / 60;
   const totalHeight = 24 * rowHeight;
 
-  // Update current time
   useEffect(() => {
     if (todayIndex === -1) return;
     const interval = setInterval(() => { setCurrentTime(getCurrentTimePosition()); }, 60000);
     return () => clearInterval(interval);
   }, [todayIndex]);
 
-  // Scroll to working hours
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = 8 * rowHeight - 60;
-    }
+    if (scrollRef.current) scrollRef.current.scrollTop = 8 * rowHeight - 60;
   }, [startDate, zoomLevel, rowHeight]);
 
-  // Build appointment map: key = "dayIdx-doctorId"
   const apptsByDayDoctor = useMemo(() => {
     const map: Record<string, Appointment[]> = {};
     appointments.forEach(a => {
       const d = new Date(a.appointment_date);
       let dayIdx = -1;
       for (let i = 0; i < days.length; i++) {
-        if (d.getDate() === days[i].getDate() && d.getMonth() === days[i].getMonth() && d.getFullYear() === days[i].getFullYear()) {
-          dayIdx = i;
-          break;
-        }
+        if (d.getDate() === days[i].getDate() && d.getMonth() === days[i].getMonth() && d.getFullYear() === days[i].getFullYear()) { dayIdx = i; break; }
       }
       if (dayIdx === -1) return;
       const docKey = a.doctor_id || 'none';
@@ -136,18 +127,12 @@ export default function WeekView({
     return map;
   }, [appointments, days]);
 
-  function getAppts(dayIdx: number, doctorId: string) {
-    return apptsByDayDoctor[`${dayIdx}-${doctorId}`] || [];
-  }
+  function getAppts(dayIdx: number, doctorId: string) { return apptsByDayDoctor[`${dayIdx}-${doctorId}`] || []; }
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  }, []);
+  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }, []);
 
   const handleDrop = useCallback((e: React.DragEvent, day: Date, doctorId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     if (!onAppointmentDrop || !scrollRef.current) return;
     try {
       const data = JSON.parse(e.dataTransfer.getData('text/plain'));
@@ -174,33 +159,33 @@ export default function WeekView({
   const timeIndicatorTop = currentTime * 60 * pxPerMinute;
 
   return (
-    <div className="rounded-[20px] overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="card-cyber p-0 overflow-hidden rounded-[20px]">
       {/* Day Headers */}
-      <div className="sticky top-0 z-20 flex" style={{ background: 'rgba(5,11,20,0.98)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.98)' }} />
+      <div className="sticky top-0 z-[var(--z-sticky)] flex font-sans"
+        style={{ background: 'var(--app-header-bg)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--app-border)' }}>
+        <div className="w-16 shrink-0 sticky left-0 z-[var(--z-sticky)]" style={{ background: 'var(--app-header-bg)' }} />
         {days.map((day, i) => {
           const today = isToday(day);
           const isWeekend = day.getDay() === 0 || day.getDay() === 6;
           return (
-            <div key={i} className="flex-1 text-center py-2 relative" style={{
-              borderLeft: '1px solid rgba(255,255,255,0.04)',
-              background: today ? 'rgba(79,209,255,0.06)' : isWeekend ? 'rgba(255,255,255,0.02)' : 'transparent',
-            }}>
-              <div className="text-[9px] uppercase tracking-wider" style={{ color: today ? '#4FD1FF' : 'rgba(255,255,255,0.4)' }}>{DAY_NAMES[day.getDay()]}</div>
-              <div className={`text-sm font-bold ${today ? 'text-[#4FD1FF]' : 'text-white'}`}>{day.getDate()}</div>
-              {today && <div className="w-1.5 h-1.5 rounded-full mx-auto mt-0.5" style={{ background: '#4FD1FF' }} />}
+            <div key={i} className="flex-1 text-center py-2 relative font-sans"
+              style={{ borderLeft: '1px solid var(--app-border)', background: today ? 'var(--color-primary-container)' : isWeekend ? 'var(--app-hover)' : 'transparent' }}>
+              <div className="text-[9px] uppercase tracking-wider" style={{ color: today ? 'var(--color-primary)' : 'var(--app-text-muted)' }}>{DAY_NAMES[day.getDay()]}</div>
+              <div className={`text-sm font-bold ${today ? 'text-[var(--color-primary)]' : 'text-[var(--app-text)]'}`}>{day.getDate()}</div>
+              {today && <div className="w-1.5 h-1.5 rounded-full mx-auto mt-0.5" style={{ background: 'var(--color-primary)' }} />}
             </div>
           );
         })}
       </div>
 
       {/* Doctor Sub-headers per Day */}
-      <div className="sticky top-[52px] z-20 flex" style={{ background: 'rgba(5,11,20,0.96)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.96)' }} />
+      <div className="sticky top-[52px] z-[var(--z-sticky)] flex font-sans"
+        style={{ background: 'var(--app-sidebar-bg)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--app-border)' }}>
+        <div className="w-16 shrink-0 sticky left-0 z-[var(--z-sticky)]" style={{ background: 'var(--app-sidebar-bg)' }} />
         {days.map((day, di) => {
           const isWeekend = day.getDay() === 0 || day.getDay() === 6;
           return (
-            <div key={di} className="flex-1 flex" style={{ borderLeft: '1px solid rgba(255,255,255,0.04)', background: isWeekend ? 'rgba(255,255,255,0.01)' : 'transparent' }}>
+            <div key={di} className="flex-1 flex" style={{ borderLeft: '1px solid var(--app-border)', background: isWeekend ? 'var(--app-hover)' : 'transparent' }}>
               {doctors.map((doc, docIdx) => {
                 const off = isOffDay(doc.id, doctorSchedules || {}, day.getDay());
                 const hours = getWorkingHours(doc.id, doctorSchedules || {}, day.getDay());
@@ -208,15 +193,17 @@ export default function WeekView({
                 const dayAppts = getAppts(di, doc.id);
                 const stats = getDoctorStats(dayAppts);
                 return (
-                  <div key={doc.id} className="flex-1 px-1.5 py-1.5 relative min-w-0" style={{ opacity: off ? 0.45 : 1, borderLeft: docIdx > 0 ? '1px solid rgba(255,255,255,0.02)' : 'none' }}>
+                  <div key={doc.id} className="flex-1 px-1.5 py-1.5 relative min-w-0 font-sans"
+                    style={{ opacity: off ? 0.45 : 1, borderLeft: docIdx > 0 ? '1px solid var(--app-border)' : 'none' }}>
                     <div className="flex items-center gap-1.5">
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0" style={{ background: `${docColor}20`, color: docColor }}>
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0"
+                        style={{ background: `${docColor}20`, color: docColor }}>
                         {getInitials(doc.name)}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[9px] font-bold text-white truncate">{doc.name.split(' ')[0]}</div>
+                        <div className="text-[9px] font-bold text-[var(--app-text)] truncate">{doc.name.split(' ')[0]}</div>
                         {off && <span className="text-[7px] font-bold uppercase px-1 rounded" style={{ background: 'rgba(244,67,54,0.2)', color: '#F44336' }}>OFF</span>}
-                        {!off && hours && <div className="text-[7px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{hours.start}</div>}
+                        {!off && hours && <div className="text-[7px] font-mono" style={{ color: 'var(--app-text-muted)' }}>{hours.start}</div>}
                       </div>
                     </div>
                     {!off && stats.total > 0 && (
@@ -238,12 +225,10 @@ export default function WeekView({
       <div ref={scrollRef} className="overflow-y-auto relative" style={{ maxHeight: 'calc(100vh - 360px)', scrollBehavior: 'smooth' }}>
         <div className="flex" style={{ height: totalHeight }}>
           {/* Sticky Time Labels */}
-          <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.96)' }}>
+          <div className="w-16 shrink-0 sticky left-0 z-[var(--z-sticky)]" style={{ background: 'var(--app-sidebar-bg)' }}>
             {HOURS.map(hour => (
-              <div key={hour} className="flex items-start justify-center pt-1" style={{ height: rowHeight, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                  {formatHour(hour)}
-                </span>
+              <div key={hour} className="flex items-start justify-center pt-1" style={{ height: rowHeight, borderBottom: '1px solid var(--app-border)' }}>
+                <span className="text-[10px] font-mono" style={{ color: 'var(--app-text-muted)' }}>{formatHour(hour)}</span>
               </div>
             ))}
           </div>
@@ -253,57 +238,32 @@ export default function WeekView({
             const today = isToday(day);
             const isWeekend = day.getDay() === 0 || day.getDay() === 6;
             return (
-              <div key={di} className="flex-1 flex" style={{ borderLeft: '1px solid rgba(255,255,255,0.04)', background: isWeekend ? 'rgba(255,255,255,0.015)' : 'transparent' }}>
+              <div key={di} className="flex-1 flex" style={{ borderLeft: '1px solid var(--app-border)', background: isWeekend ? 'rgba(255,255,255,0.015)' : today ? 'var(--color-primary-container)' : 'transparent' }}>
                 {doctors.map((doc, docIdx) => {
                   const off = isOffDay(doc.id, doctorSchedules || {}, day.getDay());
                   const dayAppts = getAppts(di, doc.id);
                   return (
-                    <div
-                      key={doc.id}
-                      className="flex-1 relative min-w-0"
-                      style={{
-                        height: '100%',
-                        borderLeft: '1px solid rgba(255,255,255,0.015)',
-                        background: off ? 'rgba(0,0,0,0.35)' : 'transparent',
-                        opacity: off ? 0.25 : 1,
-                      }}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, day, doc.id)}
-                    >
+                    <div key={doc.id} className="flex-1 relative min-w-0"
+                      style={{ height: '100%', borderLeft: '1px solid var(--app-border)', background: off ? 'rgba(0,0,0,0.35)' : 'transparent', opacity: off ? 0.25 : 1 }}
+                      onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, day, doc.id)}>
                       {/* Hour grid lines */}
                       {HOURS.map(hour => {
                         const currentHour = today && hour === Math.floor(currentTime);
                         const isOff = !isWorkingHour(doc.id, doctorSchedules || {}, day.getDay(), hour);
                         return (
-                          <div
-                            key={hour}
-                            className="w-full cursor-pointer"
-                            style={{
-                              position: 'absolute',
-                              top: hour * rowHeight,
-                              height: rowHeight,
-                              borderBottom: '1px solid rgba(255,255,255,0.03)',
-                              background: off
-                                ? 'rgba(0,0,0,0.35)'
-                                : isOff
-                                  ? 'rgba(0,0,0,0.2)'
-                                  : currentHour
-                                    ? 'rgba(79,209,255,0.04)'
-                                    : 'transparent',
-                              opacity: off ? 0.25 : isOff ? 0.45 : 1,
-                            }}
-                            onClick={(e) => handleSlotClickWithPos(e, day, docIdx, hour)}
-                          />
+                          <div key={hour} className="w-full cursor-pointer"
+                            style={{ position: 'absolute', top: hour * rowHeight, height: rowHeight, borderBottom: '1px solid var(--app-border)',
+                              background: off ? 'rgba(0,0,0,0.35)' : isOff ? 'rgba(0,0,0,0.2)' : currentHour ? 'var(--color-primary-container)' : 'transparent',
+                              opacity: off ? 0.25 : isOff ? 0.45 : 1 }}
+                            onClick={(e) => handleSlotClickWithPos(e, day, docIdx, hour)} />
                         );
                       })}
-
                       {/* OFF watermark */}
                       {off && (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none" style={{ zIndex: 1 }}>
                           <span className="text-[36px] font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.02)' }}>OFF</span>
                         </div>
                       )}
-
                       {/* Appointments */}
                       {dayAppts.map(app => {
                         const start = new Date(app.appointment_date);
@@ -311,24 +271,11 @@ export default function WeekView({
                         const mins = start.getHours() * 60 + start.getMinutes();
                         const dur = app.duration_minutes || 30;
                         return (
-                          <div
-                            key={app.id}
-                            className="absolute left-0.5 right-0.5"
-                            style={{
-                              top: mins * (rowHeight / 60),
-                              height: Math.max(18, dur * (rowHeight / 60)),
-                              zIndex: 5,
-                            }}
-                          >
-                            <AppointmentBlock
-                              appointment={app}
-                              onClick={(a) => { onSelectAppointment?.(a); }}
-                              onDoubleClick={(a) => onAppointmentDoubleClick(a)}
-                              onContextMenu={onAppointmentContextMenu}
-                              onDrop={onAppointmentDrop}
-                              onResize={onResize}
-                              selected={app.id === selectedAppointmentId}
-                            />
+                          <div key={app.id} className="absolute left-0.5 right-0.5"
+                            style={{ top: mins * (rowHeight / 60), height: Math.max(18, dur * (rowHeight / 60)), zIndex: 5 }}>
+                            <AppointmentBlock appointment={app} onClick={(a) => { onSelectAppointment?.(a); }}
+                              onDoubleClick={(a) => onAppointmentDoubleClick(a)} onContextMenu={onAppointmentContextMenu}
+                              onDrop={onAppointmentDrop} onResize={onResize} selected={app.id === selectedAppointmentId} />
                           </div>
                         );
                       })}
@@ -342,13 +289,11 @@ export default function WeekView({
 
         {/* Current Time Indicator */}
         {todayIndex >= 0 && (
-          <div className="absolute left-0 right-0 pointer-events-none z-10" style={{ top: timeIndicatorTop }}>
+          <div className="absolute left-0 right-0 pointer-events-none z-[var(--z-sticky)]" style={{ top: timeIndicatorTop }}>
             <div className="flex items-center">
               <div className="w-2 h-2 rounded-full shrink-0 ml-[62px]" style={{ background: '#F44336', boxShadow: '0 0 6px rgba(244,67,54,0.8)' }} />
               <div className="flex-1" style={{ height: '2px', background: '#F44336' }} />
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 shrink-0" style={{ background: '#F44336', color: 'white' }}>
-                {formatCurrentTime()}
-              </span>
+              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 shrink-0" style={{ background: '#F44336', color: 'white' }}>{formatCurrentTime()}</span>
             </div>
           </div>
         )}

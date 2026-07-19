@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { patientService } from '../../../services/patientService';
@@ -62,9 +62,7 @@ export default function BookingDialog({ isOpen, onClose, onSave, appointment, de
       setDuration(appointment.duration_minutes || 30);
       setProcedureName(appointment.procedure_name || '');
       setNotes(appointment.notes || '');
-    } else {
-      resetForm();
-    }
+    } else { resetForm(); }
   }, [appointment, isOpen]);
 
   function resetForm() {
@@ -86,135 +84,120 @@ export default function BookingDialog({ isOpen, onClose, onSave, appointment, de
     if (!doctorSchedule || doctorSchedule.length === 0 || !date || !time) return;
     const dayOfWeek = new Date(date + 'T' + time).getDay();
     const daySchedule = doctorSchedule.find(s => s.day_of_week === dayOfWeek);
-    if (!daySchedule) {
-      setScheduleWarning(`Dr. ${selectedDoctorName} does not work on this day.`);
-      return;
-    }
+    if (!daySchedule) { setScheduleWarning(`Dr. ${selectedDoctorName} does not work on this day.`); return; }
     const apptTime = time;
     if (apptTime < daySchedule.start_time.slice(0, 5) || apptTime >= daySchedule.end_time.slice(0, 5)) {
       setScheduleWarning(`This appointment is outside Dr. ${selectedDoctorName}'s normal working hours (${daySchedule.start_time.slice(0, 5)} - ${daySchedule.end_time.slice(0, 5)}).`);
-    } else {
-      setScheduleWarning(null);
-    }
+    } else { setScheduleWarning(null); }
   }
 
   useEffect(() => { checkSchedule(); }, [doctorId, date, time, doctorSchedule]);
 
   async function handleSubmit() {
     if (!patientId || !doctorId || !date || !time) return;
-
     const appointmentDate = new Date(`${date}T${time}:00`).toISOString();
-
     try {
       const { hasOverlap, appointments: conflicts } = await appointmentService.checkOverlap(doctorId, appointmentDate, duration, appointment?.id);
-      if (hasOverlap) {
-        setConflictApps(conflicts);
-        setShowWarning(true);
-        return;
-      }
-    } catch {
-      toast.error('Could not verify schedule — please try again');
-      return;
-    }
-
+      if (hasOverlap) { setConflictApps(conflicts); setShowWarning(true); return; }
+    } catch { toast.error('Could not verify schedule — please try again'); return; }
     try {
       await onSave({ patient_id: patientId, doctor_id: doctorId, appointment_date: appointmentDate, duration_minutes: duration, status: appointment?.status || 'scheduled', procedure_name: procedureName || undefined, notes, branch_id: activeBranchId || undefined });
-      resetForm();
-      onClose();
-    } catch {
-      // onError handled by mutation's onError callback
-    }
+      resetForm(); onClose();
+    } catch { /* onError handled by mutation */ }
   }
 
   async function handleContinueAnyway() {
     setShowWarning(false);
     try {
       await onSave({ patient_id: patientId, doctor_id: doctorId, appointment_date: new Date(`${date}T${time}:00`).toISOString(), duration_minutes: duration, status: appointment?.status || 'scheduled', procedure_name: procedureName || undefined, notes, branch_id: activeBranchId || undefined });
-      resetForm();
-      onClose();
-    } catch {
-      // onError handled by mutation's onError callback
-    }
+      resetForm(); onClose();
+    } catch { /* onError handled by mutation */ }
   }
-
-  const inputClass = 'w-full h-10 px-3 rounded-xl text-sm outline-none transition-all bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500';
 
   if (!isOpen) return null;
 
   return (
     <Portal>
-      <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 'var(--z-dialog-overlay)', background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-        onClick={(e) => { if (e.target === e.currentTarget) { if (!showWarning) onClose(); } }}>
-        <div className="w-full max-w-md rounded-[24px] max-h-[90vh] overflow-y-auto" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
-            <h2 className="text-lg font-bold text-white">{appointment ? 'Edit Appointment' : 'New Appointment'}</h2>
-            <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)' }}>
+      <div className="fixed inset-0 flex items-center justify-center p-4"
+        style={{ zIndex: 'var(--z-dialog-overlay)', background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }}
+        onClick={(e) => { if (e.target === e.currentTarget && !showWarning) onClose(); }}>
+        <div className="w-full max-w-md rounded-[24px] max-h-[90vh] overflow-y-auto glass-strong">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b" style={{ borderBottom: '1px solid var(--app-border)' }}>
+            <h2 className="text-lg font-bold text-[var(--app-text)] font-sans">{appointment ? 'Edit Appointment' : 'New Appointment'}</h2>
+            <button onClick={onClose} className="btn-ghost btn-xs w-8 h-8 rounded-xl p-0 flex items-center justify-center" aria-label="Close dialog">
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="p-6 space-y-4">
+          {/* Form */}
+          <div className="p-6 space-y-5">
+            {/* Patient */}
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'rgba(255,255,255,0.3)' }}>Patient *</label>
-              <select value={patientId} onChange={e => setPatientId(e.target.value)} className={inputClass}>
-                <option value="" style={{ background: '#0D1B2A', color: '#888' }}>Select patient...</option>
-                {(patients || []).map((p: any) => (
-                  <option key={p.id} value={p.id} style={{ background: '#0D1B2A', color: 'white' }}>{p.full_name}</option>
-                ))}
+              <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block font-sans" style={{ color: 'var(--app-text-muted)' }}>Patient *</label>
+              <select value={patientId} onChange={e => setPatientId(e.target.value)} className="input-cyber" aria-label="Select patient">
+                <option value="">Select patient...</option>
+                {(patients || []).map((p: any) => (<option key={p.id} value={p.id}>{p.full_name}</option>))}
               </select>
             </div>
 
+            {/* Doctor */}
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'rgba(255,255,255,0.3)' }}>Doctor *</label>
-              <select value={doctorId} onChange={e => setDoctorId(e.target.value)} className={inputClass}>
-                <option value="" style={{ background: '#0D1B2A', color: '#888' }}>Select doctor...</option>
-                {(doctors || []).map((d: any) => (
-                  <option key={d.auth_user_id} value={d.auth_user_id} style={{ background: '#0D1B2A', color: 'white' }}>{d.full_name || d.username}</option>
-                ))}
+              <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block font-sans" style={{ color: 'var(--app-text-muted)' }}>Doctor *</label>
+              <select value={doctorId} onChange={e => setDoctorId(e.target.value)} className="input-cyber" aria-label="Select doctor">
+                <option value="">Select doctor...</option>
+                {(doctors || []).map((d: any) => (<option key={d.auth_user_id} value={d.auth_user_id}>{d.full_name || d.username}</option>))}
               </select>
             </div>
 
+            {/* Date + Time */}
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'rgba(255,255,255,0.3)' }}>Date *</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass} />
+                <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block font-sans" style={{ color: 'var(--app-text-muted)' }}>Date *</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="input-cyber" aria-label="Appointment date" />
               </div>
               <div className="flex-1">
-                <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'rgba(255,255,255,0.3)' }}>Time *</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block font-sans" style={{ color: 'var(--app-text-muted)' }}>Time *</label>
                 <TimePicker value={time} onChange={setTime} />
               </div>
             </div>
 
+            {/* Duration */}
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'rgba(255,255,255,0.3)' }}>Duration (minutes)</label>
-              <select value={duration} onChange={e => setDuration(Number(e.target.value))} className={inputClass}>
-                {[15, 30, 45, 60, 90, 120].map(m => (
-                  <option key={m} value={m} style={{ background: '#0D1B2A', color: 'white' }}>{m} min</option>
-                ))}
+              <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block font-sans" style={{ color: 'var(--app-text-muted)' }}>Duration</label>
+              <select value={duration} onChange={e => setDuration(Number(e.target.value))} className="input-cyber" aria-label="Appointment duration">
+                {[15, 30, 45, 60, 90, 120].map(m => (<option key={m} value={m}>{m} min</option>))}
               </select>
             </div>
 
+            {/* Procedure */}
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'rgba(255,255,255,0.3)' }}>Procedure</label>
-              <input type="text" value={procedureName} onChange={e => setProcedureName(e.target.value)} placeholder="e.g. Implant, Crown, Cleaning..." className={inputClass} />
+              <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block font-sans" style={{ color: 'var(--app-text-muted)' }}>Procedure</label>
+              <input type="text" value={procedureName} onChange={e => setProcedureName(e.target.value)} placeholder="e.g. Implant, Crown, Cleaning..." className="input-cyber" aria-label="Procedure name" />
             </div>
 
+            {/* Notes */}
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'rgba(255,255,255,0.3)' }}>Notes</label>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} className={inputClass + ' h-20 pt-2 resize-none'} rows={2} />
+              <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block font-sans" style={{ color: 'var(--app-text-muted)' }}>Notes</label>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} className="input-cyber h-20 pt-2 resize-none" rows={2} aria-label="Appointment notes" />
             </div>
 
+            {/* Schedule Warning */}
             {scheduleWarning && (
-              <div className="p-3 rounded-xl text-xs" style={{ background: 'rgba(255,193,7,0.1)', border: '1px solid rgba(255,193,7,0.2)', color: '#FFC107' }}>
-                {scheduleWarning}
+              <div className="p-3 rounded-xl text-xs flex items-start gap-2 font-sans"
+                style={{ background: 'var(--color-warning-container)', border: '1px solid rgba(251,191,36,0.2)', color: 'var(--color-warning)' }}>
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>{scheduleWarning}</span>
               </div>
             )}
           </div>
 
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
-            <button onClick={onClose} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Cancel</button>
-            <button onClick={handleSubmit} className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98]"
-              style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t" style={{ borderTop: '1px solid var(--app-border)' }}>
+            <button onClick={onClose} className="btn-ghost h-10 px-5 rounded-xl text-sm font-medium">
+              Cancel
+            </button>
+            <button onClick={handleSubmit} className="btn-primary h-10 px-6 rounded-xl text-sm font-bold">
               {appointment ? 'Save Changes' : 'Book Appointment'}
             </button>
           </div>

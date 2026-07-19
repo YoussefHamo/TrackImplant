@@ -95,14 +95,12 @@ export default function DayView({
   const pxPerMinute = rowHeight / 60;
   const totalHeight = 24 * rowHeight;
 
-  // Update current time every minute
   useEffect(() => {
     if (!today) return;
     const interval = setInterval(() => { setCurrentTime(getCurrentTimePosition()); }, 60000);
     return () => clearInterval(interval);
   }, [today]);
 
-  // Scroll to working hours (08:00) on mount
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 8 * rowHeight - 60;
@@ -118,17 +116,13 @@ export default function DayView({
     const hour = Math.min(23, Math.max(0, Math.floor(minutesFromMidnight / 60)));
     const minute = Math.min(59, minutesFromMidnight % 60);
 
-    // Determine doctor from column hit-test
     let cumulative = 0;
     let doctorIndex = -1;
     for (let i = 0; i < doctors.length; i++) {
       const colEl = document.getElementById(`dayview-col-${doctors[i].id}`);
       if (colEl) {
         const colW = colEl.offsetWidth;
-        if (x >= cumulative && x < cumulative + colW) {
-          doctorIndex = i;
-          break;
-        }
+        if (x >= cumulative && x < cumulative + colW) { doctorIndex = i; break; }
         cumulative += colW;
       }
     }
@@ -163,7 +157,6 @@ export default function DayView({
   const timeIndicatorTop = currentTime * 60 * pxPerMinute;
   const dateStr = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-  // Group appointments by doctor for rendering
   const apptsByDoctor = useMemo(() => {
     const map: Record<string, Appointment[]> = {};
     appointments.forEach(a => {
@@ -175,10 +168,10 @@ export default function DayView({
   }, [appointments]);
 
   return (
-    <div className="rounded-[20px] overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="card-cyber p-0 overflow-hidden rounded-[20px]">
       {/* Header */}
-      <div className="px-5 py-3 text-sm font-semibold flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <span className="text-white">{dateStr}</span>
+      <div className="px-5 py-3 text-sm font-semibold flex items-center justify-between font-sans" style={{ borderBottom: '1px solid var(--app-border)' }}>
+        <span className="text-[var(--app-text)]">{dateStr}</span>
         {today && (
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full" style={{ background: 'rgba(244,67,54,0.15)', color: '#F44336' }}>
             Today
@@ -187,23 +180,25 @@ export default function DayView({
       </div>
 
       {/* Doctor Headers with Stats */}
-      <div className="sticky top-0 z-20" style={{ background: 'rgba(5,11,20,0.98)', backdropFilter: 'blur(12px)' }}>
-        <div className="flex" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-          <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.98)' }} />
+      <div className="sticky top-0 z-[var(--z-sticky)]" style={{ background: 'var(--app-header-bg)', backdropFilter: 'blur(12px)' }}>
+        <div className="flex" style={{ borderBottom: '1px solid var(--app-border)' }}>
+          <div className="w-16 shrink-0 sticky left-0 z-[var(--z-sticky)]" style={{ background: 'var(--app-header-bg)' }} />
           {doctors.map((doc, di) => {
             const off = isOffDay(doc.id, doctorSchedules || {}, dayOfWeek);
             const hours = getWorkingHours(doc.id, doctorSchedules || {}, dayOfWeek);
             const docColor = DOCTOR_COLORS[di % DOCTOR_COLORS.length];
             const stats = getDoctorStats(doc.id, appointments, date);
             return (
-              <div key={doc.id} id={`dayview-header-${doc.id}`} className="flex-1 px-2 py-2.5 relative min-w-0" style={{ borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none', opacity: off ? 0.5 : 1 }}>
+              <div key={doc.id} id={`dayview-header-${doc.id}`} className="flex-1 px-2 py-2.5 relative min-w-0 font-sans"
+                style={{ borderLeft: di > 0 ? '1px solid var(--app-border)' : 'none', opacity: off ? 0.5 : 1 }}>
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style={{ background: `${docColor}20`, color: docColor }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                    style={{ background: `${docColor}20`, color: docColor }}>
                     {getInitials(doc.name)}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-white truncate">{doc.name}</div>
-                    <div className="text-[9px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    <div className="text-xs font-bold text-[var(--app-text)] truncate">{doc.name}</div>
+                    <div className="text-[9px] font-mono" style={{ color: 'var(--app-text-muted)' }}>
                       {off ? 'Day Off' : hours ? `${hours.start} - ${hours.end}` : 'No Schedule'}
                     </div>
                   </div>
@@ -230,12 +225,13 @@ export default function DayView({
       <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 320px)', scrollBehavior: 'smooth', position: 'relative' }}>
         <div ref={gridRef} className="flex relative" style={{ height: totalHeight }} onClick={handleGridClick} onDragOver={handleDragOver}>
           {/* Sticky Time Labels */}
-          <div className="w-16 shrink-0 sticky left-0 z-10" style={{ background: 'rgba(5,11,20,0.96)' }}>
+          <div className="w-16 shrink-0 sticky left-0 z-[var(--z-sticky)]" style={{ background: 'var(--app-sidebar-bg)' }}>
             {HOURS.map(hour => {
               const isCurrentHour = today && hour === Math.floor(currentTime);
               return (
-                <div key={hour} className="flex items-start justify-center pt-1" style={{ height: rowHeight, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  <span className="text-[10px] font-mono" style={{ color: isCurrentHour ? '#4FD1FF' : 'rgba(255,255,255,0.3)', fontWeight: isCurrentHour ? 700 : 400 }}>
+                <div key={hour} className="flex items-start justify-center pt-1" style={{ height: rowHeight, borderBottom: '1px solid var(--app-border)' }}>
+                  <span className={`text-[10px] font-mono ${isCurrentHour ? 'font-bold' : ''}`}
+                    style={{ color: isCurrentHour ? 'var(--color-primary)' : 'var(--app-text-muted)' }}>
                     {formatHour(hour)}
                   </span>
                 </div>
@@ -254,7 +250,7 @@ export default function DayView({
                 className="flex-1 relative min-w-0"
                 style={{
                   height: '100%',
-                  borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.02)' : 'none',
+                  borderLeft: di > 0 ? '1px solid var(--app-border)' : 'none',
                   background: off ? 'rgba(0,0,0,0.35)' : 'transparent',
                   opacity: off ? 0.25 : 1,
                 }}
@@ -267,49 +263,35 @@ export default function DayView({
                   return (
                     <div
                       key={hour}
-                      className="w-full"
+                      className="w-full cursor-pointer"
                       style={{
                         position: 'absolute',
                         top: hour * rowHeight,
                         height: rowHeight,
-                        borderBottom: '1px solid rgba(255,255,255,0.03)',
-                        background: off
-                          ? 'rgba(0,0,0,0.35)'
-                          : isOff
-                            ? 'rgba(0,0,0,0.2)'
-                            : isCurrentHour
-                              ? 'rgba(79,209,255,0.04)'
-                              : 'transparent',
+                        borderBottom: '1px solid var(--app-border)',
+                        background: off ? 'rgba(0,0,0,0.35)' : isOff ? 'rgba(0,0,0,0.2)' : isCurrentHour ? 'var(--color-primary-container)' : 'transparent',
                         opacity: off ? 0.25 : isOff ? 0.45 : 1,
-                        cursor: 'pointer',
                       }}
                     />
                   );
                 })}
 
-                {/* OFF badge for full day off */}
+                {/* OFF badge */}
                 {off && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none" style={{ zIndex: 1 }}>
                     <span className="text-[48px] font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.03)' }}>OFF</span>
                   </div>
                 )}
 
-                {/* Appointments - absolute positioned within doctor column */}
+                {/* Appointments */}
                 {docAppts.map(app => {
                   const start = new Date(app.appointment_date);
                   if (isNaN(start.getTime())) return null;
                   const mins = start.getHours() * 60 + start.getMinutes();
                   const dur = app.duration_minutes || 30;
                   return (
-                    <div
-                      key={app.id}
-                      className="absolute left-0.5 right-0.5"
-                      style={{
-                        top: mins * pxPerMinute,
-                        height: Math.max(18, dur * pxPerMinute),
-                        zIndex: 5,
-                      }}
-                    >
+                    <div key={app.id} className="absolute left-0.5 right-0.5"
+                      style={{ top: mins * pxPerMinute, height: Math.max(18, dur * pxPerMinute), zIndex: 5 }}>
                       <AppointmentBlock
                         appointment={app}
                         onClick={(a) => { onSelectAppointment?.(a); }}
@@ -328,7 +310,7 @@ export default function DayView({
 
           {/* Current Time Indicator */}
           {today && (
-            <div className="absolute left-0 right-0 pointer-events-none z-10" style={{ top: timeIndicatorTop }}>
+            <div className="absolute left-0 right-0 pointer-events-none z-[var(--z-sticky)]" style={{ top: timeIndicatorTop }}>
               <div className="flex items-center">
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ background: '#F44336', boxShadow: '0 0 6px rgba(244,67,54,0.8)', marginLeft: '1px' }} />
                 <div className="flex-1" style={{ height: '2px', background: '#F44336' }} />

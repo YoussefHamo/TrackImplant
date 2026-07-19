@@ -57,25 +57,35 @@ const docCategories: { value: DocumentCategory; icon: string }[] = [
   { value: 'Blood Analysis', icon: '🧪' }, { value: 'Prescription', icon: '📋' }, { value: 'Clinical Photos', icon: '📷' },
   { value: 'Treatment Plan', icon: '📄' }, { value: 'Other', icon: '📁' },
 ];
-const inputCls = 'w-full h-10 px-3 rounded-xl text-sm outline-none bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500 transition-all';
 
 /* ─── Badge ─── */
 function StatusBadge({ status }: { status: string }) {
   const c = statusColors[status] || { bg: 'rgba(255,255,255,0.05)', text: 'rgba(255,255,255,0.4)' };
-  return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: c.bg, color: c.text }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: c.text }} />{status}</span>;
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
+      style={{ background: c.bg, color: c.text }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: c.text }} />
+      {status}
+    </span>
+  );
 }
 
 /* ─── Stat Card ─── */
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
   return (
-    <div className="rounded-[16px] p-4 transition-all hover:-translate-y-0.5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}15`, border: `1px solid ${color}22` }}>
-            {icon}
-          </div>
+    <div className="card-cyber hover:-translate-y-0.5 transition-all duration-200">
+      <div className="flex items-center gap-2 mb-2">
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center"
+          style={{ background: `${color}15`, border: `1px solid ${color}22` }}
+        >
+          {icon}
         </div>
-      <div className="text-lg font-bold text-white">{value}</div>
-      <div className="text-[10px] font-medium uppercase tracking-wider mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{label}</div>
+      </div>
+      <div className="text-lg font-bold text-white font-mono">{value}</div>
+      <div className="text-[10px] font-medium uppercase tracking-wider mt-0.5 text-white/35">{label}</div>
     </div>
   );
 }
@@ -83,7 +93,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
 /* ─── Section Wrapper ─── */
 function Section({ title, children, className = '' }: { title?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-[18px] p-5 ${className}`} style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+    <div className={`card-cyber ${className}`}>
       {title && <h3 className="text-sm font-semibold text-white mb-4">{title}</h3>}
       {children}
     </div>
@@ -484,40 +494,40 @@ export default function PatientProfile() {
   };
 
   const fileExtIcon = (type: string) => {
-    if (type.startsWith('image/')) return <Image className="w-5 h-5" style={{ color: '#4FD1FF' }} />;
-    if (type.includes('pdf')) return <FileText className="w-5 h-5" style={{ color: '#FF6B6B' }} />;
-    return <File className="w-5 h-5" style={{ color: '#FFC107' }} />;
+    if (type.startsWith('image/')) return <Image className="w-5 h-5 text-cyan" />;
+    if (type.includes('pdf')) return <FileText className="w-5 h-5 text-[#FF6B6B]" />;
+    return <File className="w-5 h-5 text-warning" />;
   };
 
   if (patientLoading) return (
-    <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-[#4FD1FF] border-t-transparent rounded-full animate-spin" /></div>
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 border-2 border-[#4FD1FF] border-t-transparent rounded-full animate-spin" />
+    </div>
   );
-  if (!patient) return <div className="text-center py-16" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.patient_not_found')}</div>;
+  if (!patient) return <div className="text-center py-16 text-white/30">{t('profile.patient_not_found')}</div>;
 
   return (
     <div className="font-sans select-auto space-y-6">
       {/* ── Back Button ── */}
-      <button onClick={() => navigate('/dashboard/patients')} className="flex items-center gap-2 text-xs font-medium transition-all hover:gap-3" style={{ color: '#4FD1FF' }}>
+      <button onClick={() => navigate('/dashboard/patients')} className="flex items-center gap-2 text-xs font-medium text-cyan transition-all hover:gap-3">
         <ArrowLeft className="w-4 h-4" /> {t('profile.back_to_patients')}
       </button>
 
       {/* ══════════════════════════════════════
           PROFILE HEADER
           ══════════════════════════════════════ */}
-      <div className="rounded-[22px] p-6 relative overflow-hidden" style={{ background: 'rgba(13,24,40,0.9)', border: '1px solid rgba(255,255,255,0.05)' }}>
+      <div className="glass-strong rounded-[22px] p-6 relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
           {/* Avatar */}
           <div className="relative group flex-shrink-0">
-            <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center text-2xl font-bold"
-              style={{ background: 'rgba(79,209,255,0.12)', border: '2px solid rgba(79,209,255,0.2)' }}>
+            <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center text-2xl font-bold bg-cyan/10 border-2 border-cyan/20">
               {patient.profile_image_url ? (
                 <img src={patient.profile_image_url} alt="" className="w-full h-full object-cover" />
               ) : (
-                <span style={{ color: '#4FD1FF' }}>{patient.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}</span>
+                <span className="text-cyan">{patient.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}</span>
               )}
             </div>
-            <button onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 w-7 h-7 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-              style={{ background: '#4FD1FF', color: '#050B14' }}>
+            <button onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 w-7 h-7 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 bg-cyan text-[#050B14]">
               <Camera className="w-3.5 h-3.5" />
             </button>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -529,33 +539,32 @@ export default function PatientProfile() {
               <div>
                 <h1 className="text-xl font-bold text-white">{patient.full_name}</h1>
                 <div className="flex flex-wrap items-center gap-3 mt-1.5">
-                  <span className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}><Phone className="w-3 h-3" />{patient.phone ? <Copyable text={patient.phone}>{patient.phone}</Copyable> : t('common.dash')}</span>
-                  {patient.email && <span className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}><Mail className="w-3 h-3" />{patient.email ? <Copyable text={patient.email}>{patient.email}</Copyable> : patient.email}</span>}
-                  {patient.gender && <span className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}><User className="w-3 h-3" />{patient.gender}</span>}
-                  {patient.date_of_birth && <span className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}><Calendar className="w-3 h-3" />{new Date(patient.date_of_birth).toLocaleDateString()}</span>}
+                  <span className="flex items-center gap-1 text-xs text-white/40"><Phone className="w-3 h-3" />{patient.phone ? <Copyable text={patient.phone}>{patient.phone}</Copyable> : t('common.dash')}</span>
+                  {patient.email && <span className="flex items-center gap-1 text-xs text-white/40"><Mail className="w-3 h-3" />{patient.email ? <Copyable text={patient.email}>{patient.email}</Copyable> : patient.email}</span>}
+                  {patient.gender && <span className="flex items-center gap-1 text-xs text-white/40"><User className="w-3 h-3" />{patient.gender}</span>}
+                  {patient.date_of_birth && <span className="flex items-center gap-1 text-xs text-white/40"><Calendar className="w-3 h-3" />{new Date(patient.date_of_birth).toLocaleDateString()}</span>}
                 </div>
                 <div className="flex items-center gap-3 mt-2">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md cursor-pointer" style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.3)' }}>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md text-white/30 bg-white/5 cursor-pointer">
                     <Copyable text={patient.id}>{t('profile.id_prefix')} #{patient.id.slice(0, 8).toUpperCase()}</Copyable>
                   </span>
-                  <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{t('profile.registered_prefix')} {patient.created_at ? new Date(patient.created_at).toLocaleDateString() : t('common.dash')}</span>
-                  {patient.external_medical_code && <span className="text-[10px] font-mono px-2 py-0.5 rounded-md" style={{ background: 'rgba(79,209,255,0.08)', color: '#4FD1FF' }}>
+                  <span className="text-[10px] text-white/25">{t('profile.registered_prefix')} {patient.created_at ? new Date(patient.created_at).toLocaleDateString() : t('common.dash')}</span>
+                  {patient.external_medical_code && <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-cyan/10 text-cyan">
                     <Copyable text={patient.external_medical_code}>{patient.external_medical_code}</Copyable>
                   </span>}
-                  {patient.home_branch_name && <span className="text-[10px] font-medium px-2 py-0.5 rounded-md" style={{ background: 'rgba(0,229,168,0.08)', color: '#00E5A8' }}>
+                  {patient.home_branch_name && <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-[rgba(0,229,168,0.08)] text-[#00E5A8]">
                     {patient.home_branch_name}
                   </span>}
                   <span className="text-[10px] px-2 py-0.5 rounded-md" style={{ background: patient.insurance_company ? 'rgba(79,209,255,0.08)' : 'rgba(0,229,168,0.08)', color: patient.insurance_company ? '#4FD1FF' : '#00E5A8' }}>{patient.insurance_company || 'Cash'}</span>
                 </div>
               </div>
               <button onClick={editing ? handleSaveProfile : startEditing} disabled={updatePatientMut.isPending}
-                className="h-9 px-4 rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all active:scale-[0.98]"
-                style={{ background: editing ? 'linear-gradient(135deg, #00E5A8, #45D6FF)' : 'rgba(79,209,255,0.1)', border: editing ? 'none' : '1px solid rgba(79,209,255,0.15)', color: editing ? '#050B14' : '#4FD1FF' }}>
+                className={editing ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}>
                 {editing ? <><Save className="w-3.5 h-3.5" /> {updatePatientMut.isPending ? t('profile.saving_profile') : t('profile.save_profile')}</> : <><Edit3 className="w-3.5 h-3.5" /> {t('profile.edit_profile')}</>}
               </button>
             </div>
             {editing && (
-              <button onClick={() => setEditing(false)} className="ml-2 text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('common.cancel')}</button>
+              <button onClick={() => setEditing(false)} className="ml-2 text-[10px] text-white/30">{t('common.cancel')}</button>
             )}
           </div>
         </div>
@@ -564,13 +573,13 @@ export default function PatientProfile() {
       {/* ══════════════════════════════════════
           TABS
           ══════════════════════════════════════ */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-app-border">
         {tabs.map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className="px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all whitespace-nowrap"
             style={{
-              color: activeTab === tab ? '#4FD1FF' : 'rgba(255,255,255,0.35)',
-              borderBottom: activeTab === tab ? '2px solid #4FD1FF' : '2px solid transparent',
+              color: activeTab === tab ? 'var(--color-primary)' : 'var(--app-text-muted)',
+              borderBottom: activeTab === tab ? '2px solid var(--color-primary)' : '2px solid transparent',
             }}>
             {t(tabKeys[tab])}
           </button>
@@ -583,25 +592,25 @@ export default function PatientProfile() {
       {activeTab === 'Overview' && (
         <div className="space-y-5">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <StatCard icon={<Activity className="w-4 h-4" color="#4FD1FF" />} label={t('profile.stat_active_procedures')} value={procedures.length.toString()} color="#4FD1FF" />
-            <StatCard icon={<FileText className="w-4 h-4" color="#7C5CFF" />} label={t('profile.stat_total_invoiced')} value={`$${totalInvoiced.toLocaleString()}`} color="#7C5CFF" />
-            <StatCard icon={<DollarSign className="w-4 h-4" color="#00E5A8" />} label={t('profile.stat_total_paid')} value={`$${totalPaid.toLocaleString()}`} color="#00E5A8" />
-            <StatCard icon={<Clock className="w-4 h-4" color="#FFC107" />} label={t('profile.stat_remaining')} value={`$${totalRemaining.toLocaleString()}`} color="#FFC107" />
-            <StatCard icon={<Calendar className="w-4 h-4" color="#4FD1FF" />} label={t('profile.stat_upcoming_appts')} value={upcomingAppts.length.toString()} color="#4FD1FF" />
-            <StatCard icon={<FileText className="w-4 h-4" color="#FF6B6B" />} label={t('profile.stat_documents')} value={documents.length.toString()} color="#FF6B6B" />
+            <StatCard icon={<Activity className="w-4 h-4 text-cyan" />} label={t('profile.stat_active_procedures')} value={procedures.length.toString()} color="#4FD1FF" />
+            <StatCard icon={<FileText className="w-4 h-4 text-secondary" />} label={t('profile.stat_total_invoiced')} value={`$${totalInvoiced.toLocaleString()}`} color="#7C5CFF" />
+            <StatCard icon={<DollarSign className="w-4 h-4 text-[#00E5A8]" />} label={t('profile.stat_total_paid')} value={`$${totalPaid.toLocaleString()}`} color="#00E5A8" />
+            <StatCard icon={<Clock className="w-4 h-4 text-warning" />} label={t('profile.stat_remaining')} value={`$${totalRemaining.toLocaleString()}`} color="#FFC107" />
+            <StatCard icon={<Calendar className="w-4 h-4 text-cyan" />} label={t('profile.stat_upcoming_appts')} value={upcomingAppts.length.toString()} color="#4FD1FF" />
+            <StatCard icon={<FileText className="w-4 h-4 text-[#FF6B6B]" />} label={t('profile.stat_documents')} value={documents.length.toString()} color="#FF6B6B" />
           </div>
 
           {/* Quick Info */}
           <Section title={t('profile.patient_summary')}>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.name_label')}: </span><span className="text-white"><Copyable text={patient.full_name}>{patient.full_name}</Copyable></span></div>
-              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.phone_label')}: </span><span className="text-white">{patient.phone ? <Copyable text={patient.phone}>{patient.phone}</Copyable> : t('common.dash')}</span></div>
-              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.email_label')}: </span><span className="text-white">{patient.email ? <Copyable text={patient.email}>{patient.email}</Copyable> : t('common.dash')}</span></div>
-              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.gender_label')}: </span><span className="text-white">{patient.gender || t('common.dash')}</span></div>
-              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.dob_label')}: </span><span className="text-white">{patient.date_of_birth ? new Date(patient.date_of_birth).toLocaleDateString() : t('common.dash')}</span></div>
-              {patient.smoking_status && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.smoking_label')}: </span><span className="text-white">{patient.smoking_status}</span></div>}
-              {patient.external_medical_code && <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>External Code: </span><span className="text-[#4FD1FF] font-mono">{patient.external_medical_code}</span></div>}
-              <div><span style={{ color: 'rgba(255,255,255,0.35)' }}>Payment: </span><span className="text-white" style={{ color: patient.insurance_company ? '#4FD1FF' : '#00E5A8' }}>{patient.insurance_company || 'Cash'}</span></div>
+              <div><span className="text-white/35">{t('profile.name_label')}: </span><span className="text-white"><Copyable text={patient.full_name}>{patient.full_name}</Copyable></span></div>
+              <div><span className="text-white/35">{t('profile.phone_label')}: </span><span className="text-white">{patient.phone ? <Copyable text={patient.phone}>{patient.phone}</Copyable> : t('common.dash')}</span></div>
+              <div><span className="text-white/35">{t('profile.email_label')}: </span><span className="text-white">{patient.email ? <Copyable text={patient.email}>{patient.email}</Copyable> : t('common.dash')}</span></div>
+              <div><span className="text-white/35">{t('profile.gender_label')}: </span><span className="text-white">{patient.gender || t('common.dash')}</span></div>
+              <div><span className="text-white/35">{t('profile.dob_label')}: </span><span className="text-white">{patient.date_of_birth ? new Date(patient.date_of_birth).toLocaleDateString() : t('common.dash')}</span></div>
+              {patient.smoking_status && <div><span className="text-white/35">{t('profile.smoking_label')}: </span><span className="text-white">{patient.smoking_status}</span></div>}
+              {patient.external_medical_code && <div><span className="text-white/35">External Code: </span><span className="text-cyan font-mono">{patient.external_medical_code}</span></div>}
+              <div><span className="text-white/35">Payment: </span><span className="text-white" style={{ color: patient.insurance_company ? '#4FD1FF' : '#00E5A8' }}>{patient.insurance_company || 'Cash'}</span></div>
             </div>
           </Section>
 
@@ -610,10 +619,10 @@ export default function PatientProfile() {
             <Section title={t('profile.recent_procedures', { count: procedures.length })}>
               <div className="space-y-2">
                 {procedures.slice(0, 5).map(p => (
-                  <div key={p.id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
                     <div>
                       <div className="text-sm font-medium text-white">{p.procedure_name}</div>
-                      <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.procedure_tooth_date', { tooth: p.tooth_number || t('common.dash'), date: p.procedure_date ? new Date(p.procedure_date).toLocaleDateString() : t('common.dash') })}</div>
+                      <div className="text-[11px] text-white/35">{t('profile.procedure_tooth_date', { tooth: p.tooth_number || t('common.dash'), date: p.procedure_date ? new Date(p.procedure_date).toLocaleDateString() : t('common.dash') })}</div>
                     </div>
                     <StatusBadge status={p.status} />
                   </div>
@@ -627,10 +636,10 @@ export default function PatientProfile() {
             <Section title={t('profile.upcoming_appointments')}>
               <div className="space-y-2">
                 {upcomingAppts.slice(0, 5).map(a => (
-                  <div key={a.id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div key={a.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
                     <div>
                       <div className="text-sm text-white">{new Date(a.appointment_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                      <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>{new Date(a.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                      <div className="text-[11px] text-white/35">{new Date(a.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     </div>
                     <StatusBadge status={a.status} />
                   </div>
@@ -644,19 +653,18 @@ export default function PatientProfile() {
             <Section title={t('profile.failure_timeline')}>
               <div className="space-y-3">
                 {failureEvents.map(fe => (
-                  <div key={fe.id} className="flex items-start gap-3 p-4 rounded-xl animate-fadeIn"
-                    style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(239,68,68,0.15)' }}>
+                  <div key={fe.id} className="flex items-start gap-3 p-4 rounded-xl animate-fadeIn bg-[rgba(239,68,68,0.06)] border border-[rgba(239,68,68,0.15)]">
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-[rgba(239,68,68,0.15)]">
                       <AlertTriangle className="w-4 h-4 text-[#ef4444]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-[#ef4444]">{t('profile.failure_recorded')}</span>
-                        <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                        <span className="text-[10px] text-white/35">
                           {fe.created_at ? new Date(fe.created_at).toLocaleDateString() : t('common.dash')}
                         </span>
                       </div>
-                      {fe.notes && <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>{fe.notes}</p>}
+                      {fe.notes && <p className="text-xs mt-1 text-white/60">{fe.notes}</p>}
                     </div>
                   </div>
                 ))}
@@ -683,11 +691,11 @@ export default function PatientProfile() {
                 { key: 'insurance_company', label: 'Insurance Company' },
               ].map(f => (
                 <div key={f.key} className={f.full ? 'col-span-2' : ''}>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.' + f.label)}</label>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">{t('profile.' + f.label)}</label>
                   {f.multiline ? (
-                    <textarea value={editForm[f.key] || ''} onChange={e => setEditForm(prev => ({ ...prev, [f.key]: e.target.value }))} rows={3} className={inputCls + ' h-20 pt-2 resize-none'} />
+                    <textarea value={editForm[f.key] || ''} onChange={e => setEditForm(prev => ({ ...prev, [f.key]: e.target.value }))} rows={3} className="input-cyber h-20 pt-2 resize-none" />
                   ) : (
-                    <input value={editForm[f.key] || ''} onChange={e => setEditForm(prev => ({ ...prev, [f.key]: e.target.value }))} className={inputCls} />
+                    <input value={editForm[f.key] || ''} onChange={e => setEditForm(prev => ({ ...prev, [f.key]: e.target.value }))} className="input-cyber" />
                   )}
                 </div>
               ))}
@@ -695,32 +703,32 @@ export default function PatientProfile() {
           ) : (
             <div className="space-y-4">
               {/* Medical History */}
-              <div className="p-4 rounded-xl" style={{ background: 'rgba(79,209,255,0.03)', border: '1px solid rgba(79,209,255,0.08)' }}>
-                <h4 className="text-xs font-semibold text-[#4FD1FF] mb-2 flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> {t('profile.medical_history_title')}</h4>
-                <p className="text-sm" style={{ color: patient.medical_history ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)' }}>{patient.medical_history || t('profile.no_medical_history')}</p>
+              <div className="p-4 rounded-xl bg-cyan/5 border border-cyan/10">
+                <h4 className="text-xs font-semibold text-cyan mb-2 flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> {t('profile.medical_history_title')}</h4>
+                <p className="text-sm text-white/70">{patient.medical_history || <span className="text-white/20">{t('profile.no_medical_history')}</span>}</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div className="flex items-center gap-1.5 mb-1"><Pill className="w-3.5 h-3.5" style={{ color: '#FFC107' }} /><span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.chronic_disease')}</span></div>
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-1.5 mb-1"><Pill className="w-3.5 h-3.5 text-warning" /><span className="text-[10px] font-semibold uppercase tracking-wider text-white/30">{t('profile.chronic_disease')}</span></div>
                   <p className="text-sm text-white">{patient.chronic_disease || t('common.dash')}</p>
                 </div>
-                <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div className="flex items-center gap-1.5 mb-1"><Pill className="w-3.5 h-3.5" style={{ color: '#00E5A8' }} /><span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.medications')}</span></div>
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-1.5 mb-1"><Pill className="w-3.5 h-3.5 text-[#00E5A8]" /><span className="text-[10px] font-semibold uppercase tracking-wider text-white/30">{t('profile.medications')}</span></div>
                   <p className="text-sm text-white">{patient.medication || t('common.dash')}</p>
                 </div>
-                <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div className="flex items-center gap-1.5 mb-1"><AlertCircle className="w-3.5 h-3.5" style={{ color: '#FF6B6B' }} /><span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.allergies')}</span></div>
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-1.5 mb-1"><AlertCircle className="w-3.5 h-3.5 text-[#FF6B6B]" /><span className="text-[10px] font-semibold uppercase tracking-wider text-white/30">{t('profile.allergies')}</span></div>
                   <p className="text-sm text-white">{patient.allergies || t('common.dash')}</p>
                 </div>
               </div>
               {patient.smoking_status && (
-                <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div className="flex items-center gap-1.5 mb-1"><AlertTriangle className="w-3.5 h-3.5" style={{ color: '#FFC107' }} /><span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.smoking_status')}</span></div>
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-1.5 mb-1"><AlertTriangle className="w-3.5 h-3.5 text-warning" /><span className="text-[10px] font-semibold uppercase tracking-wider text-white/30">{t('profile.smoking_status')}</span></div>
                   <p className="text-sm text-white">{patient.smoking_status}</p>
                 </div>
               )}
               {!editing && (
-                <button onClick={startEditing} className="h-9 px-4 rounded-xl flex items-center gap-1.5 text-xs font-bold" style={{ background: 'rgba(79,209,255,0.1)', border: '1px solid rgba(79,209,255,0.15)', color: '#4FD1FF' }}>
+                <button onClick={startEditing} className="btn-secondary btn-sm">
                   <Edit3 className="w-3.5 h-3.5" /> {t('profile.edit_medical_history')}
                 </button>
               )}
@@ -735,53 +743,53 @@ export default function PatientProfile() {
       {activeTab === 'Implant Procedures' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.procedures_found', { count: procedures.length })}</span>
-            <button onClick={() => navigate('/dashboard/cases')} className="h-9 px-4 rounded-xl flex items-center gap-1.5 text-xs font-bold" style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
+            <span className="text-sm text-white/35">{t('profile.procedures_found', { count: procedures.length })}</span>
+            <button onClick={() => navigate('/dashboard/cases')} className="btn-primary btn-sm">
               <Plus className="w-3.5 h-3.5" /> {t('profile.new_procedure')}
             </button>
           </div>
           {procedures.length === 0 ? (
-            <div className="py-12 text-center text-sm rounded-[18px]" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)' }}>
+            <div className="py-12 text-center text-sm card-cyber text-white/30">
               {t('profile.no_procedures_hint')}
             </div>
           ) : procedures.map(p => (
-            <div key={p.id} className="rounded-[18px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div key={p.id} className="card-cyber">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h4 className="text-sm font-semibold text-white">{p.procedure_name}</h4>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.procedure_tooth_date', { tooth: p.tooth_number || t('common.dash'), date: p.procedure_date ? new Date(p.procedure_date).toLocaleDateString() : t('common.dash') })}</p>
+                  <p className="text-[11px] mt-0.5 text-white/35">{t('profile.procedure_tooth_date', { tooth: p.tooth_number || t('common.dash'), date: p.procedure_date ? new Date(p.procedure_date).toLocaleDateString() : t('common.dash') })}</p>
                 </div>
                 <StatusBadge status={p.status} />
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                {p.implant_system && <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.system_label')}: </span><span className="text-white">{p.implant_system}</span></div>}
-                {p.implant_size && <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.size_label')}: </span><span className="text-white">{p.implant_size}</span></div>}
-                {p.implant_decision && <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.decision_label')}: </span><span className="text-white">{p.implant_decision}</span></div>}
-                {p.abutment_type && <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.abutment_label')}: </span><span className="text-white">{p.abutment_type}</span></div>}
-                {p.bone_condition && <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.bone_label')}: </span><span className="text-white">{p.bone_condition}</span></div>}
+                {p.implant_system && <div><span className="text-white/30">{t('profile.system_label')}: </span><span className="text-white">{p.implant_system}</span></div>}
+                {p.implant_size && <div><span className="text-white/30">{t('profile.size_label')}: </span><span className="text-white">{p.implant_size}</span></div>}
+                {p.implant_decision && <div><span className="text-white/30">{t('profile.decision_label')}: </span><span className="text-white">{p.implant_decision}</span></div>}
+                {p.abutment_type && <div><span className="text-white/30">{t('profile.abutment_label')}: </span><span className="text-white">{p.abutment_type}</span></div>}
+                {p.bone_condition && <div><span className="text-white/30">{t('profile.bone_label')}: </span><span className="text-white">{p.bone_condition}</span></div>}
                 {doctorsByProcedure[p.id] && doctorsByProcedure[p.id].length > 0 && (
-                  <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.doctor_label')}: </span>
+                  <div><span className="text-white/30">{t('profile.doctor_label')}: </span>
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       {doctorsByProcedure[p.id].map(pd => (
                         <span key={pd.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
                           style={{ background: pd.role_in_procedure === 'primary' ? 'rgba(79,209,255,0.12)' : 'rgba(255,255,255,0.06)', color: pd.role_in_procedure === 'primary' ? '#4FD1FF' : 'rgba(255,255,255,0.5)' }}>
                           {pd.doctor_name || pd.doctor_id}
-                          {pd.role_in_procedure === 'primary' && <span style={{ color: '#4FD1FF', opacity: 0.6 }}>★</span>}
+                          {pd.role_in_procedure === 'primary' && <span className="text-cyan/60">★</span>}
                         </span>
                       ))}
                     </div>
                   </div>
                 )}
-                {p.extraction_needed !== undefined && <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.extraction_label')}: </span><span className="text-white">{p.extraction_needed ? t('common.yes') : t('common.no')}</span></div>}
+                {p.extraction_needed !== undefined && <div><span className="text-white/30">{t('profile.extraction_label')}: </span><span className="text-white">{p.extraction_needed ? t('common.yes') : t('common.no')}</span></div>}
               </div>
-              {p.notes && <p className="text-xs mt-3" style={{ color: 'rgba(255,255,255,0.4)' }}>{p.notes}</p>}
+              {p.notes && <p className="text-xs mt-3 text-white/40">{p.notes}</p>}
               {(p.bone_height || p.bone_width || p.ct_scan_notes) && (
-                <div className="mt-3 pt-3 border-t border-[rgba(255,255,255,0.04)]">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[#4FD1FF]">{t('profile.cbct_heading')}</span>
+                <div className="mt-3 pt-3 border-t border-app-border">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-cyan">{t('profile.cbct_heading')}</span>
                   <div className="flex flex-wrap gap-3 mt-1 text-xs">
-                    {p.bone_height && <span style={{ color: 'rgba(255,255,255,0.4)' }}>{t('profile.height_label')}: <span className="text-white">{p.bone_height}mm</span></span>}
-                    {p.bone_width && <span style={{ color: 'rgba(255,255,255,0.4)' }}>{t('profile.width_label')}: <span className="text-white">{p.bone_width}mm</span></span>}
-                    {p.ct_scan_notes && <span style={{ color: 'rgba(255,255,255,0.4)' }}>{t('profile.notes_label')}: <span className="text-white">{p.ct_scan_notes}</span></span>}
+                    {p.bone_height && <span className="text-white/40">{t('profile.height_label')}: <span className="text-white">{p.bone_height}mm</span></span>}
+                    {p.bone_width && <span className="text-white/40">{t('profile.width_label')}: <span className="text-white">{p.bone_width}mm</span></span>}
+                    {p.ct_scan_notes && <span className="text-white/40">{t('profile.notes_label')}: <span className="text-white">{p.ct_scan_notes}</span></span>}
                   </div>
                 </div>
               )}
@@ -797,69 +805,69 @@ export default function PatientProfile() {
         <div className="space-y-4">
           {/* Summary */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-[16px] p-4 text-center" style={{ background: 'rgba(0,229,168,0.06)', border: '1px solid rgba(0,229,168,0.1)' }}>
-              <div className="text-lg font-bold text-[#00E5A8]">${totalPaid.toLocaleString()}</div>
-              <div className="text-[10px] font-medium uppercase tracking-wider mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.financial_paid')}</div>
+            <div className="card-cyber text-center" style={{ background: 'rgba(0,229,168,0.06)', borderColor: 'rgba(0,229,168,0.1)' }}>
+              <div className="text-lg font-bold text-[#00E5A8] font-mono">${totalPaid.toLocaleString()}</div>
+              <div className="text-[10px] font-medium uppercase tracking-wider mt-1 text-white/35">{t('profile.financial_paid')}</div>
             </div>
-            <div className="rounded-[16px] p-4 text-center" style={{ background: 'rgba(255,193,7,0.06)', border: '1px solid rgba(255,193,7,0.1)' }}>
-              <div className="text-lg font-bold text-[#FFC107]">${totalRemaining.toLocaleString()}</div>
-              <div className="text-[10px] font-medium uppercase tracking-wider mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.financial_remaining')}</div>
+            <div className="card-cyber text-center" style={{ background: 'rgba(255,193,7,0.06)', borderColor: 'rgba(255,193,7,0.1)' }}>
+              <div className="text-lg font-bold text-warning font-mono">${totalRemaining.toLocaleString()}</div>
+              <div className="text-[10px] font-medium uppercase tracking-wider mt-1 text-white/35">{t('profile.financial_remaining')}</div>
             </div>
-            <div className="rounded-[16px] p-4 text-center" style={{ background: 'rgba(124,92,255,0.06)', border: '1px solid rgba(124,92,255,0.1)' }}>
-              <div className="text-lg font-bold text-[#7C5CFF]">{invoices.length}</div>
-              <div className="text-[10px] font-medium uppercase tracking-wider mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.financial_invoices')}</div>
+            <div className="card-cyber text-center" style={{ background: 'rgba(124,92,255,0.06)', borderColor: 'rgba(124,92,255,0.1)' }}>
+              <div className="text-lg font-bold text-secondary font-mono">{invoices.length}</div>
+              <div className="text-[10px] font-medium uppercase tracking-wider mt-1 text-white/35">{t('profile.financial_invoices')}</div>
             </div>
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.invoice_count', { count: invoices.length })}</span>
+            <span className="text-sm text-white/35">{t('profile.invoice_count', { count: invoices.length })}</span>
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowStatement(true)} className="h-9 px-4 rounded-xl flex items-center gap-1.5 text-xs font-bold" style={{ background: 'rgba(124,92,255,0.1)', border: '1px solid rgba(124,92,255,0.15)', color: '#7C5CFF' }}>
+              <button onClick={() => setShowStatement(true)} className="btn-secondary btn-sm">
                 <ScrollText className="w-3.5 h-3.5" /> {t('profile.statement')}
               </button>
-              <button onClick={() => setShowAddInvoice(true)} className="h-9 px-4 rounded-xl flex items-center gap-1.5 text-xs font-bold" style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
+              <button onClick={() => setShowAddInvoice(true)} className="btn-primary btn-sm">
                 <Plus className="w-3.5 h-3.5" /> {t('profile.new_invoice')}
               </button>
             </div>
           </div>
 
           {invoices.length === 0 ? (
-            <div className="py-12 text-center text-sm rounded-[18px]" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)' }}>{t('profile.no_invoices')}</div>
+            <div className="py-12 text-center text-sm card-cyber text-white/30">{t('profile.no_invoices')}</div>
           ) : invoices.map(inv => {
             const invPayments = payments.filter(p => p.parent_invoice_id === inv.id);
             return (
-              <div key={inv.id} className="rounded-[18px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div key={inv.id} className="card-cyber">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h4 className="text-sm font-semibold text-white">{inv.invoice_name}</h4>
                     {inv.branch_name && (
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }}>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan">
                           {inv.branch_name}
                         </span>
                       </div>
                     )}
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.total_label')}: ${Number(inv.total_amount).toLocaleString()}</span>
-                      <span className="text-xs text-[#00E5A8]">{t('profile.paid_label')}: ${Number(inv.paid_so_far).toLocaleString()}</span>
-                      <span className="text-xs text-[#FFC107]">{t('profile.remaining_label')}: ${Number(inv.remaining_amount).toLocaleString()}</span>
+                      <span className="text-xs text-white/35 font-mono">{t('profile.total_label')}: ${Number(inv.total_amount).toLocaleString()}</span>
+                      <span className="text-xs text-[#00E5A8] font-mono">{t('profile.paid_label')}: ${Number(inv.paid_so_far).toLocaleString()}</span>
+                      <span className="text-xs text-warning font-mono">{t('profile.remaining_label')}: ${Number(inv.remaining_amount).toLocaleString()}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusBadge status={inv.status} />
                     <button onClick={() => handlePrintReceipt(inv)} title={t('profile.print_receipt')}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: '#4FD1FF', background: 'rgba(79,209,255,0.1)' }}>
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-cyan bg-cyan/10">
                       <Printer className="w-3.5 h-3.5" />
                     </button>
                     {inv.status !== 'Paid' && (
                       <button onClick={() => { setPayingInvoice(inv); setShowPayModal(true); }}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: '#00E5A8', background: 'rgba(0,229,168,0.1)' }}>
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[#00E5A8] bg-[rgba(0,229,168,0.1)]">
                         <CreditCard className="w-3.5 h-3.5" />
                       </button>
                     )}
                     {Number(inv.paid_so_far) > 0 && (
                       <button onClick={() => { setRefundingInvoice(inv); setRefundAmount(''); setShowRefundModal(true); }}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}>
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[#ef4444] bg-[rgba(239,68,68,0.1)]">
                         <Undo2 className="w-3.5 h-3.5" />
                       </button>
                     )}
@@ -867,8 +875,8 @@ export default function PatientProfile() {
                 </div>
                 {/* Payment Timeline */}
                 {invPayments.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-[rgba(255,255,255,0.04)]">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.25)' }}>{t('profile.payment_history')}</span>
+                  <div className="mt-3 pt-3 border-t border-app-border">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-white/25">{t('profile.payment_history')}</span>
                     <div className="mt-2 space-y-1.5">
                       {invPayments.map(p => {
                         const isRefund = Number(p.amount) < 0;
@@ -876,9 +884,9 @@ export default function PatientProfile() {
                         return (
                         <div key={p.id} className="flex items-center justify-between text-xs px-3 py-2 rounded-lg" style={{ background: isRefund ? 'rgba(239,68,68,0.03)' : 'rgba(0,229,168,0.03)', border: `1px solid ${isRefund ? 'rgba(239,68,68,0.06)' : 'rgba(0,229,168,0.06)'}` }}>
                           <div className="flex items-center gap-2">
-                            <span className={`font-medium ${isRefund ? 'text-[#ef4444]' : 'text-white'}`}>${isRefund ? '-' : ''}${Math.abs(Number(p.amount)).toLocaleString()}</span>
+                            <span className={`font-mono font-medium ${isRefund ? 'text-[#ef4444]' : 'text-white'}`}>${isRefund ? '-' : ''}${Math.abs(Number(p.amount)).toLocaleString()}</span>
                             {p.payment_method && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: isRefund ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.06)', color: isRefund ? '#ef4444' : 'rgba(255,255,255,0.4)' }}>{t('profile.payment_method_' + p.payment_method) || p.payment_method.replace('_', ' ')}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: isRefund ? 'rgba(239,68,68,0.08)' : 'bg-white/10', color: isRefund ? '#ef4444' : 'text-white/40' }}>{t('profile.payment_method_' + p.payment_method) || p.payment_method.replace('_', ' ')}</span>
                             )}
                             {isRefund && refundTypeLabel && (
                               <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: refundTypeLabel === 'Insurance' ? 'rgba(79,209,255,0.1)' : 'rgba(0,229,168,0.1)', color: refundTypeLabel === 'Insurance' ? '#4FD1FF' : '#00E5A8' }}>
@@ -886,7 +894,7 @@ export default function PatientProfile() {
                               </span>
                             )}
                           </div>
-                          <span style={{ color: 'rgba(255,255,255,0.35)' }}>{p.created_at ? new Date(p.created_at).toLocaleDateString() : t('common.dash')}</span>
+                          <span className="text-white/35">{p.created_at ? new Date(p.created_at).toLocaleDateString() : t('common.dash')}</span>
                         </div>
                         );
                       })}
@@ -905,24 +913,24 @@ export default function PatientProfile() {
       {activeTab === 'Appointments' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.appointments_count', { count: patientAppointments.length })}</span>
-            <button onClick={() => setShowAddAppt(true)} className="h-9 px-4 rounded-xl flex items-center gap-1.5 text-xs font-bold" style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
+            <span className="text-sm text-white/35">{t('profile.appointments_count', { count: patientAppointments.length })}</span>
+            <button onClick={() => setShowAddAppt(true)} className="btn-primary btn-sm">
               <Plus className="w-3.5 h-3.5" /> {t('profile.new_appointment')}
             </button>
           </div>
           {patientAppointments.length === 0 ? (
-            <div className="py-12 text-center text-sm rounded-[18px]" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)' }}>{t('profile.no_appointments')}</div>
+            <div className="py-12 text-center text-sm card-cyber text-white/30">{t('profile.no_appointments')}</div>
           ) : patientAppointments.map(a => (
-            <div key={a.id} className="rounded-[18px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div key={a.id} className="card-cyber">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-sm font-semibold text-white">{new Date(a.appointment_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
-                  <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{new Date(a.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                  <div className="text-xs mt-1 text-white/35">{new Date(a.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={a.status} />
                   {a.status !== 'cancelled' && a.status !== 'completed' && (
-                    <button onClick={() => cancelApptMut.mutate(a.id)} className="text-[10px] px-2 py-1 rounded-lg" style={{ background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.15)', color: '#FF6B6B' }}>
+                    <button onClick={() => cancelApptMut.mutate(a.id)} className="text-[10px] px-2 py-1 rounded-lg bg-[rgba(255,107,107,0.1)] border border-[rgba(255,107,107,0.15)] text-[#FF6B6B]">
                       {t('profile.cancel_appointment')}
                     </button>
                   )}
@@ -939,95 +947,92 @@ export default function PatientProfile() {
       {activeTab === 'Documents' && (
         <div className="space-y-4">
           {/* Upload Area */}
-          <div className="rounded-[18px] p-5" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="card-cyber">
             <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
               <div className="flex items-center gap-3 flex-1 flex-wrap">
                 <select value={docCategory} onChange={e => setDocCategory(e.target.value as DocumentCategory)}
-                  className="h-10 px-3 rounded-xl text-sm outline-none bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white cursor-pointer min-w-[140px]">
-                  {docCategories.map(c => <option key={c.value} value={c.value} style={{ background: '#0D1B2A' }}>{c.icon} {t(docCategoryKeys[c.value])}</option>)}
+                  className="input-cyber cursor-pointer min-w-[140px]">
+                  {docCategories.map(c => <option key={c.value} value={c.value} className="bg-[#0D1B2A]">{c.icon} {t(docCategoryKeys[c.value])}</option>)}
                 </select>
                 <button onClick={() => docUploadRef.current?.click()} disabled={uploadingDocs}
-                  className="h-10 px-5 rounded-xl flex items-center gap-2 text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-                  style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
+                  className="btn-primary btn-sm">
                   <Upload className="w-4 h-4" /> {uploadingDocs ? t('profile.documents_uploading') : t('profile.documents_upload')}
                 </button>
                 <input ref={docUploadRef} type="file" multiple className="hidden" onChange={handleDocUpload} />
                 <button onClick={() => { setEditingImplantForm(null); setShowImplantFormDialog(true); }}
-                  className="h-10 px-5 rounded-xl flex items-center gap-2 text-sm font-bold transition-all active:scale-[0.98]"
-                  style={{ background: 'rgba(124,92,255,0.1)', border: '1px solid rgba(124,92,255,0.15)', color: '#7C5CFF' }}>
+                  className="btn-secondary btn-sm">
                   <FileText className="w-4 h-4" /> Implant Form
                 </button>
               </div>
               <div className="relative w-full md:w-48">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.25)' }} />
-                <input value={docSearch} onChange={e => setDocSearch(e.target.value)} placeholder={t('profile.documents_search')} className="w-full h-10 pl-9 pr-3 rounded-xl text-xs outline-none bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25" />
+                <input value={docSearch} onChange={e => setDocSearch(e.target.value)} placeholder={t('profile.documents_search')} className="input-cyber pl-9 text-xs" />
               </div>
             </div>
           </div>
 
           {/* File Grid */}
           {docsError ? (
-            <div className="py-12 text-center text-sm rounded-[18px]" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', color: '#FF6B6B' }}>
-              {t('profile.documents_failed')} <button onClick={() => refetchDocs()} className="underline" style={{ color: '#4FD1FF' }}>{t('profile.documents_retry')}</button>
+            <div className="py-12 text-center text-sm card-cyber text-[#FF6B6B]">
+              {t('profile.documents_failed')} <button onClick={() => refetchDocs()} className="underline text-cyan">{t('profile.documents_retry')}</button>
             </div>
           ) : filteredDocs.length === 0 ? (
-            <div className="py-12 text-center text-sm rounded-[18px]" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)' }}>
+            <div className="py-12 text-center text-sm card-cyber text-white/30">
               {docSearch ? t('profile.documents_no_match') : t('profile.documents_empty')}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {filteredDocs.map(item => item.type === 'file' ? (
-                <div key={item.data.id} className="rounded-[16px] p-4 transition-all hover:-translate-y-0.5 group" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div key={item.data.id} className="card-cyber hover:-translate-y-0.5 transition-all duration-200 group">
                   {(item.data as PatientFile).file_type.startsWith('image/') ? (
-                    <div className="w-full h-32 rounded-xl overflow-hidden mb-3 bg-[rgba(0,0,0,0.3)] flex items-center justify-center">
+                    <div className="w-full h-32 rounded-xl overflow-hidden mb-3 bg-black/30 flex items-center justify-center">
                       <img src={(item.data as PatientFile).public_url} alt="" className="w-full h-full object-cover" />
                     </div>
                   ) : (
-                    <div className="w-full h-32 rounded-xl mb-3 flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                    <div className="w-full h-32 rounded-xl mb-3 flex items-center justify-center bg-white/5">
                       {fileExtIcon((item.data as PatientFile).file_type)}
                     </div>
                   )}
                   {editDocId === item.data.id ? (
                     <div className="flex items-center gap-1">
-                      <input value={editDocName} onChange={e => setEditDocName(e.target.value)} className="flex-1 h-7 px-2 rounded-lg text-xs outline-none bg-[rgba(255,255,255,0.06)] text-white" autoFocus />
-                      <button onClick={() => handleRenameDoc(item.data.id)} className="w-6 h-6 rounded flex items-center justify-center" style={{ color: '#00E5A8' }}><Check className="w-3 h-3" /></button>
-                      <button onClick={() => setEditDocId(null)} className="w-6 h-6 rounded flex items-center justify-center" style={{ color: '#FF6B6B' }}><X className="w-3 h-3" /></button>
+                      <input value={editDocName} onChange={e => setEditDocName(e.target.value)} className="flex-1 h-7 px-2 rounded-lg text-xs outline-none bg-white/10 text-white" autoFocus />
+                      <button onClick={() => handleRenameDoc(item.data.id)} className="w-6 h-6 rounded flex items-center justify-center text-[#00E5A8]"><Check className="w-3 h-3" /></button>
+                      <button onClick={() => setEditDocId(null)} className="w-6 h-6 rounded flex items-center justify-center text-[#FF6B6B]"><X className="w-3 h-3" /></button>
                     </div>
                   ) : (
                     <p className="text-xs font-medium text-white truncate">{(item.data as PatientFile).file_name}</p>
                   )}
                   <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(79,209,255,0.08)', color: '#4FD1FF' }}>{(item.data as PatientFile).category}</span>
-                    <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{(item.data as PatientFile).file_size ? t('profile.documents_file_size', { size: ((item.data as PatientFile).file_size! / 1024).toFixed(0) }) : ''}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan">{(item.data as PatientFile).category}</span>
+                    <span className="text-[10px] text-white/25">{(item.data as PatientFile).file_size ? t('profile.documents_file_size', { size: ((item.data as PatientFile).file_size! / 1024).toFixed(0) }) : ''}</span>
                   </div>
-                  <div className="flex items-center gap-1 mt-3 pt-2 border-t border-[rgba(255,255,255,0.04)]">
+                  <div className="flex items-center gap-1 mt-3 pt-2 border-t border-app-border">
                     {(item.data as PatientFile).public_url && (
                       <a href={(item.data as PatientFile).public_url} target="_blank" rel="noopener noreferrer"
-                        className="flex-1 h-7 rounded-lg flex items-center justify-center gap-1 text-[10px] font-medium transition-all"
-                        style={{ background: 'rgba(79,209,255,0.08)', color: '#4FD1FF' }}>
+                        className="flex-1 h-7 rounded-lg flex items-center justify-center gap-1 text-[10px] font-medium transition-all text-cyan bg-cyan/10">
                         <Eye className="w-3 h-3" /> {t('profile.documents_view')}
                       </a>
                     )}
                     {(item.data as PatientFile).public_url && (
                       <a href={(item.data as PatientFile).public_url} download={(item.data as PatientFile).file_name}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center transition-all" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                        className="w-7 h-7 rounded-lg flex items-center justify-center transition-all text-white/30">
                         <Download className="w-3.5 h-3.5" />
                       </a>
                     )}
                     <button onClick={() => { setEditDocId(item.data.id); setEditDocName((item.data as PatientFile).file_name); }}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all text-white/30">
                       <Edit3 className="w-3 h-3" />
                     </button>
                     <button onClick={() => handleDeleteDoc(item.data)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-[rgba(255,107,107,0.1)]" style={{ color: '#FF6B6B' }}>
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all text-[#FF6B6B] hover:bg-[rgba(255,107,107,0.1)]">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
               ) : (
-                <div key={item.data.id} className="rounded-[16px] p-4 transition-all hover:-translate-y-0.5 group" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(124,92,255,0.15)' }}>
-                  <div className="w-full h-32 rounded-xl mb-3 flex items-center justify-center" style={{ background: 'rgba(124,92,255,0.06)' }}>
-                    <FileText className="w-10 h-10" style={{ color: '#7C5CFF' }} />
+                <div key={item.data.id} className="card-cyber hover:-translate-y-0.5 transition-all duration-200 group" style={{ borderColor: 'rgba(124,92,255,0.15)' }}>
+                  <div className="w-full h-32 rounded-xl mb-3 flex items-center justify-center bg-[rgba(124,92,255,0.06)]">
+                    <FileText className="w-10 h-10 text-secondary" />
                   </div>
                   <p className="text-xs font-medium text-white truncate">Implant Form — {(item.data as ImplantForm).tooth_number}</p>
                   <div className="flex items-center justify-between mt-1.5">
@@ -1038,20 +1043,19 @@ export default function PatientProfile() {
                       }}>
                       {(item.data as ImplantForm).status}
                     </span>
-                    <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{(item.data as ImplantForm).implant_type}</span>
+                    <span className="text-[10px] text-white/25">{(item.data as ImplantForm).implant_type}</span>
                   </div>
-                  <div className="flex items-center gap-1 mt-3 pt-2 border-t border-[rgba(255,255,255,0.04)]">
+                  <div className="flex items-center gap-1 mt-3 pt-2 border-t border-app-border">
                     <button onClick={() => { setViewingImplantForm(item.data as ImplantForm); setShowImplantFormViewer(true); }}
-                      className="flex-1 h-7 rounded-lg flex items-center justify-center gap-1 text-[10px] font-medium transition-all"
-                      style={{ background: 'rgba(124,92,255,0.08)', color: '#7C5CFF' }}>
+                      className="flex-1 h-7 rounded-lg flex items-center justify-center gap-1 text-[10px] font-medium transition-all text-secondary bg-[rgba(124,92,255,0.08)]">
                       <Eye className="w-3 h-3" /> View
                     </button>
                     <button onClick={() => { setEditingImplantForm(item.data as ImplantForm); setShowImplantFormDialog(true); }}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all" style={{ color: '#4FD1FF' }}>
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all text-cyan">
                       <Edit3 className="w-3 h-3" />
                     </button>
                     <button onClick={() => deleteImplantFormMut.mutate(item.data.id)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-[rgba(255,107,107,0.1)]" style={{ color: '#FF6B6B' }}>
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all text-[#FF6B6B] hover:bg-[rgba(255,107,107,0.1)]">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -1068,26 +1072,26 @@ export default function PatientProfile() {
       {activeTab === 'Timeline' && (
         <div className="space-y-3">
           {timelineEvents.length === 0 ? (
-            <div className="text-center py-16" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            <div className="text-center py-16 text-white/30">
               <div className="text-4xl mb-3">📋</div>
               <p className="text-sm">No timeline events recorded yet</p>
             </div>
           ) : (
             <div className="space-y-0">
               {timelineEvents.map(event => (
-                <div key={event.id} className="flex items-start gap-4 p-4 rounded-xl transition-colors hover:bg-[rgba(255,255,255,0.03)] cursor-pointer"
+                <div key={event.id} className="flex items-start gap-4 p-4 rounded-xl transition-colors hover:bg-white/5 cursor-pointer"
                   onClick={() => {
                     if (event.related_entity_type === 'appointment') navigate(`/dashboard/schedule`);
                     else if (event.related_entity_type === 'procedure') navigate(`/dashboard/cases`);
                     else if (event.related_entity_type === 'financial_record') navigate(`/dashboard/payments`);
                   }}
-                  style={{ borderLeft: `2px solid rgba(255,255,255,0.06)` }}>
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: 'rgba(79,209,255,0.08)' }}>
+                  style={{ borderLeft: '2px solid rgba(255,255,255,0.06)' }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-base shrink-0 bg-cyan/10">
                     {event.icon}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white/80 font-medium">{event.description}</p>
-                    <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-white/35">
                       <span>{new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                       <span>{event.time}</span>
                       {event.user_name && <span>by {event.user_name}</span>}
@@ -1103,42 +1107,41 @@ export default function PatientProfile() {
 
       {/* ─── Add Communication Modal ─── */}
       {showCommForm && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowCommForm(false)}>
-          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => setShowCommForm(false)}>
+          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border)' }}>
+            <div className="flex items-center justify-between p-6 border-b border-app-border">
               <h2 className="text-lg font-bold text-white">Record Communication</h2>
-              <button onClick={() => setShowCommForm(false)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
+              <button onClick={() => setShowCommForm(false)} className="w-8 h-8 rounded-xl flex items-center justify-center text-white/40"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Type</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">Type</label>
                 <select value={commForm.type} onChange={e => setCommForm(f => ({ ...f, type: e.target.value as Communication['type'] }))}
-                  className={inputCls + ' cursor-pointer'}>
-                  <option value="note" style={{ background: '#0D1B2A' }}>Note</option>
-                  <option value="call" style={{ background: '#0D1B2A' }}>Phone Call</option>
-                  <option value="email" style={{ background: '#0D1B2A' }}>Email</option>
-                  <option value="sms" style={{ background: '#0D1B2A' }}>SMS</option>
+                  className="input-cyber cursor-pointer">
+                  <option value="note" className="bg-[#0D1B2A]">Note</option>
+                  <option value="call" className="bg-[#0D1B2A]">Phone Call</option>
+                  <option value="email" className="bg-[#0D1B2A]">Email</option>
+                  <option value="sms" className="bg-[#0D1B2A]">SMS</option>
                 </select>
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Direction</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">Direction</label>
                 <select value={commForm.direction} onChange={e => setCommForm(f => ({ ...f, direction: e.target.value as Communication['direction'] }))}
-                  className={inputCls + ' cursor-pointer'}>
-                  <option value="outbound" style={{ background: '#0D1B2A' }}>Outbound (to patient)</option>
-                  <option value="inbound" style={{ background: '#0D1B2A' }}>Inbound (from patient)</option>
+                  className="input-cyber cursor-pointer">
+                  <option value="outbound" className="bg-[#0D1B2A]">Outbound (to patient)</option>
+                  <option value="inbound" className="bg-[#0D1B2A]">Inbound (from patient)</option>
                 </select>
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Content</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">Content</label>
                 <textarea value={commForm.content} onChange={e => setCommForm(f => ({ ...f, content: e.target.value }))}
-                  rows={3} className={inputCls + ' h-20 pt-2 resize-none'} placeholder="Enter notes or message content..." />
+                  rows={3} className="input-cyber h-20 pt-2 resize-none" placeholder="Enter notes or message content..." />
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
-              <button onClick={() => setShowCommForm(false)} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Cancel</button>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-app-border">
+              <button onClick={() => setShowCommForm(false)} className="btn-ghost btn-sm">Cancel</button>
               <button onClick={() => createCommMut.mutate()} disabled={!commForm.content.trim() || createCommMut.isPending}
-                className="h-10 px-6 rounded-xl text-sm font-bold disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
+                className="btn-primary btn-sm">
                 {createCommMut.isPending ? 'Saving...' : 'Save'}
               </button>
             </div>
@@ -1150,31 +1153,30 @@ export default function PatientProfile() {
 
       {/* Add Invoice Modal */}
       {showAddInvoice && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowAddInvoice(false)}>
-          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => setShowAddInvoice(false)}>
+          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border)' }}>
+            <div className="flex items-center justify-between p-6 border-b border-app-border">
               <h2 className="text-lg font-bold text-white">{t('profile.modal_new_invoice')}</h2>
-              <button onClick={() => setShowAddInvoice(false)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
+              <button onClick={() => setShowAddInvoice(false)} className="w-8 h-8 rounded-xl flex items-center justify-center text-white/40"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.modal_invoice_name')}</label>
-                <input value={invForm.invoice_name} onChange={e => setInvForm(f => ({ ...f, invoice_name: e.target.value }))} placeholder={t('profile.modal_invoice_placeholder')} className={inputCls} />
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">{t('profile.modal_invoice_name')}</label>
+                <input value={invForm.invoice_name} onChange={e => setInvForm(f => ({ ...f, invoice_name: e.target.value }))} placeholder={t('profile.modal_invoice_placeholder')} className="input-cyber" />
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.modal_total_amount')}</label>
-                <input type="number" min="0" step="0.01" value={invForm.total_amount} onChange={e => setInvForm(f => ({ ...f, total_amount: e.target.value }))} className={inputCls} />
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">{t('profile.modal_total_amount')}</label>
+                <input type="number" min="0" step="0.01" value={invForm.total_amount} onChange={e => setInvForm(f => ({ ...f, total_amount: e.target.value }))} className="input-cyber" />
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.modal_notes')}</label>
-                <textarea value={invForm.notes} onChange={e => setInvForm(f => ({ ...f, notes: e.target.value }))} rows={2} className={inputCls + ' h-16 pt-2 resize-none'} />
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">{t('profile.modal_notes')}</label>
+                <textarea value={invForm.notes} onChange={e => setInvForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="input-cyber h-16 pt-2 resize-none" />
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
-              <button onClick={() => setShowAddInvoice(false)} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('common.cancel')}</button>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-app-border">
+              <button onClick={() => setShowAddInvoice(false)} className="btn-ghost btn-sm">{t('common.cancel')}</button>
               <button onClick={handleCreateInvoice} disabled={createInvoiceMut.isPending}
-                className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
+                className="btn-primary btn-sm">
                 {createInvoiceMut.isPending ? t('profile.modal_creating') : t('profile.modal_create_invoice')}
               </button>
             </div>
@@ -1184,40 +1186,39 @@ export default function PatientProfile() {
 
       {/* Record Payment Modal */}
       {showPayModal && payingInvoice && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowPayModal(false); setPayingInvoice(null); }}>
-          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowPayModal(false); setPayingInvoice(null); }}>
+          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border)' }}>
+            <div className="flex items-center justify-between p-6 border-b border-app-border">
               <div>
                 <h2 className="text-lg font-bold text-white">{t('profile.modal_record_payment')}</h2>
-                <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{payingInvoice.invoice_name}</p>
+                <p className="text-xs mt-1 text-white/35">{payingInvoice.invoice_name}</p>
               </div>
-              <button onClick={() => { setShowPayModal(false); setPayingInvoice(null); }} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
+              <button onClick={() => { setShowPayModal(false); setPayingInvoice(null); }} className="w-8 h-8 rounded-xl flex items-center justify-center text-white/40"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{t('profile.total_label')}: ${Number(payingInvoice.total_amount).toLocaleString()}</span>
-                <span className="text-xs text-[#00E5A8]">{t('profile.paid_label')}: ${Number(payingInvoice.paid_so_far).toLocaleString()}</span>
-                <span className="text-xs text-[#FFC107]">{t('profile.remaining_label')}: ${Number(payingInvoice.remaining_amount).toLocaleString()}</span>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-xs text-white/40 font-mono">{t('profile.total_label')}: ${Number(payingInvoice.total_amount).toLocaleString()}</span>
+                <span className="text-xs text-[#00E5A8] font-mono">{t('profile.paid_label')}: ${Number(payingInvoice.paid_so_far).toLocaleString()}</span>
+                <span className="text-xs text-warning font-mono">{t('profile.remaining_label')}: ${Number(payingInvoice.remaining_amount).toLocaleString()}</span>
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.modal_amount')}</label>
-                <input type="number" min="0" step="0.01" value={payAmount} onChange={e => setPayAmount(e.target.value)} className={inputCls} />
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">{t('profile.modal_amount')}</label>
+                <input type="number" min="0" step="0.01" value={payAmount} onChange={e => setPayAmount(e.target.value)} className="input-cyber" />
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.modal_method')}</label>
-                <select value={payMethod} onChange={e => setPayMethod(e.target.value)} className={inputCls + ' cursor-pointer'}>
-                  <option value="cash" style={{ background: '#0D1B2A' }}>{t('profile.payment_method_cash')}</option>
-                  <option value="card" style={{ background: '#0D1B2A' }}>{t('profile.payment_method_card')}</option>
-                  <option value="insurance" style={{ background: '#0D1B2A' }}>{t('profile.payment_method_insurance')}</option>
-                  <option value="bank_transfer" style={{ background: '#0D1B2A' }}>{t('profile.payment_method_bank_transfer')}</option>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">{t('profile.modal_method')}</label>
+                <select value={payMethod} onChange={e => setPayMethod(e.target.value)} className="input-cyber cursor-pointer">
+                  <option value="cash" className="bg-[#0D1B2A]">{t('profile.payment_method_cash')}</option>
+                  <option value="card" className="bg-[#0D1B2A]">{t('profile.payment_method_card')}</option>
+                  <option value="insurance" className="bg-[#0D1B2A]">{t('profile.payment_method_insurance')}</option>
+                  <option value="bank_transfer" className="bg-[#0D1B2A]">{t('profile.payment_method_bank_transfer')}</option>
                 </select>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
-              <button onClick={() => { setShowPayModal(false); setPayingInvoice(null); }} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('common.cancel')}</button>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-app-border">
+              <button onClick={() => { setShowPayModal(false); setPayingInvoice(null); }} className="btn-ghost btn-sm">{t('common.cancel')}</button>
               <button onClick={handlePay} disabled={addPayMut.isPending}
-                className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
+                className="btn-primary btn-sm">
                 {addPayMut.isPending ? t('profile.modal_recording') : t('profile.modal_record_payment_btn')}
               </button>
             </div>
@@ -1227,54 +1228,61 @@ export default function PatientProfile() {
 
       {/* Refund Modal */}
       {showRefundModal && refundingInvoice && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowRefundModal(false); setRefundingInvoice(null); setRefundAmount(''); }}>
-          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowRefundModal(false); setRefundingInvoice(null); setRefundAmount(''); }}>
+          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border)' }}>
+            <div className="flex items-center justify-between p-6 border-b border-app-border">
               <div>
                 <h2 className="text-lg font-bold text-white">Process Refund</h2>
-                <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{refundingInvoice.invoice_name}</p>
+                <p className="text-xs mt-1 text-white/35">{refundingInvoice.invoice_name}</p>
               </div>
-              <button onClick={() => { setShowRefundModal(false); setRefundingInvoice(null); setRefundAmount(''); }} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
+              <button onClick={() => { setShowRefundModal(false); setRefundingInvoice(null); setRefundAmount(''); }} className="w-8 h-8 rounded-xl flex items-center justify-center text-white/40"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Total: ${Number(refundingInvoice.total_amount).toLocaleString()}</span>
-                <span className="text-xs text-[#00E5A8]">Paid: ${Number(refundingInvoice.paid_so_far).toLocaleString()}</span>
-                <span className="text-xs text-[#ef4444]">Refundable: ${Number(refundingInvoice.paid_so_far).toLocaleString()}</span>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-xs text-white/40 font-mono">Total: ${Number(refundingInvoice.total_amount).toLocaleString()}</span>
+                <span className="text-xs text-[#00E5A8] font-mono">Paid: ${Number(refundingInvoice.paid_so_far).toLocaleString()}</span>
+                <span className="text-xs text-[#ef4444] font-mono">Refundable: ${Number(refundingInvoice.paid_so_far).toLocaleString()}</span>
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Refund Amount</label>
-                <input type="number" min="0" max={Number(refundingInvoice.paid_so_far)} step="0.01" value={refundAmount} onChange={e => setRefundAmount(e.target.value)} className={inputCls} />
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">Refund Amount</label>
+                <input type="number" min="0" max={Number(refundingInvoice.paid_so_far)} step="0.01" value={refundAmount} onChange={e => setRefundAmount(e.target.value)} className="input-cyber" />
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Refund Method</label>
-                <select value={refundMethod} onChange={e => setRefundMethod(e.target.value)} className={inputCls + ' cursor-pointer'}>
-                  <option value="cash" style={{ background: '#0D1B2A' }}>Cash</option>
-                  <option value="card" style={{ background: '#0D1B2A' }}>Card</option>
-                  <option value="bank_transfer" style={{ background: '#0D1B2A' }}>Bank Transfer</option>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">Refund Method</label>
+                <select value={refundMethod} onChange={e => setRefundMethod(e.target.value)} className="input-cyber cursor-pointer">
+                  <option value="cash" className="bg-[#0D1B2A]">Cash</option>
+                  <option value="card" className="bg-[#0D1B2A]">Card</option>
+                  <option value="bank_transfer" className="bg-[#0D1B2A]">Bank Transfer</option>
                 </select>
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Refund Type</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">Refund Type</label>
                 <div className="flex gap-2">
                   <button onClick={() => setRefundType('cash')}
                     className="flex-1 h-10 rounded-xl text-sm font-medium transition-all"
-                    style={{ background: refundType === 'cash' ? 'rgba(0,229,168,0.15)' : 'rgba(255,255,255,0.04)', border: refundType === 'cash' ? '1px solid rgba(0,229,168,0.3)' : '1px solid rgba(255,255,255,0.06)', color: refundType === 'cash' ? '#00E5A8' : 'rgba(255,255,255,0.5)' }}>
+                    style={{
+                      background: refundType === 'cash' ? 'rgba(0,229,168,0.15)' : 'bg-white/5',
+                      border: refundType === 'cash' ? '1px solid rgba(0,229,168,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                      color: refundType === 'cash' ? '#00E5A8' : 'text-white/50',
+                    }}>
                     Cash Refund
                   </button>
                   <button onClick={() => setRefundType('insurance')}
                     className="flex-1 h-10 rounded-xl text-sm font-medium transition-all"
-                    style={{ background: refundType === 'insurance' ? 'rgba(79,209,255,0.15)' : 'rgba(255,255,255,0.04)', border: refundType === 'insurance' ? '1px solid rgba(79,209,255,0.3)' : '1px solid rgba(255,255,255,0.06)', color: refundType === 'insurance' ? '#4FD1FF' : 'rgba(255,255,255,0.5)' }}>
+                    style={{
+                      background: refundType === 'insurance' ? 'rgba(79,209,255,0.15)' : 'bg-white/5',
+                      border: refundType === 'insurance' ? '1px solid rgba(79,209,255,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                      color: refundType === 'insurance' ? '#4FD1FF' : 'text-white/50',
+                    }}>
                     Insurance Refund
                   </button>
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
-              <button onClick={() => { setShowRefundModal(false); setRefundingInvoice(null); setRefundAmount(''); }} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Cancel</button>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-app-border">
+              <button onClick={() => { setShowRefundModal(false); setRefundingInvoice(null); setRefundAmount(''); }} className="btn-ghost btn-sm">Cancel</button>
               <button onClick={handleRefund} disabled={refundMut.isPending}
-                className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-                style={{ background: '#ef4444', color: 'white' }}>
+                className="btn-danger btn-sm">
                 {refundMut.isPending ? 'Processing...' : 'Process Refund'}
               </button>
             </div>
@@ -1284,35 +1292,35 @@ export default function PatientProfile() {
 
       {/* Account Statement Modal */}
       {showStatement && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowStatement(false)}>
-          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)] sticky top-0" style={{ background: 'rgba(13,24,40,0.98)' }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => setShowStatement(false)}>
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-[24px]" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border)' }}>
+            <div className="flex items-center justify-between p-6 border-b border-app-border sticky top-0" style={{ background: 'var(--app-surface-modal)' }}>
               <div>
                 <h2 className="text-lg font-bold text-white">{t('profile.modal_statement_title')}</h2>
-                <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{patient?.full_name}</p>
+                <p className="text-xs mt-1 text-white/35">{patient?.full_name}</p>
               </div>
-              <button onClick={() => setShowStatement(false)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
+              <button onClick={() => setShowStatement(false)} className="w-8 h-8 rounded-xl flex items-center justify-center text-white/40"><X className="w-4 h-4" /></button>
             </div>
 
             {/* Summary */}
             <div className="grid grid-cols-3 gap-4 p-6">
-              <div className="rounded-[16px] p-4 text-center" style={{ background: 'rgba(124,92,255,0.06)', border: '1px solid rgba(124,92,255,0.1)' }}>
-                <div className="text-lg font-bold text-[#7C5CFF]">${totalInvoiced.toLocaleString()}</div>
-                <div className="text-[10px] font-medium uppercase tracking-wider mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.modal_statement_total_invoiced')}</div>
+              <div className="card-cyber text-center" style={{ background: 'rgba(124,92,255,0.06)', borderColor: 'rgba(124,92,255,0.1)' }}>
+                <div className="text-lg font-bold text-secondary font-mono">${totalInvoiced.toLocaleString()}</div>
+                <div className="text-[10px] font-medium uppercase tracking-wider mt-1 text-white/35">{t('profile.modal_statement_total_invoiced')}</div>
               </div>
-              <div className="rounded-[16px] p-4 text-center" style={{ background: 'rgba(0,229,168,0.06)', border: '1px solid rgba(0,229,168,0.1)' }}>
-                <div className="text-lg font-bold text-[#00E5A8]">${totalPaid.toLocaleString()}</div>
-                <div className="text-[10px] font-medium uppercase tracking-wider mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.modal_statement_total_paid')}</div>
+              <div className="card-cyber text-center" style={{ background: 'rgba(0,229,168,0.06)', borderColor: 'rgba(0,229,168,0.1)' }}>
+                <div className="text-lg font-bold text-[#00E5A8] font-mono">${totalPaid.toLocaleString()}</div>
+                <div className="text-[10px] font-medium uppercase tracking-wider mt-1 text-white/35">{t('profile.modal_statement_total_paid')}</div>
               </div>
-              <div className="rounded-[16px] p-4 text-center" style={{ background: 'rgba(255,193,7,0.06)', border: '1px solid rgba(255,193,7,0.1)' }}>
-                <div className="text-lg font-bold text-[#FFC107]">${totalRemaining.toLocaleString()}</div>
-                <div className="text-[10px] font-medium uppercase tracking-wider mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.modal_statement_remaining')}</div>
+              <div className="card-cyber text-center" style={{ background: 'rgba(255,193,7,0.06)', borderColor: 'rgba(255,193,7,0.1)' }}>
+                <div className="text-lg font-bold text-warning font-mono">${totalRemaining.toLocaleString()}</div>
+                <div className="text-[10px] font-medium uppercase tracking-wider mt-1 text-white/35">{t('profile.modal_statement_remaining')}</div>
               </div>
             </div>
 
             {/* Timeline */}
             <div className="px-6 pb-6">
-              <h3 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('profile.modal_statement_history')}</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wider mb-4 text-white/35">{t('profile.modal_statement_history')}</h3>
               {(() => {
                 const entries = [
                   ...invoices.map(inv => ({ ...inv, entry_type: 'invoice' as const, entry_date: inv.created_at || '' })),
@@ -1322,10 +1330,10 @@ export default function PatientProfile() {
                 let runningBalance = 0;
 
                 return entries.length === 0 ? (
-                  <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.modal_statement_empty')}</div>
+                  <div className="py-8 text-center text-sm text-white/30">{t('profile.modal_statement_empty')}</div>
                 ) : (
                   <div className="space-y-1">
-                    <div className="flex items-center text-[10px] font-semibold uppercase tracking-wider px-4 py-2 rounded-lg" style={{ color: 'rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.02)' }}>
+                    <div className="flex items-center text-[10px] font-semibold uppercase tracking-wider px-4 py-2 rounded-lg text-white/25 bg-white/5">
                       <div className="w-24">{t('profile.modal_statement_date')}</div>
                       <div className="flex-1">{t('profile.modal_statement_description')}</div>
                       <div className="w-20 text-right">{t('profile.modal_statement_amount')}</div>
@@ -1339,28 +1347,28 @@ export default function PatientProfile() {
                       }
                       const isInvoice = entry.entry_type === 'invoice';
                       return (
-                        <div key={`${entry.entry_type}-${entry.id}`} className="flex items-center px-4 py-2.5 rounded-lg text-xs transition-all hover:bg-[rgba(255,255,255,0.02)]" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                          <div className="w-24" style={{ color: 'rgba(255,255,255,0.4)' }}>{new Date(entry.entry_date).toLocaleDateString()}</div>
+                        <div key={`${entry.entry_type}-${entry.id}`} className="flex items-center px-4 py-2.5 rounded-lg text-xs transition-all hover:bg-white/5" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                          <div className="w-24 text-white/40">{new Date(entry.entry_date).toLocaleDateString()}</div>
                           <div className="flex-1 flex items-center gap-2">
                             {isInvoice ? (
-                              <><FileText className="w-3.5 h-3.5" style={{ color: '#7C5CFF' }} /><span className="text-white">{entry.invoice_name || t('profile.modal_statement_invoice')}</span></>
+                              <><FileText className="w-3.5 h-3.5 text-secondary" /><span className="text-white">{entry.invoice_name || t('profile.modal_statement_invoice')}</span></>
                             ) : (
-                              <><CreditCard className="w-3.5 h-3.5" style={{ color: '#00E5A8' }} /><span className="text-white">{t('profile.modal_statement_payment')}</span>{entry.payment_method && <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)' }}>{t('profile.payment_method_' + entry.payment_method) || entry.payment_method.replace('_', ' ')}</span>}</>
+                              <><CreditCard className="w-3.5 h-3.5 text-[#00E5A8]" /><span className="text-white">{t('profile.modal_statement_payment')}</span>{entry.payment_method && <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/30">{t('profile.payment_method_' + entry.payment_method) || entry.payment_method.replace('_', ' ')}</span>}</>
                             )}
                           </div>
-                          <div className="w-20 text-right font-medium" style={{ color: isInvoice ? '#7C5CFF' : '#00E5A8' }}>
+                          <div className="w-20 text-right font-mono font-medium" style={{ color: isInvoice ? '#7C5CFF' : '#00E5A8' }}>
                             {isInvoice ? '+' : '-'}${isInvoice ? Number(entry.total_amount).toLocaleString() : Number(entry.amount).toLocaleString()}
                           </div>
-                          <div className="w-24 text-right font-semibold text-white">${runningBalance.toLocaleString()}</div>
+                          <div className="w-24 text-right font-mono font-semibold text-white">${runningBalance.toLocaleString()}</div>
                         </div>
                       );
                     })}
                     {/* Final balance */}
                     <div className="flex items-center px-4 py-3 rounded-lg text-sm font-bold" style={{ background: 'rgba(255,193,7,0.06)', border: '1px solid rgba(255,193,7,0.1)' }}>
                       <div className="w-24" />
-                      <div className="flex-1 text-[#FFC107]">{t('profile.modal_statement_due')}</div>
+                      <div className="flex-1 text-warning">{t('profile.modal_statement_due')}</div>
                       <div className="w-20 text-right" />
-                      <div className="w-24 text-right text-[#FFC107]">${totalRemaining.toLocaleString()}</div>
+                      <div className="w-24 text-right font-mono text-warning">${totalRemaining.toLocaleString()}</div>
                     </div>
                   </div>
                 );
@@ -1372,30 +1380,29 @@ export default function PatientProfile() {
 
       {/* New Appointment Modal */}
       {showAddAppt && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setShowAddAppt(false)}>
-          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => setShowAddAppt(false)}>
+          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border)' }}>
+            <div className="flex items-center justify-between p-6 border-b border-app-border">
               <h2 className="text-lg font-bold text-white">{t('profile.modal_new_appointment')}</h2>
-              <button onClick={() => setShowAddAppt(false)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
+              <button onClick={() => setShowAddAppt(false)} className="w-8 h-8 rounded-xl flex items-center justify-center text-white/40"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.modal_appt_datetime')}</label>
-                <input type="datetime-local" value={apptForm.appointment_date} onChange={e => setApptForm(f => ({ ...f, appointment_date: e.target.value }))} className={inputCls + ' [color-scheme:dark]'} />
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">{t('profile.modal_appt_datetime')}</label>
+                <input type="datetime-local" value={apptForm.appointment_date} onChange={e => setApptForm(f => ({ ...f, appointment_date: e.target.value }))} className="input-cyber [color-scheme:dark]" />
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('profile.modal_appt_status')}</label>
-                <select value={apptForm.status} onChange={e => setApptForm(f => ({ ...f, status: e.target.value }))} className={inputCls + ' cursor-pointer'}>
-                  <option value="scheduled" style={{ background: '#0D1B2A' }}>{t('profile.modal_appt_scheduled')}</option>
-                  <option value="confirmed" style={{ background: '#0D1B2A' }}>{t('profile.modal_appt_confirmed')}</option>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5 text-white/30">{t('profile.modal_appt_status')}</label>
+                <select value={apptForm.status} onChange={e => setApptForm(f => ({ ...f, status: e.target.value }))} className="input-cyber cursor-pointer">
+                  <option value="scheduled" className="bg-[#0D1B2A]">{t('profile.modal_appt_scheduled')}</option>
+                  <option value="confirmed" className="bg-[#0D1B2A]">{t('profile.modal_appt_confirmed')}</option>
                 </select>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
-              <button onClick={() => setShowAddAppt(false)} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('common.cancel')}</button>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-app-border">
+              <button onClick={() => setShowAddAppt(false)} className="btn-ghost btn-sm">{t('common.cancel')}</button>
               <button onClick={() => createApptMut.mutate()} disabled={createApptMut.isPending || !apptForm.appointment_date}
-                className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
+                className="btn-primary btn-sm">
                 {createApptMut.isPending ? t('profile.modal_creating') : t('profile.modal_create_appointment')}
               </button>
             </div>

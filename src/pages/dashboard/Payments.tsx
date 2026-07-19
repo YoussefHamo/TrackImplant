@@ -15,25 +15,27 @@ import type { FinancialRecord, PaymentMethod, ChangeReason } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import ReasonDialog from '../../components/ReasonDialog';
 import FixedOverlay from '../../components/ui/FixedOverlay';
+import EmptyState from '../../components/ui/EmptyState';
 
-const statusColors: Record<string, { bg: string; text: string }> = {
-  Paid: { bg: 'rgba(0,229,168,0.12)', text: '#00E5A8' },
-  Partial: { bg: 'rgba(79,209,255,0.12)', text: '#4FD1FF' },
-  Pending: { bg: 'rgba(255,193,7,0.12)', text: '#FFC107' },
+const statusColors: Record<string, string> = {
+  Paid: 'var(--color-success)',
+  Partial: 'var(--color-primary)',
+  Pending: 'var(--color-warning)',
+  Overdue: 'var(--color-error)',
+  Cancelled: '#9E9E9E',
+  Refunded: '#7C5CFF',
 };
 
 function Badge({ status }: { status: string }) {
-  const c = statusColors[status] || statusColors.Pending;
+  const color = statusColors[status] || 'var(--color-warning)';
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
-      style={{ background: c.bg, color: c.text }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: c.text }} />
+      style={{ background: `${color}1A`, color }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
       {status}
     </span>
   );
 }
-
-const inputCls = 'w-full h-10 px-3 rounded-xl text-sm outline-none transition-all bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500';
 
 export default function Payments() {
   const queryClient = useQueryClient();
@@ -229,18 +231,16 @@ export default function Payments() {
   };
 
   return (
-    <div className="font-sans select-auto space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">{t('payments.title')}</h1>
-          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
+          <h1 className="text-2xl font-bold text-[var(--color-on-surface)]">{t('payments.title')}</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--app-text-muted)' }}>
             {t('payments.subtitle', { count: a.invoiceCount, amount: a.totalRevenue.toLocaleString() })}
           </p>
         </div>
-        <button onClick={() => setShowAddInvoiceModal(true)}
-          className="h-10 px-5 rounded-xl flex items-center gap-2 text-sm font-bold transition-all duration-300 active:scale-[0.98]"
-          style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
+        <button onClick={() => setShowAddInvoiceModal(true)} className="btn-primary">
           <Plus className="w-4 h-4" /> {t('payments.new_invoice')}
         </button>
       </div>
@@ -248,66 +248,64 @@ export default function Payments() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { icon: DollarSign, label: t('payments.kpi_total_revenue'), value: `$${a.totalRevenue.toLocaleString()}`, color: '#00E5A8', bg: 'rgba(0,229,168,0.1)' },
-          { icon: Clock, label: t('payments.kpi_pending_revenue'), value: `$${a.totalPending.toLocaleString()}`, color: '#FFC107', bg: 'rgba(255,193,7,0.1)' },
-          { icon: TrendingUp, label: t('payments.kpi_monthly_collected'), value: `$${a.monthlyCollected.toLocaleString()}`, color: '#4FD1FF', bg: 'rgba(79,209,255,0.1)' },
-          { icon: TrendingUp, label: t('payments.kpi_monthly_growth'), value: `${a.monthlyGrowth >= 0 ? '+' : ''}${a.monthlyGrowth}%`, color: a.monthlyGrowth >= 0 ? '#00E5A8' : '#ef4444', bg: a.monthlyGrowth >= 0 ? 'rgba(0,229,168,0.1)' : 'rgba(239,68,68,0.1)' },
-          { icon: FileText, label: t('payments.kpi_total_invoices'), value: a.invoiceCount.toLocaleString(), color: '#7C5CFF', bg: 'rgba(124,92,255,0.1)' },
-          { icon: PieChart, label: t('payments.kpi_status_format', { paid: a.paidCount, partial: a.partialCount, pending: a.pendingCount }), value: `${a.paidCount} / ${a.partialCount} / ${a.pendingCount}`, color: '#4FD1FF', bg: 'rgba(79,209,255,0.1)' },
+          { icon: DollarSign, label: t('payments.kpi_total_revenue'), value: `$${a.totalRevenue.toLocaleString()}`, color: 'var(--color-success)', bg: 'var(--color-success-container)' },
+          { icon: Clock, label: t('payments.kpi_pending_revenue'), value: `$${a.totalPending.toLocaleString()}`, color: 'var(--color-warning)', bg: 'var(--color-warning-container)' },
+          { icon: TrendingUp, label: t('payments.kpi_monthly_collected'), value: `$${a.monthlyCollected.toLocaleString()}`, color: 'var(--color-primary)', bg: 'var(--color-primary-container)' },
+          { icon: TrendingUp, label: t('payments.kpi_monthly_growth'), value: `${a.monthlyGrowth >= 0 ? '+' : ''}${a.monthlyGrowth}%`, color: a.monthlyGrowth >= 0 ? 'var(--color-success)' : 'var(--color-error)', bg: a.monthlyGrowth >= 0 ? 'var(--color-success-container)' : 'var(--color-error-container)' },
+          { icon: FileText, label: t('payments.kpi_total_invoices'), value: a.invoiceCount.toLocaleString(), color: 'var(--color-secondary)', bg: 'var(--color-secondary-container)' },
+          { icon: PieChart, label: t('payments.kpi_status_format', { paid: a.paidCount, partial: a.partialCount, pending: a.pendingCount }), value: `${a.paidCount} / ${a.partialCount} / ${a.pendingCount}`, color: 'var(--color-primary)', bg: 'var(--color-primary-container)' },
           { icon: Heart, label: t('payments.kpi_insurance_revenue'), value: `$${insuranceRevenue.toLocaleString()}`, color: '#ff6b9d', bg: 'rgba(255,107,157,0.1)' },
         ].map((card, i) => (
-          <div key={i} className="rounded-[18px] p-5 transition-all duration-300 hover:-translate-y-0.5"
-            style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
+          <div key={i} className="card-cyber hover:-translate-y-0.5 transition-all duration-300">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: card.bg, border: `1px solid ${card.color}22` }}>
                 <card.icon className="w-5 h-5" style={{ color: card.color }} />
               </div>
             </div>
-            <div className="text-xl font-bold text-white">{card.value}</div>
-            <div className="text-[10px] mt-0.5 font-medium uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>{card.label}</div>
+            <div className="text-xl font-bold text-[var(--color-on-surface)] font-mono">{card.value}</div>
+            <div className="text-[10px] mt-0.5 font-medium uppercase tracking-wider" style={{ color: 'var(--app-text-muted)' }}>{card.label}</div>
           </div>
         ))}
       </div>
 
       {/* Monthly Chart */}
-      <div className="rounded-[20px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
-        <h3 className="text-base font-semibold text-white mb-4">{t('payments.chart_title')}</h3>
+      <div className="card-cyber">
+        <h3 className="text-base font-semibold text-[var(--color-on-surface)] mb-4">{t('payments.chart_title')}</h3>
         <div className="h-[220px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthlyData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-              <XAxis dataKey="name" stroke="rgba(255,255,255,0.15)" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis stroke="rgba(255,255,255,0.15)" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ background: 'rgba(8,15,25,0.95)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', fontSize: '12px' }} />
-              <Bar dataKey="collected" name={t('payments.chart_collected')} fill="#4FD1FF" radius={[4, 4, 0, 0]} maxBarSize={24} />
-              <Bar dataKey="pending" name={t('payments.chart_pending')} fill="#FFC107" radius={[4, 4, 0, 0]} maxBarSize={24} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--app-border)" />
+              <XAxis dataKey="name" stroke="var(--app-text-muted)" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis stroke="var(--app-text-muted)" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border-light)', borderRadius: '12px', color: 'var(--color-on-surface)', fontSize: '12px' }} />
+              <Bar dataKey="collected" name={t('payments.chart_collected')} fill="var(--color-primary)" radius={[4, 4, 0, 0]} maxBarSize={24} />
+              <Bar dataKey="pending" name={t('payments.chart_pending')} fill="var(--color-warning)" radius={[4, 4, 0, 0]} maxBarSize={24} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Patient Selector */}
-      <div className="rounded-[20px] p-6" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
+      <div className="card-cyber">
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <User className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.3)' }} />
-            <span className="text-sm font-semibold text-white">{t('payments.patient_label')}</span>
+            <User className="w-4 h-4" style={{ color: 'var(--app-text-muted)' }} />
+            <span className="text-sm font-semibold text-[var(--color-on-surface)]">{t('payments.patient_label')}</span>
           </div>
           <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.25)' }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--app-text-muted)' }} />
             <input value={patientSearch} onChange={e => { setPatientSearch(e.target.value); setSelectedPatientId(''); setPage(1); }}
-              placeholder={t('payments.patient_search')}
-              className="w-full h-10 pl-9 pr-3 rounded-xl text-sm outline-none bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500" />
+              placeholder={t('payments.patient_search')} className="input-cyber pl-9" />
           </div>
           <select value={selectedPatientId} onChange={e => { setSelectedPatientId(e.target.value); setPage(1); }}
-            className="h-10 px-4 rounded-xl text-sm outline-none bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white cursor-pointer appearance-none min-w-[180px]">
-            <option value="" style={{ background: '#0D1B2A' }}>{t('payments.patient_select')}</option>
+            className="input-cyber cursor-pointer appearance-none min-w-[180px]">
+            <option value="">{t('payments.patient_select')}</option>
             {filteredPatients.map(p => (
-              <option key={p.id} value={p.id} style={{ background: '#0D1B2A' }}>{p.full_name}</option>
+              <option key={p.id} value={p.id}>{p.full_name}</option>
             ))}
           </select>
           {selectedPatient && (
-            <span className="text-xs px-3 py-1.5 rounded-lg" style={{ background: 'rgba(0,229,168,0.1)', border: '1px solid rgba(0,229,168,0.12)', color: '#00E5A8' }}>
+            <span className="text-xs px-3 py-1.5 rounded-lg" style={{ background: 'var(--color-success-container)', border: '1px solid rgba(52,211,153,0.12)', color: 'var(--color-success)' }}>
               {t('payments.patient_invoices', { count: invoices.length })}
             </span>
           )}
@@ -315,149 +313,136 @@ export default function Payments() {
       </div>
 
       {/* Invoices Table */}
-      <div className="overflow-x-auto rounded-[20px]" style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
-        <div className="min-w-[800px]">
-        <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
-          style={{ color: 'rgba(255,255,255,0.25)' }}>
-          <div className="flex-[2]">{t('payments.table_invoice')}</div>
-          <div className="flex-[1]">{t('payments.table_total')}</div>
-          <div className="flex-[1]">{t('payments.table_paid')}</div>
-          <div className="flex-[1]">{t('payments.table_remaining')}</div>
-          <div className="flex-[0.8]">{t('payments.table_branch')}</div>
-          <div className="flex-[1]">Doctor</div>
-          <div className="flex-[0.9]">Procedure</div>
-          <div className="flex-[1]">{t('payments.table_status')}</div>
-          <div className="flex-[1]">{t('payments.table_date')}</div>
-          <div className="w-28 text-right">{t('payments.table_actions')}</div>
-        </div>
+      <div className="card-cyber p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <div className="min-w-[800px]">
+            <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b" style={{ borderColor: 'var(--app-border)', color: 'var(--app-text-muted)' }}>
+              <div className="flex-[2]">{t('payments.table_invoice')}</div>
+              <div className="flex-[1]">{t('payments.table_total')}</div>
+              <div className="flex-[1]">{t('payments.table_paid')}</div>
+              <div className="flex-[1]">{t('payments.table_remaining')}</div>
+              <div className="flex-[0.8]">{t('payments.table_branch')}</div>
+              <div className="flex-[1]">Doctor</div>
+              <div className="flex-[0.9]">Procedure</div>
+              <div className="flex-[1]">{t('payments.table_status')}</div>
+              <div className="flex-[1]">{t('payments.table_date')}</div>
+              <div className="w-28 text-right">{t('payments.table_actions')}</div>
+            </div>
 
-        <div className="divide-y divide-[rgba(255,255,255,0.04)]">
-          {!selectedPatientId ? (
-            <div className="py-16 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              {t('payments.empty_select')}
+            <div className="divide-y" style={{ borderColor: 'var(--app-border)' }}>
+              {!selectedPatientId ? (
+                <EmptyState title={t('payments.empty_select')} description="" />
+              ) : invoicesLoading ? (
+                <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin" /></div>
+              ) : paged.length === 0 ? (
+                <EmptyState title={t('payments.empty_invoices')} description="" />
+              ) : paged.map(inv => (
+                <div key={inv.id} className="flex items-center px-6 py-3.5 transition-all hover:bg-[var(--app-table-hover)]">
+                  <div className="flex-[2] text-sm font-medium text-[var(--color-on-surface)]">{inv.invoice_name}</div>
+                  <div className="flex-[1] text-sm font-semibold text-[var(--color-on-surface)] font-mono">${Number(inv.total_amount).toLocaleString()}</div>
+                  <div className="flex-[1] text-sm font-mono" style={{ color: 'var(--color-success)' }}>${Number(inv.paid_so_far).toLocaleString()}</div>
+                  <div className="flex-[1] text-sm font-mono" style={{ color: Number(inv.remaining_amount) > 0 ? 'var(--color-warning)' : 'var(--app-text-muted)' }}>
+                    ${Number(inv.remaining_amount).toLocaleString()}
+                  </div>
+                  <div className="flex-[0.8] text-[10px] truncate" style={{ color: 'var(--app-text-dim)' }}>
+                    {inv.branch_name || '\u2014'}
+                  </div>
+                  <div className="flex-[1] text-xs truncate" style={{ color: 'var(--app-text-dim)' }}>
+                    {inv.procedure_id && procedureMap.get(inv.procedure_id)?.doctor_name
+                      ? procedureMap.get(inv.procedure_id)!.doctor_name
+                      : '\u2014'}
+                  </div>
+                  <div className="flex-[0.9]">
+                    {inv.procedure_id ? (
+                      <button onClick={() => navigate(`/dashboard/cases?id=${inv.procedure_id}`)}
+                        className="text-xs font-medium px-2.5 py-1 rounded-lg transition-all"
+                        style={{ color: 'var(--color-primary)', background: 'var(--color-primary-container)' }}>
+                        View Procedure
+                      </button>
+                    ) : (
+                      <span className="text-xs" style={{ color: 'var(--app-text-dim)' }}>\u2014</span>
+                    )}
+                  </div>
+                  <div className="flex-[1]"><Badge status={inv.status} /></div>
+                  <div className="flex-[1] text-xs" style={{ color: 'var(--app-text-dim)' }}>
+                    {inv.created_at ? new Date(inv.created_at).toLocaleDateString() : '\u2014'}
+                  </div>
+                  <div className="w-28 flex items-center justify-end gap-1">
+                    <button onClick={() => viewPayments(inv)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-[rgba(79,209,255,0.1)]" style={{ color: 'var(--app-text-dim)' }}
+                      title={t('payments.tooltip_view_payments')}>
+                      <DollarSign className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => { setEditingInvoice(inv); setEditForm({ invoice_name: inv.invoice_name || '', total_amount: inv.total_amount.toString(), notes: inv.notes || '' }); }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-[rgba(79,209,255,0.1)] hover:text-[var(--color-primary)]" style={{ color: 'var(--app-text-dim)' }}
+                      title={t('payments.tooltip_edit_invoice')}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => { setDeleteConfirmId(inv.id); setDeleteType('invoice'); }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-[rgba(244,63,94,0.1)] hover:text-[var(--color-error)]" style={{ color: 'var(--app-text-dim)' }}
+                      title={t('payments.tooltip_delete_invoice')}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    {inv.status !== 'Paid' && (
+                      <button onClick={() => { setPayingInvoice(inv); setShowPayModal(true); }}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-[rgba(52,211,153,0.1)] hover:text-[var(--color-success)]" style={{ color: 'var(--app-text-dim)' }}
+                        title={t('payments.tooltip_add_payment')}>
+                        <CreditCard className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          ) : invoicesLoading ? (
-            <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-[#4FD1FF] border-t-transparent rounded-full animate-spin" /></div>
-          ) : paged.length === 0 ? (
-            <div className="py-16 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              {t('payments.empty_invoices')}
-            </div>
-          ) : paged.map(inv => (
-            <div key={inv.id} className="flex items-center px-6 py-3.5 transition-all hover:bg-[rgba(255,255,255,0.02)]">
-              <div className="flex-[2] text-sm font-medium text-white">{inv.invoice_name}</div>
-              <div className="flex-[1] text-sm font-semibold text-white">${Number(inv.total_amount).toLocaleString()}</div>
-              <div className="flex-[1] text-sm" style={{ color: '#00E5A8' }}>${Number(inv.paid_so_far).toLocaleString()}</div>
-              <div className="flex-[1] text-sm" style={{ color: Number(inv.remaining_amount) > 0 ? '#FFC107' : 'rgba(255,255,255,0.45)' }}>
-                ${Number(inv.remaining_amount).toLocaleString()}
-              </div>
-              <div className="flex-[0.8] text-[10px] truncate" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                {inv.branch_name || '—'}
-              </div>
-              <div className="flex-[1] text-xs truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                {inv.procedure_id && procedureMap.get(inv.procedure_id)?.doctor_name
-                  ? procedureMap.get(inv.procedure_id)!.doctor_name
-                  : '—'}
-              </div>
-              <div className="flex-[0.9]">
-                {inv.procedure_id ? (
-                  <button onClick={() => navigate(`/dashboard/cases?id=${inv.procedure_id}`)}
-                    className="text-xs font-medium px-2.5 py-1 rounded-lg transition-all"
-                    style={{ color: '#4FD1FF', background: 'rgba(79,209,255,0.1)' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(79,209,255,0.2)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(79,209,255,0.1)'; }}>
-                    View Procedure
-                  </button>
-                ) : (
-                  <span className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>
-                )}
-              </div>
-              <div className="flex-[1]"><Badge status={inv.status} /></div>
-              <div className="flex-[1] text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                {inv.created_at ? new Date(inv.created_at).toLocaleDateString() : '—'}
-              </div>
-              <div className="w-28 flex items-center justify-end gap-1">
-                <button onClick={() => viewPayments(inv)}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-all" style={{ color: 'rgba(255,255,255,0.3)' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#4FD1FF'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
-                  title={t('payments.tooltip_view_payments')}>
-                  <DollarSign className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => { setEditingInvoice(inv); setEditForm({ invoice_name: inv.invoice_name || '', total_amount: inv.total_amount.toString(), notes: inv.notes || '' }); }}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-all" style={{ color: 'rgba(255,255,255,0.3)' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(79,209,255,0.1)'; e.currentTarget.style.color = '#4FD1FF'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
-                  title={t('payments.tooltip_edit_invoice')}>
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => { setDeleteConfirmId(inv.id); setDeleteType('invoice'); }}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-all" style={{ color: 'rgba(255,255,255,0.3)' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#ef4444'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
-                  title={t('payments.tooltip_delete_invoice')}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-                {inv.status !== 'Paid' && (
-                  <button onClick={() => { setPayingInvoice(inv); setShowPayModal(true); }}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-all" style={{ color: 'rgba(255,255,255,0.3)' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,229,168,0.1)'; e.currentTarget.style.color = '#00E5A8'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
-                    title={t('payments.tooltip_add_payment')}>
-                    <CreditCard className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
 
-        {/* Pagination */}
-        {selectedPatientId && invoices.length > perPage && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
-            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
-              {t('common.showing_entries', { start: (page - 1) * perPage + 1, end: Math.min(page * perPage, invoices.length), total: invoices.length })}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}
-                className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-30" style={{ border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' }}>
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              {Array.from({ length: Math.min(totalPages, 5) }).map((_, idx) => {
-                const n = idx + 1;
-                return <button key={n} onClick={() => setPage(n)}
-                  className="w-8 h-8 rounded-lg text-xs font-semibold"
-                  style={{ background: page === n ? 'rgba(79,209,255,0.12)' : 'transparent', border: `1px solid ${page === n ? 'rgba(79,209,255,0.2)' : 'rgba(255,255,255,0.06)'}`, color: page === n ? '#4FD1FF' : 'rgba(255,255,255,0.4)' }}>{n}</button>;
-              })}
-              <button disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-30" style={{ border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' }}>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            {/* Pagination */}
+            {selectedPatientId && invoices.length > perPage && (
+              <div className="flex items-center justify-between px-6 py-4 border-t" style={{ borderColor: 'var(--app-border)' }}>
+                <span className="text-xs" style={{ color: 'var(--app-text-dim)' }}>
+                  {t('common.showing_entries', { start: (page - 1) * perPage + 1, end: Math.min(page * perPage, invoices.length), total: invoices.length })}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-30" style={{ border: '1px solid var(--app-border)', color: 'var(--app-text-dim)' }}>
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  {Array.from({ length: Math.min(totalPages, 5) }).map((_, idx) => {
+                    const n = idx + 1;
+                    return <button key={n} onClick={() => setPage(n)}
+                      className="w-8 h-8 rounded-lg text-xs font-semibold"
+                      style={{ background: page === n ? 'var(--color-primary-container)' : 'transparent', border: `1px solid ${page === n ? 'rgba(79,209,255,0.2)' : 'var(--app-border)'}`, color: page === n ? 'var(--color-primary)' : 'var(--app-text-dim)' }}>{n}</button>;
+                  })}
+                  <button disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-30" style={{ border: '1px solid var(--app-border)', color: 'var(--app-text-dim)' }}>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
         </div>
       </div>
 
       {/* ===== VIEW PAYMENTS DRAWER ===== */}
       {viewingInvoice && (
-        <FixedOverlay className="flex items-start justify-center p-4 pt-20" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setViewingInvoice(null)}>
-          <div className="w-full max-w-lg rounded-[24px] max-h-[70vh] overflow-y-auto" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
+        <FixedOverlay className="flex items-start justify-center p-4 pt-20" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => setViewingInvoice(null)}>
+          <div className="w-full max-w-lg rounded-[24px] max-h-[70vh] overflow-y-auto" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border-light)' }}>
+            <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--app-border)' }}>
               <div>
-                <h2 className="text-lg font-bold text-white">{viewingInvoice.invoice_name}</h2>
-                <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                  {viewingInvoice.patient_name} · ${Number(viewingInvoice.total_amount).toLocaleString()} total · <Badge status={viewingInvoice.status} />
+                <h2 className="text-lg font-bold text-[var(--color-on-surface)]">{viewingInvoice.invoice_name}</h2>
+                <p className="text-xs mt-1" style={{ color: 'var(--app-text-dim)' }}>
+                  {viewingInvoice.patient_name} \u00b7 <span className="font-mono">${Number(viewingInvoice.total_amount).toLocaleString()}</span> total \u00b7 <Badge status={viewingInvoice.status} />
                 </p>
               </div>
-              <button onClick={() => setViewingInvoice(null)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <button onClick={() => setViewingInvoice(null)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'var(--app-text-dim)' }}>
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="p-6">
-              <h3 className="text-sm font-semibold text-white mb-4">{t('payments.drawer_payment_history')}</h3>
+              <h3 className="text-sm font-semibold text-[var(--color-on-surface)] mb-4">{t('payments.drawer_payment_history')}</h3>
               {invoicePayments.length === 0 ? (
-                <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                <div className="py-8 text-center text-sm" style={{ color: 'var(--app-text-muted)' }}>
                   {t('payments.drawer_no_payments')}
                 </div>
               ) : (
@@ -466,17 +451,15 @@ export default function Payments() {
                     <div key={p.id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)' }}>
                       <div className="flex items-center gap-3">
                         <div>
-                          <div className="text-sm font-medium text-white">${Number(p.amount).toLocaleString()}</div>
-                          <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                          <div className="text-sm font-medium text-[var(--color-on-surface)] font-mono">${Number(p.amount).toLocaleString()}</div>
+                          <div className="text-[11px]" style={{ color: 'var(--app-text-dim)' }}>
                             {p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}
                           </div>
                         </div>
-                        {p.notes && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{p.notes}</div>}
+                        {p.notes && <div className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{p.notes}</div>}
                       </div>
                       <button onClick={() => { setDeleteConfirmId(p.id); setDeleteType('payment'); }}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center transition-all flex-shrink-0" style={{ color: 'rgba(255,255,255,0.2)' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#ef4444'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.2)'; }}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center transition-all flex-shrink-0 hover:bg-[rgba(244,63,94,0.1)] hover:text-[var(--color-error)]" style={{ color: 'var(--app-text-dim)' }}
                         title={t('payments.tooltip_delete_invoice')}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -486,12 +469,12 @@ export default function Payments() {
               )}
             </div>
 
-            <div className="flex items-center gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
+            <div className="flex items-center gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--app-border)' }}>
               <div className="flex-1">
-                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.drawer_paid')}: <strong className="text-[#00E5A8]">${Number(viewingInvoice.paid_so_far).toLocaleString()}</strong></span>
+                <span className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{t('payments.drawer_paid')}: <strong style={{ color: 'var(--color-success)' }} className="font-mono">${Number(viewingInvoice.paid_so_far).toLocaleString()}</strong></span>
               </div>
               <div className="flex-1 text-right">
-                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.drawer_remaining')}: <strong className="text-[#FFC107]">${Number(viewingInvoice.remaining_amount).toLocaleString()}</strong></span>
+                <span className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{t('payments.drawer_remaining')}: <strong style={{ color: 'var(--color-warning)' }} className="font-mono">${Number(viewingInvoice.remaining_amount).toLocaleString()}</strong></span>
               </div>
             </div>
           </div>
@@ -500,52 +483,49 @@ export default function Payments() {
 
       {/* ===== ADD INVOICE MODAL ===== */}
       {showAddInvoiceModal && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowAddInvoiceModal(false); setAddForm({ patient_id: '', patient_name: '', invoice_name: '', total_amount: '', notes: '' }); }}>
-          <div className="w-full max-w-lg rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
-              <h2 className="text-lg font-bold text-white">{t('payments.modal_new_invoice')}</h2>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowAddInvoiceModal(false); setAddForm({ patient_id: '', patient_name: '', invoice_name: '', total_amount: '', notes: '' }); }}>
+          <div className="w-full max-w-lg rounded-[24px]" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border-light)' }}>
+            <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--app-border)' }}>
+              <h2 className="text-lg font-bold text-[var(--color-on-surface)]">{t('payments.modal_new_invoice')}</h2>
               <button onClick={() => { setShowAddInvoiceModal(false); setAddForm({ patient_id: '', patient_name: '', invoice_name: '', total_amount: '', notes: '' }); }}
-                className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'var(--app-text-dim)' }}>
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.modal_patient')} *</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('payments.modal_patient')} *</label>
                 <select value={addForm.patient_id} onChange={e => {
                   const p = patients.find(pt => pt.id === e.target.value);
                   setAddForm(f => ({ ...f, patient_id: e.target.value, patient_name: p ? p.full_name : '' }));
-                }}
-                  className={inputCls + ' cursor-pointer appearance-none'}>
-                  <option value="" style={{ background: '#0D1B2A' }}>{t('payments.placeholder_patient')}</option>
-                  {patients.map(p => <option key={p.id} value={p.id} style={{ background: '#0D1B2A' }}>{p.full_name}</option>)}
+                }} className="input-cyber cursor-pointer appearance-none">
+                  <option value="">{t('payments.placeholder_patient')}</option>
+                  {patients.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                 </select>
-                {formErrors.patient && <p className="text-[11px] mt-1 text-red-400">{formErrors.patient}</p>}
+                {formErrors.patient && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{formErrors.patient}</p>}
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.modal_invoice_name')} *</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('payments.modal_invoice_name')} *</label>
                 <input value={addForm.invoice_name} onChange={e => setAddForm(f => ({ ...f, invoice_name: e.target.value }))}
-                  placeholder={t('payments.placeholder_invoice_name')} className={inputCls} />
-                {formErrors.invoice_name && <p className="text-[11px] mt-1 text-red-400">{formErrors.invoice_name}</p>}
+                  placeholder={t('payments.placeholder_invoice_name')} className="input-cyber" />
+                {formErrors.invoice_name && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{formErrors.invoice_name}</p>}
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.modal_total_amount')} *</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('payments.modal_total_amount')} *</label>
                 <input type="number" min="0" step="0.01" value={addForm.total_amount} onChange={e => setAddForm(f => ({ ...f, total_amount: e.target.value }))}
-                  placeholder="0.00" className={inputCls} />
-                {formErrors.total_amount && <p className="text-[11px] mt-1 text-red-400">{formErrors.total_amount}</p>}
+                  placeholder="0.00" className="input-cyber" />
+                {formErrors.total_amount && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{formErrors.total_amount}</p>}
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.modal_notes')}</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('payments.modal_notes')}</label>
                 <textarea value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))}
-                  rows={2} className={inputCls + ' h-20 pt-2 resize-none'} placeholder={t('payments.placeholder_notes')} />
+                  rows={2} className="input-cyber h-20 pt-2 resize-none" placeholder={t('payments.placeholder_notes')} />
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--app-border)' }}>
               <button onClick={() => { setShowAddInvoiceModal(false); setAddForm({ patient_id: '', patient_name: '', invoice_name: '', total_amount: '', notes: '' }); }}
-                className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('payments.modal_cancel')}</button>
-              <button onClick={handleCreateInvoice} disabled={createInvoiceMut.isPending}
-                className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
+                className="btn-ghost">{t('payments.modal_cancel')}</button>
+              <button onClick={handleCreateInvoice} disabled={createInvoiceMut.isPending} className="btn-primary">
                 {createInvoiceMut.isPending ? t('payments.modal_creating') : t('payments.modal_create')}
               </button>
             </div>
@@ -555,47 +535,44 @@ export default function Payments() {
 
       {/* ===== ADD PAYMENT MODAL ===== */}
       {showPayModal && payingInvoice && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowPayModal(false); setPayingInvoice(null); }}>
-          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowPayModal(false); setPayingInvoice(null); }}>
+          <div className="w-full max-w-md rounded-[24px]" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border-light)' }}>
+            <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--app-border)' }}>
               <div>
-                <h2 className="text-lg font-bold text-white">{t('payments.modal_record_title')}</h2>
-                <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                  {payingInvoice.invoice_name} · {payingInvoice.patient_name}
+                <h2 className="text-lg font-bold text-[var(--color-on-surface)]">{t('payments.modal_record_title')}</h2>
+                <p className="text-xs mt-1" style={{ color: 'var(--app-text-dim)' }}>
+                  {payingInvoice.invoice_name} \u00b7 {payingInvoice.patient_name}
                 </p>
               </div>
-              <button onClick={() => { setShowPayModal(false); setPayingInvoice(null); }} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <button onClick={() => { setShowPayModal(false); setPayingInvoice(null); }} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'var(--app-text-dim)' }}>
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Total: ${Number(payingInvoice.total_amount).toLocaleString()}</span>
-                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Paid: <span className="text-[#00E5A8]">${Number(payingInvoice.paid_so_far).toLocaleString()}</span></span>
-                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Remaining: <span className="text-[#FFC107]">${Number(payingInvoice.remaining_amount).toLocaleString()}</span></span>
+                <span className="text-xs" style={{ color: 'var(--app-text-dim)' }}>Total: <span className="font-mono">${Number(payingInvoice.total_amount).toLocaleString()}</span></span>
+                <span className="text-xs" style={{ color: 'var(--app-text-dim)' }}>Paid: <span style={{ color: 'var(--color-success)' }} className="font-mono">${Number(payingInvoice.paid_so_far).toLocaleString()}</span></span>
+                <span className="text-xs" style={{ color: 'var(--app-text-dim)' }}>Remaining: <span style={{ color: 'var(--color-warning)' }} className="font-mono">${Number(payingInvoice.remaining_amount).toLocaleString()}</span></span>
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.modal_amount')} *</label>
-                <input type="number" min="0" step="0.01" value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder="0.00" className={inputCls} />
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('payments.modal_amount')} *</label>
+                <input type="number" min="0" step="0.01" value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder="0.00" className="input-cyber" />
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.modal_method')}</label>
-                <select value={payMethod} onChange={e => setPayMethod(e.target.value as PaymentMethod)} className={inputCls + ' cursor-pointer appearance-none'}>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('payments.modal_method')}</label>
+                <select value={payMethod} onChange={e => setPayMethod(e.target.value as PaymentMethod)} className="input-cyber cursor-pointer appearance-none">
                   {[{ v: 'cash', l: t('payments.method_cash') }, { v: 'card', l: t('payments.method_card') }, { v: 'insurance', l: t('payments.method_insurance') }, { v: 'bank_transfer', l: t('payments.method_bank_transfer') }]
-                    .map(o => <option key={o.v} value={o.v} style={{ background: '#0D1B2A' }}>{o.l}</option>)}
+                    .map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.modal_notes_label')}</label>
-                <input value={payNotes} onChange={e => setPayNotes(e.target.value)} placeholder={t('payments.placeholder_notes')} className={inputCls} />
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('payments.modal_notes_label')}</label>
+                <input value={payNotes} onChange={e => setPayNotes(e.target.value)} placeholder={t('payments.placeholder_notes')} className="input-cyber" />
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
-              <button onClick={() => { setShowPayModal(false); setPayingInvoice(null); }}
-                className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('payments.modal_cancel_pay')}</button>
-              <button onClick={handlePay} disabled={addPaymentMut.isPending}
-                className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--app-border)' }}>
+              <button onClick={() => { setShowPayModal(false); setPayingInvoice(null); }} className="btn-ghost">{t('payments.modal_cancel_pay')}</button>
+              <button onClick={handlePay} disabled={addPaymentMut.isPending} className="btn-primary">
                 {addPaymentMut.isPending ? t('payments.modal_recording') : t('payments.modal_record')}
               </button>
             </div>
@@ -605,43 +582,39 @@ export default function Payments() {
 
       {/* ===== EDIT INVOICE MODAL ===== */}
       {editingInvoice && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setEditingInvoice(null)}>
-          <div className="w-full max-w-lg rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center justify-between p-6 border-b border-[rgba(255,255,255,0.05)]">
-              <h2 className="text-lg font-bold text-white">{t('payments.modal_edit_title')}</h2>
-              <button onClick={() => setEditingInvoice(null)}
-                className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => setEditingInvoice(null)}>
+          <div className="w-full max-w-lg rounded-[24px]" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border-light)' }}>
+            <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--app-border)' }}>
+              <h2 className="text-lg font-bold text-[var(--color-on-surface)]">{t('payments.modal_edit_title')}</h2>
+              <button onClick={() => setEditingInvoice(null)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'var(--app-text-dim)' }}>
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.modal_invoice_name')} *</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('payments.modal_invoice_name')} *</label>
                 <input value={editForm.invoice_name} onChange={e => setEditForm(f => ({ ...f, invoice_name: e.target.value }))}
-                  placeholder={t('payments.placeholder_invoice_name')} className={inputCls} />
+                  placeholder={t('payments.placeholder_invoice_name')} className="input-cyber" />
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.modal_total_amount')} *</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('payments.modal_total_amount')} *</label>
                 <input type="number" min="0" step="0.01" value={editForm.total_amount} onChange={e => setEditForm(f => ({ ...f, total_amount: e.target.value }))}
-                  placeholder="0.00" className={inputCls} />
+                  placeholder="0.00" className="input-cyber" />
               </div>
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('payments.modal_notes')}</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('payments.modal_notes')}</label>
                 <textarea value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
-                  rows={2} className={inputCls + ' h-20 pt-2 resize-none'} placeholder={t('payments.placeholder_notes')} />
+                  rows={2} className="input-cyber h-20 pt-2 resize-none" placeholder={t('payments.placeholder_notes')} />
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
-              <button onClick={() => setEditingInvoice(null)}
-                className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('payments.modal_edit_cancel')}</button>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--app-border)' }}>
+              <button onClick={() => setEditingInvoice(null)} className="btn-ghost">{t('payments.modal_edit_cancel')}</button>
               <button onClick={() => {
                 const amt = Number(editForm.total_amount);
                 if (!editForm.invoice_name.trim()) { toast.error(t('payments.error_name_required')); return; }
                 if (!amt || amt <= 0) { toast.error(t('payments.error_amount_positive')); return; }
                 updateInvoiceMut.mutate({ id: editingInvoice.id, data: { invoice_name: editForm.invoice_name.trim(), total_amount: amt, notes: editForm.notes || undefined } });
-              }} disabled={updateInvoiceMut.isPending}
-                className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
+              }} disabled={updateInvoiceMut.isPending} className="btn-primary">
                 {updateInvoiceMut.isPending ? t('payments.modal_edit_saving') : t('payments.modal_edit_save')}
               </button>
             </div>
@@ -651,22 +624,21 @@ export default function Payments() {
 
       {/* ===== DELETE CONFIRMATION MODAL ===== */}
       {deleteConfirmId && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setDeleteConfirmId(null)}>
-          <div className="w-full max-w-sm rounded-[24px]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => setDeleteConfirmId(null)}>
+          <div className="w-full max-w-sm rounded-[24px]" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border-light)' }}>
             <div className="p-6">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(239,68,68,0.1)' }}>
-                <Trash2 className="w-6 h-6" style={{ color: '#ef4444' }} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--color-error-container)' }}>
+                <Trash2 className="w-6 h-6" style={{ color: 'var(--color-error)' }} />
               </div>
-              <h3 className="text-lg font-bold text-white text-center mb-2">
+              <h3 className="text-lg font-bold text-[var(--color-on-surface)] text-center mb-2">
                 {t(deleteType === 'invoice' ? 'payments.modal_delete_invoice_title' : 'payments.modal_delete_payment_title')}
               </h3>
-              <p className="text-sm text-center" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              <p className="text-sm text-center" style={{ color: 'var(--app-text-dim)' }}>
                 {t(deleteType === 'invoice' ? 'payments.modal_delete_invoice_desc' : 'payments.modal_delete_payment_desc')}
               </p>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)]">
-              <button onClick={() => setDeleteConfirmId(null)}
-                className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--app-border)' }}>
+              <button onClick={() => setDeleteConfirmId(null)} className="btn-ghost">
                 {t('payments.modal_delete_cancel')}
               </button>
               <button onClick={() => {
@@ -677,9 +649,7 @@ export default function Payments() {
                     deleteRecordMut.mutate({ id: deleteConfirmId, reason: { change_reason: r.reason, reason_category: r.category } });
                   },
                 });
-              }} disabled={deleteRecordMut.isPending}
-                className="h-10 px-5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-                style={{ background: '#ef4444', color: 'white' }}>
+              }} disabled={deleteRecordMut.isPending} className="btn-danger">
                 {deleteRecordMut.isPending ? t('payments.modal_delete_deleting') : t('payments.modal_delete_confirm')}
               </button>
             </div>

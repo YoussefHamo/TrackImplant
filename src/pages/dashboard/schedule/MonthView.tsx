@@ -45,18 +45,19 @@ export default function MonthView({ year, month, appointments, onAppointmentClic
   }, [appointments]);
 
   return (
-    <div className="rounded-[20px] overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="card-cyber p-0 overflow-hidden rounded-[20px]">
       <div className="grid grid-cols-7">
         {DAY_NAMES.map(d => (
-          <div key={d} className="py-2 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div key={d} className="py-2 text-center text-xs font-semibold uppercase tracking-wider font-sans"
+            style={{ color: 'var(--app-text-muted)', background: 'var(--app-hover)', borderBottom: '1px solid var(--app-border)' }}>
             {d}
           </div>
         ))}
       </div>
       {weeks.map((week, wi) => (
-        <div key={wi} className="grid grid-cols-7" style={{ borderBottom: wi < weeks.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+        <div key={wi} className="grid grid-cols-7" style={{ borderBottom: wi < weeks.length - 1 ? '1px solid var(--app-border)' : 'none' }}>
           {week.map((day, di) => {
-            if (day === null) return <div key={`e-${di}`} className="min-h-[100px] p-1" style={{ background: 'rgba(255,255,255,0.01)' }} />;
+            if (day === null) return <div key={`e-${di}`} className="min-h-[100px] p-1" style={{ background: 'var(--app-hover)' }} />;
             const key = `${year}-${month}-${day}`;
             const dayApps = apptsByDay[`${year}-${month}-${day}`] || [];
             const isToday = new Date().getFullYear() === year && new Date().getMonth() === month && new Date().getDate() === day;
@@ -64,10 +65,13 @@ export default function MonthView({ year, month, appointments, onAppointmentClic
               <div
                 key={key}
                 onClick={() => onDateClick(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`)}
-                className="min-h-[100px] p-1 cursor-pointer transition-colors"
-                style={{ background: isToday ? 'rgba(79,209,255,0.05)' : 'transparent', borderRight: di < 6 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
+                className="min-h-[100px] p-1 cursor-pointer transition-colors duration-150 font-sans"
+                style={{ background: isToday ? 'var(--color-primary-container)' : 'transparent', borderRight: di < 6 ? '1px solid var(--app-border)' : 'none' }}
+                role="gridcell"
+                aria-label={`${day} ${new Date(year, month).toLocaleDateString('en-US', { month: 'long' })} ${year}${isToday ? ' - Today' : ''}`}
               >
-                <span className="text-[11px] font-medium px-1.5 py-0.5 rounded inline-block mb-0.5" style={{ color: isToday ? '#4FD1FF' : 'rgba(255,255,255,0.5)', background: isToday ? 'rgba(79,209,255,0.15)' : 'transparent' }}>
+                <span className="text-[11px] font-medium px-1.5 py-0.5 rounded inline-block mb-0.5"
+                  style={{ color: isToday ? 'var(--color-primary)' : 'var(--app-text-dim)', background: isToday ? 'rgba(79,209,255,0.15)' : 'transparent' }}>
                   {day}
                 </span>
                 <div className="space-y-0.5">
@@ -75,7 +79,7 @@ export default function MonthView({ year, month, appointments, onAppointmentClic
                     <AppointmentBlock key={app.id} appointment={app} onClick={onAppointmentClick} onContextMenu={onAppointmentContextMenu} compact />
                   ))}
                   {dayApps.length > 3 && (
-                    <div className="text-[10px] px-1" style={{ color: 'rgba(255,255,255,0.4)' }}>+{dayApps.length - 3} more</div>
+                    <div className="text-[10px] px-1 font-medium" style={{ color: 'var(--app-text-dim)' }}>+{dayApps.length - 3} more</div>
                   )}
                 </div>
               </div>

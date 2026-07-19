@@ -1,5 +1,9 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Settings2, Search, X, Calendar, CalendarDays, Printer, Filter, RotateCcw, ExternalLink, FileText, ArrowRight, Copy, Clock, Phone, MessageSquare, Mail, XCircle, Trash2, History, Download } from 'lucide-react';
+import {
+  ChevronLeft, ChevronRight, Plus, Settings2, Search, X, Calendar, CalendarDays,
+  Printer, Filter, RotateCcw, ExternalLink, FileText, ArrowRight, Copy, Clock,
+  Phone, MessageSquare, Mail, XCircle, Trash2, History, Download, CalendarIcon
+} from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { appointmentService } from '../../../services/appointmentService';
@@ -15,8 +19,9 @@ import BookingDialog from './BookingDialog';
 import DoctorScheduleManager from './DoctorScheduleManager';
 import ContextMenu from './ContextMenu';
 import AppointmentDetailsPanel from './AppointmentDetailsPanel';
-
 import { Skeleton } from '../../../components/ui/Skeleton';
+import EmptyState from '../../../components/ui/EmptyState';
+import StatusBadge from '../../../components/ui/StatusBadge';
 import type { Appointment, DoctorSchedule } from '../../../types';
 
 const VIEW_OPTIONS = ['Day', 'Week', 'Month'] as const;
@@ -43,21 +48,29 @@ function MiniCalendar({
   if (week.length) { while (week.length < 7) week.push(null); weeks.push(week); }
 
   return (
-    <div className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="rounded-xl p-3" style={{ background: 'var(--app-hover)', border: '1px solid var(--app-border)' }}>
       <div className="flex items-center justify-between mb-2">
-        <button onClick={() => { const d = new Date(year, month - 1); onMonthChange(d.getFullYear(), d.getMonth()); }} className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+        <button
+          onClick={() => { const d = new Date(year, month - 1); onMonthChange(d.getFullYear(), d.getMonth()); }}
+          className="btn-ghost btn-xs w-6 h-6 rounded-lg p-0 flex items-center justify-center"
+          aria-label="Previous month"
+        >
           <ChevronLeft className="w-3.5 h-3.5" />
         </button>
-        <span className="text-xs font-semibold text-white/70">
+        <span className="text-xs font-semibold" style={{ color: 'var(--app-text-dim)' }}>
           {new Date(year, month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
         </span>
-        <button onClick={() => { const d = new Date(year, month + 1); onMonthChange(d.getFullYear(), d.getMonth()); }} className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+        <button
+          onClick={() => { const d = new Date(year, month + 1); onMonthChange(d.getFullYear(), d.getMonth()); }}
+          className="btn-ghost btn-xs w-6 h-6 rounded-lg p-0 flex items-center justify-center"
+          aria-label="Next month"
+        >
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
       <div className="grid grid-cols-7 gap-0">
         {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-          <div key={d} className="text-center text-[8px] font-semibold uppercase py-1" style={{ color: 'rgba(255,255,255,0.3)' }}>{d}</div>
+          <div key={d} className="text-center text-[8px] font-semibold uppercase py-1" style={{ color: 'var(--app-text-muted)' }}>{d}</div>
         ))}
         {weeks.map((week, wi) => week.map((day, di) => {
           if (day === null) return <div key={`e-${wi}-${di}`} />;
@@ -67,12 +80,13 @@ function MiniCalendar({
             <button
               key={`${wi}-${di}`}
               onClick={() => onDateSelect(new Date(year, month, day))}
-              className="w-full text-center text-[10px] py-1 rounded transition-all"
+              className="w-full text-center text-[10px] py-1 rounded transition-all cursor-pointer"
               style={{
-                background: isSelected ? '#4FD1FF' : isToday ? 'rgba(79,209,255,0.15)' : 'transparent',
-                color: isSelected ? '#050B14' : isToday ? '#4FD1FF' : 'rgba(255,255,255,0.5)',
+                background: isSelected ? 'var(--color-primary)' : isToday ? 'var(--color-primary-container)' : 'transparent',
+                color: isSelected ? 'var(--color-on-primary)' : isToday ? 'var(--color-primary)' : 'var(--app-text-muted)',
                 fontWeight: isSelected || isToday ? 700 : 400,
               }}
+              aria-label={`${new Date(year, month, day).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`}
             >
               {day}
             </button>
@@ -118,9 +132,7 @@ export default function SchedulePage() {
 
   // Responsive
   useEffect(() => {
-    function handleResize() {
-      setIsMobile(window.innerWidth < 768);
-    }
+    function handleResize() { setIsMobile(window.innerWidth < 768); }
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -157,21 +169,11 @@ export default function SchedulePage() {
         case 'T':
           goToday();
           break;
-        case '1':
-          setView('Day');
-          break;
-        case '2':
-          setView('Week');
-          break;
-        case '3':
-          setView('Month');
-          break;
-        case 'ArrowLeft':
-          navigate(-1);
-          break;
-        case 'ArrowRight':
-          navigate(1);
-          break;
+        case '1': setView('Day'); break;
+        case '2': setView('Week'); break;
+        case '3': setView('Month'); break;
+        case 'ArrowLeft': navigate(-1); break;
+        case 'ArrowRight': navigate(1); break;
         case 'f':
         case 'F':
           if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); setShowFilters(p => !p); }
@@ -186,11 +188,8 @@ export default function SchedulePage() {
   const { data: allUsers } = useQuery({ queryKey: ['users'], queryFn: () => userService.getAll() });
   const doctors = useMemo(() => (allUsers || []).filter(u => u.role === 'Doctor').map(d => ({ id: d.auth_user_id || d.id, name: d.full_name || d.username })), [allUsers]);
 
-  // Auto-select mobile doctor after doctors are loaded
   useEffect(() => {
-    if (isMobile && !mobileDoctor && doctors.length > 0) {
-      setMobileDoctor(doctors[0].id);
-    }
+    if (isMobile && !mobileDoctor && doctors.length > 0) setMobileDoctor(doctors[0].id);
   }, [isMobile, doctors, mobileDoctor]);
 
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: () => branchService.getAll() });
@@ -214,66 +213,45 @@ export default function SchedulePage() {
     const start = new Date(currentDate);
     if (view === 'Day') {
       start.setHours(0, 0, 0, 0);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 1);
+      const end = new Date(start); end.setDate(end.getDate() + 1);
       return { from: start.toISOString(), to: end.toISOString() };
     }
     if (view === 'Week') {
       const day = start.getDay();
       start.setDate(start.getDate() - day);
       start.setHours(0, 0, 0, 0);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 7);
+      const end = new Date(start); end.setDate(end.getDate() + 7);
       return { from: start.toISOString(), to: end.toISOString() };
     }
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
+    start.setDate(1); start.setHours(0, 0, 0, 0);
     const end = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59);
     return { from: start.toISOString(), to: end.toISOString() };
   }, [currentDate, view]);
 
   const dateRange = useMemo(() => getDateRange(), [getDateRange]);
 
-  // Fetch appointments
   const { data: appointments = [], isLoading: apptsLoading } = useQuery({
     queryKey: ['appointments-schedule', dateRange, filterDoctor, filterBranch, filterStatus],
     queryFn: () => appointmentService.getByDateRange(dateRange.from, dateRange.to, filterBranch || null),
   });
 
-  // Filter
   const filteredAppointments = useMemo(() => appointments.filter(a => {
     if (filterDoctor && a.doctor_id !== filterDoctor) return false;
     if (filterStatus && a.status !== filterStatus) return false;
     if (filterProcedure && !a.procedure_name?.toLowerCase().includes(filterProcedure.toLowerCase())) return false;
     if (filterSearch) {
       const q = filterSearch.toLowerCase();
-      const patientMatch = a.patient_name?.toLowerCase().includes(q);
-      const doctorMatch = a.doctor_name?.toLowerCase().includes(q);
-      const notesMatch = a.notes?.toLowerCase().includes(q);
-      const idMatch = a.id?.toLowerCase().includes(q);
-      const procMatch = a.procedure_name?.toLowerCase().includes(q);
-      return patientMatch || doctorMatch || notesMatch || idMatch || procMatch;
+      return !!(a.patient_name?.toLowerCase().includes(q) || a.doctor_name?.toLowerCase().includes(q) || a.notes?.toLowerCase().includes(q) || a.id?.toLowerCase().includes(q) || a.procedure_name?.toLowerCase().includes(q));
     }
     return true;
   }), [appointments, filterDoctor, filterStatus, filterSearch, filterProcedure]);
 
-  // Active filter chips
   const activeFilters = useMemo(() => {
     const chips: { key: string; label: string }[] = [];
-    if (filterDoctor) {
-      const doc = doctors.find(d => d.id === filterDoctor);
-      if (doc) chips.push({ key: 'doctor', label: `Dr. ${doc.name}` });
-    }
-    if (filterBranch && filterBranch !== activeBranchId) {
-      const branch = (branches || []).find((b: any) => b.id === filterBranch);
-      if (branch) chips.push({ key: 'branch', label: branch.name });
-    }
-    if (filterStatus) {
-      chips.push({ key: 'status', label: filterStatus.replace('_', ' ') });
-    }
-    if (filterProcedure) {
-      chips.push({ key: 'procedure', label: `Proc: ${filterProcedure}` });
-    }
+    if (filterDoctor) { const doc = doctors.find(d => d.id === filterDoctor); if (doc) chips.push({ key: 'doctor', label: `Dr. ${doc.name}` }); }
+    if (filterBranch && filterBranch !== activeBranchId) { const branch = (branches || []).find((b: any) => b.id === filterBranch); if (branch) chips.push({ key: 'branch', label: branch.name }); }
+    if (filterStatus) chips.push({ key: 'status', label: filterStatus.replace('_', ' ') });
+    if (filterProcedure) chips.push({ key: 'procedure', label: `Proc: ${filterProcedure}` });
     if (filterSearch) chips.push({ key: 'search', label: `"${filterSearch}"` });
     return chips;
   }, [filterDoctor, filterBranch, filterStatus, filterSearch, filterProcedure, doctors, branches, activeBranchId]);
@@ -289,51 +267,44 @@ export default function SchedulePage() {
   }
 
   function resetAllFilters() {
-    setFilterDoctor('');
-    setFilterBranch(activeBranchId || '');
-    setFilterStatus('');
-    setFilterProcedure('');
-    setFilterSearch('');
+    setFilterDoctor(''); setFilterBranch(activeBranchId || ''); setFilterStatus(''); setFilterProcedure(''); setFilterSearch('');
   }
 
   // Mutations
   const createMut = useMutation({
     mutationFn: (data: Parameters<typeof appointmentService.create>[0]) => appointmentService.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['appointments-schedule'] }); toast.success('Appointment created'); },
-    onError: (err: Error) => { console.error('createMut error:', err); toast.error(err?.message || 'Failed to create appointment'); },
+    onError: (err: Error) => { toast.error(err?.message || 'Failed to create appointment'); },
   });
 
   const updateMut = useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Appointment> }) => appointmentService.update(id, updates),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['appointments-schedule'] }); toast.success('Appointment updated'); },
-    onError: (err: Error) => { console.error('updateMut error:', err); toast.error(err?.message || 'Failed to update appointment'); },
+    onError: (err: Error) => { toast.error(err?.message || 'Failed to update appointment'); },
   });
 
   const updateStatusMut = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => appointmentService.updateStatus(id, status),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['appointments-schedule'] }); queryClient.invalidateQueries({ queryKey: ['appointments-today'] }); toast.success('Status updated'); },
-    onError: (err: Error) => { console.error('updateStatusMut error:', err); toast.error(err?.message || 'Failed to update status'); },
+    onError: (err: Error) => { toast.error(err?.message || 'Failed to update status'); },
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => appointmentService.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['appointments-schedule'] }); toast.success('Appointment deleted'); },
-    onError: (err: Error) => { console.error('deleteMut error:', err); toast.error(err?.message || 'Failed to delete appointment'); },
+    onError: (err: Error) => { toast.error(err?.message || 'Failed to delete appointment'); },
   });
 
-  // Drag & Drop
   const handleAppointmentDrop = useCallback(async (appointmentId: string, newDate: string, doctorId?: string) => {
     const updates: Partial<Appointment> = { appointment_date: newDate };
     if (doctorId) updates.doctor_id = doctorId;
     try { await updateMut.mutateAsync({ id: appointmentId, updates }); } catch (e) { console.error('Drop failed', e); }
   }, [updateMut]);
 
-  // Resize
   const handleResizeAppointment = useCallback(async (appointmentId: string, newDuration: number) => {
     try { await updateMut.mutateAsync({ id: appointmentId, updates: { duration_minutes: newDuration } }); } catch (e) { console.error('Resize failed', e); }
   }, [updateMut]);
 
-  // Navigation
   const viewRef = useRef(view);
   useEffect(() => { viewRef.current = view; }, [view]);
 
@@ -354,7 +325,6 @@ export default function SchedulePage() {
     setMiniMonth(now.getMonth());
   }, []);
 
-  // Export as CSV
   function handleExportSchedule() {
     const rows = [['Date', 'Time', 'Patient', 'Doctor', 'Status', 'Duration', 'Notes']];
     filteredAppointments.forEach(a => {
@@ -362,11 +332,8 @@ export default function SchedulePage() {
       rows.push([
         d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        a.patient_name || '',
-        a.doctor_name || '',
-        a.status,
-        String(a.duration_minutes || 30),
-        a.notes || '',
+        a.patient_name || '', a.doctor_name || '', a.status,
+        String(a.duration_minutes || 30), a.notes || '',
       ]);
     });
     const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -385,7 +352,6 @@ export default function SchedulePage() {
     URL.revokeObjectURL(link.href);
   }
 
-  // Print
   function handlePrintSchedule() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -398,16 +364,13 @@ export default function SchedulePage() {
       const d = new Date(a.appointment_date);
       return `<tr><td>${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td><td>${d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</td><td>${a.patient_name || 'N/A'}</td><td>${a.doctor_name || 'N/A'}</td><td>${a.status}</td></tr>`;
     }).join('');
-    printWindow.document.write(`
-      <html><head><title>${title}</title>
+    printWindow.document.write(`<html><head><title>${title}</title>
       <style>body{font-family:sans-serif;padding:40px}table{width:100%;border-collapse:collapse}th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #ddd}th{background:#f5f5f5}h1{font-size:20px;margin-bottom:20px}</style></head>
-      <body><h1>${title}</h1><table><thead><tr><th>Date</th><th>Time</th><th>Patient</th><th>Doctor</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></body></html>
-    `);
+      <body><h1>${title}</h1><table><thead><tr><th>Date</th><th>Time</th><th>Patient</th><th>Doctor</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
     printWindow.document.close();
     printWindow.print();
   }
 
-  // Booking
   async function handleSave(data: { patient_id: string; doctor_id: string; appointment_date: string; duration_minutes: number; status: string; procedure_name?: string; notes?: string; branch_id?: string }) {
     if (editingAppointment) {
       await updateMut.mutateAsync({ id: editingAppointment.id, updates: data });
@@ -417,43 +380,29 @@ export default function SchedulePage() {
   }
 
   function handleSlotClick(date: string, doctorId: string) {
-    setEditingAppointment(null);
-    setDefaultSlotDate(date);
-    setDefaultSlotDoctorId(doctorId);
-    setBookingOpen(true);
+    setEditingAppointment(null); setDefaultSlotDate(date); setDefaultSlotDoctorId(doctorId); setBookingOpen(true);
   }
 
   function handleAppointmentClick(app: Appointment) {
-    setSelectedAppointmentId(app.id);
-    setDetailsPanelAppointment(app);
+    setSelectedAppointmentId(app.id); setDetailsPanelAppointment(app);
   }
 
   function handleAppointmentSelect(app: Appointment | null) {
-    if (app) {
-      setSelectedAppointmentId(app.id);
-      setSelectedAppointment(app);
-    } else {
-      setSelectedAppointment(null);
-      setSelectedAppointmentId(null);
-    }
+    if (app) { setSelectedAppointmentId(app.id); setSelectedAppointment(app); }
+    else { setSelectedAppointment(null); setSelectedAppointmentId(null); }
   }
 
   function handleAppointmentDoubleClick(app: Appointment) {
-    setSelectedAppointmentId(app.id);
-    setDetailsPanelAppointment(app);
+    setSelectedAppointmentId(app.id); setDetailsPanelAppointment(app);
   }
 
   function handleSelectionQuickAction(id: string, action: string) {
     updateStatusMut.mutate({ id, status: action });
-    setSelectedAppointment(null);
-    setSelectedAppointmentId(null);
+    setSelectedAppointment(null); setSelectedAppointmentId(null);
   }
 
   function handleEditFromPanel(app: Appointment) {
-    setDetailsPanelAppointment(null);
-    setEditingAppointment(app);
-    setDefaultSlotDate(undefined);
-    setBookingOpen(true);
+    setDetailsPanelAppointment(null); setEditingAppointment(app); setDefaultSlotDate(undefined); setBookingOpen(true);
   }
 
   function handleDateClick(dateStr: string) {
@@ -461,14 +410,11 @@ export default function SchedulePage() {
     if (view === 'Month') { setCurrentDate(d); setView('Day'); }
   }
 
-  // Quick actions
   function handleDuplicateAppointment(app: Appointment) {
     createMut.mutate({
-      patient_id: app.patient_id || '',
-      doctor_id: app.doctor_id || '',
+      patient_id: app.patient_id || '', doctor_id: app.doctor_id || '',
       appointment_date: new Date(new Date(app.appointment_date).getTime() + 24 * 60 * 60 * 1000).toISOString(),
-      duration_minutes: app.duration_minutes || 30,
-      status: 'scheduled',
+      duration_minutes: app.duration_minutes || 30, status: 'scheduled',
       notes: app.notes ? `Duplicate: ${app.notes}` : 'Duplicate appointment',
     });
   }
@@ -477,32 +423,23 @@ export default function SchedulePage() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     const d = new Date(app.appointment_date);
-    printWindow.document.write(`
-      <html><head><title>Appointment - ${app.patient_name || 'Unknown'}</title>
+    printWindow.document.write(`<html><head><title>Appointment - ${app.patient_name || 'Unknown'}</title>
       <style>body{font-family:sans-serif;padding:40px;max-width:600px;margin:auto}
-      h1{font-size:24px;margin-bottom:4px}
-      .info{color:#666;margin-bottom:20px}
-      .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee}
-      .label{font-weight:600}</style></head>
-      <body>
-      <h1>Appointment</h1>
-      <div class="info">${d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+      h1{font-size:24px;margin-bottom:4px}.info{color:#666;margin-bottom:20px}
+      .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee}.label{font-weight:600}</style></head>
+      <body><h1>Appointment</h1><div class="info">${d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
       <div class="row"><span class="label">Patient</span><span>${app.patient_name || 'N/A'}</span></div>
       <div class="row"><span class="label">Doctor</span><span>${app.doctor_name || 'N/A'}</span></div>
       <div class="row"><span class="label">Time</span><span>${d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span></div>
       <div class="row"><span class="label">Duration</span><span>${app.duration_minutes || 30} min</span></div>
       <div class="row"><span class="label">Status</span><span>${app.status}</span></div>
-      ${app.notes ? `<div class="row"><span class="label">Notes</span><span>${app.notes}</span></div>` : ''}
-      </body></html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+      ${app.notes ? `<div class="row"><span class="label">Notes</span><span>${app.notes}</span></div>` : ''}</body></html>`);
+    printWindow.document.close(); printWindow.print();
   }
 
   const isAdmin = user?.role === 'Admin';
   const app = contextMenu?.appointment;
 
-  // Context menu sections (new grouped format)
   const contextSections = contextMenu && app ? [
     {
       items: [
@@ -542,29 +479,23 @@ export default function SchedulePage() {
     },
   ] : [];
 
-  // View label
   const viewLabel = view === 'Day'
     ? currentDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
     : view === 'Week'
       ? `Week of ${currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
       : currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  // Button styles
-  const btnCls = 'h-9 px-3 rounded-xl text-xs font-medium transition-all active:scale-[0.97] flex items-center gap-1.5';
-  const inputCls = 'h-9 px-3 rounded-xl text-xs outline-none bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500 focus:border-[rgba(79,209,255,0.3)] focus:ring-1 focus:ring-[rgba(79,209,255,0.2)] transition-all';
-
   return (
     <div className="space-y-4" ref={mainRef}>
       {/* ===== TOOLBAR ===== */}
       <div className="flex items-center gap-2 flex-wrap" role="toolbar" aria-label="Schedule toolbar">
         {/* View Selector */}
-        <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} role="radiogroup" aria-label="Calendar view">
+        <div className="glass-panel flex items-center gap-1 rounded-xl p-1" role="radiogroup" aria-label="Calendar view">
           {VIEW_OPTIONS.map(v => (
             <button
               key={v}
               onClick={() => setView(v)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-              style={{ background: view === v ? '#4FD1FF' : 'transparent', color: view === v ? '#050B14' : 'rgba(255,255,255,0.5)' }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${view === v ? 'bg-[var(--color-primary)] text-[var(--color-on-primary)] shadow-lg shadow-cyan-500/20' : 'text-[var(--app-text-muted)] hover:text-[var(--app-text)] hover:bg-[var(--app-hover)]'}`}
               role="radio"
               aria-checked={view === v}
               aria-label={`${v} view`}
@@ -576,19 +507,22 @@ export default function SchedulePage() {
 
         {/* Navigation */}
         <div className="flex items-center gap-1">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)' }} aria-label="Previous">
+          <button onClick={() => navigate(-1)} className="btn-ghost btn-xs w-8 h-8 rounded-xl p-0 flex items-center justify-center" aria-label="Previous">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button onClick={goToday} className="px-3 h-8 rounded-xl text-xs font-medium" style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }} aria-label="Go to today">
+          <button onClick={goToday} className="btn-sm px-3 h-8 rounded-xl text-xs font-bold cursor-pointer"
+            style={{ background: 'var(--color-primary-container)', color: 'var(--color-primary)' }}
+            aria-label="Go to today"
+          >
             Today
           </button>
-          <button onClick={() => navigate(1)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)' }} aria-label="Next">
+          <button onClick={() => navigate(1)} className="btn-ghost btn-xs w-8 h-8 rounded-xl p-0 flex items-center justify-center" aria-label="Next">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
         {/* Date label */}
-        <h2 className="text-sm font-bold text-white min-w-[140px]" aria-live="polite">{viewLabel}</h2>
+        <h2 className="text-sm font-bold text-[var(--app-text)] min-w-[140px] font-sans" aria-live="polite">{viewLabel}</h2>
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -597,20 +531,18 @@ export default function SchedulePage() {
         <div className="relative">
           <button
             onClick={() => setShowZoomMenu(p => !p)}
-            className={`${btnCls} h-8`}
-            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}
+            className="btn-ghost btn-xs h-8 rounded-xl"
             aria-label={`Zoom: ${Math.round(zoomLevel * 100)}%`}
           >
             {Math.round(zoomLevel * 100)}%
           </button>
           {showZoomMenu && (
-            <div className="absolute top-full mt-1 right-0 z-30 rounded-xl py-1 shadow-2xl min-w-[100px]" style={{ background: 'rgba(13,24,40,0.97)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="absolute top-full mt-1 right-0 z-[var(--z-dropdown)] rounded-xl py-1 shadow-2xl min-w-[100px] glass-strong">
               {ZOOM_PRESETS.map(z => (
                 <button
                   key={z}
                   onClick={() => { setZoomLevel(z); setShowZoomMenu(false); }}
-                  className="w-full text-left px-3 py-1.5 text-xs transition-all"
-                  style={{ color: zoomLevel === z ? '#4FD1FF' : 'rgba(255,255,255,0.6)', background: zoomLevel === z ? 'rgba(79,209,255,0.08)' : 'transparent' }}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-all cursor-pointer ${zoomLevel === z ? 'text-[var(--color-primary)] bg-[var(--color-primary-container)]' : 'text-[var(--app-text-dim)] hover:bg-[var(--app-hover)]'}`}
                 >
                   {Math.round(z * 100)}%
                 </button>
@@ -620,41 +552,52 @@ export default function SchedulePage() {
         </div>
 
         {/* Export */}
-        <button onClick={handleExportSchedule} className={`${btnCls} h-8`} style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.06)' }} aria-label="Export schedule as CSV">
+        <button onClick={handleExportSchedule} className="btn-ghost btn-xs h-8 rounded-xl" aria-label="Export schedule as CSV">
           <Download className="w-3.5 h-3.5" />
         </button>
 
         {/* Print */}
-        <button onClick={handlePrintSchedule} className={`${btnCls} h-8`} style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.06)' }} aria-label="Print schedule">
+        <button onClick={handlePrintSchedule} className="btn-ghost btn-xs h-8 rounded-xl" aria-label="Print schedule">
           <Printer className="w-3.5 h-3.5" />
         </button>
 
         {/* Mini Calendar Toggle */}
-        <button onClick={() => setShowMiniCalendar(p => !p)} className={`${btnCls} h-8`} style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.06)' }} aria-label="Toggle mini calendar">
-          <Calendar className="w-3.5 h-3.5" />
+        <button
+          onClick={() => setShowMiniCalendar(p => !p)}
+          className={`btn-ghost btn-xs h-8 rounded-xl ${showMiniCalendar ? 'text-[var(--color-primary)] bg-[var(--color-primary-container)]' : ''}`}
+          aria-label="Toggle mini calendar"
+        >
+          <CalendarIcon className="w-3.5 h-3.5" />
         </button>
 
         {/* Search */}
         <div className="relative hidden sm:block">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.3)' }} aria-hidden="true" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--app-text-muted)' }} aria-hidden="true" />
           <input
             type="search"
-            placeholder="Patient, doctor, notes..."
+            placeholder="Search patient, doctor..."
             value={filterSearch}
             onChange={e => setFilterSearch(e.target.value)}
-            className={inputCls + ' pl-8 w-36 lg:w-48'}
+            className="input-cyber pl-8 w-36 lg:w-48 h-8 text-xs"
             aria-label="Search appointments"
           />
         </div>
 
         {/* Filter Toggle */}
-        <button onClick={() => setShowFilters(p => !p)} className={`${btnCls} h-8`} style={{ background: showFilters ? 'rgba(79,209,255,0.1)' : 'rgba(255,255,255,0.04)', color: showFilters ? '#4FD1FF' : 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.06)' }} aria-label="Toggle filters">
+        <button
+          onClick={() => setShowFilters(p => !p)}
+          className={`btn-ghost btn-xs h-8 rounded-xl ${showFilters ? 'text-[var(--color-primary)] bg-[var(--color-primary-container)]' : ''}`}
+          aria-label="Toggle filters"
+        >
           <Filter className="w-3.5 h-3.5" />
         </button>
 
-        {/* Settings (Admin/Manager edit, Reception view) */}
+        {/* Settings */}
         {(isAdmin || user?.role === 'Manager' || user?.role === 'Receptionist') && (
-          <button onClick={() => setScheduleOpen(true)} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }} aria-label="Doctor schedule settings">
+          <button onClick={() => setScheduleOpen(true)} className="btn-ghost btn-xs h-8 rounded-xl"
+            style={{ color: 'var(--color-primary)' }}
+            aria-label="Doctor schedule settings"
+          >
             <Settings2 className="w-4 h-4" />
           </button>
         )}
@@ -662,8 +605,7 @@ export default function SchedulePage() {
         {/* New Appointment */}
         <button
           onClick={() => { setEditingAppointment(null); setDefaultSlotDate(undefined); setDefaultSlotDoctorId(undefined); setBookingOpen(true); }}
-          className={`${btnCls} h-9 px-4 font-bold`}
-          style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}
+          className="btn-primary btn-sm h-9 px-4"
           aria-label="Create new appointment"
         >
           <Plus className="w-3.5 h-3.5" /> New
@@ -677,15 +619,15 @@ export default function SchedulePage() {
             <span
               key={chip.key}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium"
-              style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF', border: '1px solid rgba(79,209,255,0.2)' }}
+              style={{ background: 'var(--color-primary-container)', color: 'var(--color-primary)', border: '1px solid rgba(79, 209, 255, 0.2)' }}
             >
               {chip.label}
-              <button onClick={() => clearFilter(chip.key)} className="hover:opacity-70" aria-label={`Remove ${chip.key} filter`}>
+              <button onClick={() => clearFilter(chip.key)} className="hover:opacity-70 cursor-pointer" aria-label={`Remove ${chip.key} filter`}>
                 <X className="w-2.5 h-2.5" />
               </button>
             </span>
           ))}
-          <button onClick={resetAllFilters} className="text-[10px] flex items-center gap-1 px-2 py-1 rounded-full" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <button onClick={resetAllFilters} className="btn-ghost btn-xs text-[10px] h-6 px-2 rounded-full" style={{ color: 'var(--app-text-muted)' }}>
             <RotateCcw className="w-2.5 h-2.5" /> Reset
           </button>
         </div>
@@ -693,30 +635,28 @@ export default function SchedulePage() {
 
       {/* ===== EXPANDED FILTERS ===== */}
       {showFilters && !(user?.role === 'Doctor') && (
-        <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <select value={filterDoctor} onChange={e => setFilterDoctor(e.target.value)} className={inputCls} aria-label="Filter by doctor">
-            <option value="" style={{ background: '#0D1B2A', color: '#888' }}>All Doctors</option>
-            {doctors.map(d => <option key={d.id} value={d.id} style={{ background: '#0D1B2A', color: 'white' }}>{d.name}</option>)}
+        <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl" style={{ background: 'var(--app-hover)', border: '1px solid var(--app-border)' }}>
+          <select value={filterDoctor} onChange={e => setFilterDoctor(e.target.value)} className="input-cyber h-8 text-xs w-auto min-w-[120px]" aria-label="Filter by doctor">
+            <option value="">All Doctors</option>
+            {doctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
-          <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className={inputCls} aria-label="Filter by branch">
-            <option value="" style={{ background: '#0D1B2A', color: '#888' }}>All Branches</option>
-            {(branches || []).map((b: any) => <option key={b.id} value={b.id} style={{ background: '#0D1B2A', color: 'white' }}>{b.name}</option>)}
+          <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} className="input-cyber h-8 text-xs w-auto min-w-[120px]" aria-label="Filter by branch">
+            <option value="">All Branches</option>
+            {(branches || []).map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={inputCls} aria-label="Filter by status">
-            <option value="" style={{ background: '#0D1B2A', color: '#888' }}>All Status</option>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input-cyber h-8 text-xs w-auto min-w-[120px]" aria-label="Filter by status">
+            <option value="">All Status</option>
             {['scheduled', 'checked_in', 'working', 'completed', 'cancelled', 'no_show', 'postponed'].map(s => (
-              <option key={s} value={s} style={{ background: '#0D1B2A', color: 'white' }}>{s.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+              <option key={s} value={s}>{s.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
             ))}
           </select>
           <input
-            type="text"
-            placeholder="Procedure..."
-            value={filterProcedure}
+            type="text" placeholder="Procedure..." value={filterProcedure}
             onChange={e => setFilterProcedure(e.target.value)}
-            className={inputCls + ' w-32'}
+            className="input-cyber h-8 text-xs w-28"
             aria-label="Filter by procedure"
           />
-          <button onClick={resetAllFilters} className={`${btnCls} h-8`} style={{ color: 'rgba(255,255,255,0.5)' }}>
+          <button onClick={resetAllFilters} className="btn-ghost btn-xs h-8 text-xs">
             <RotateCcw className="w-3 h-3" /> Reset
           </button>
         </div>
@@ -725,14 +665,10 @@ export default function SchedulePage() {
       {/* ===== MOBILE DOCTOR SELECTOR ===== */}
       {isMobile && (view === 'Day' || view === 'Week') && doctors.length > 1 && (
         <select
-          value={mobileDoctor}
-          onChange={e => setMobileDoctor(e.target.value)}
-          className={inputCls + ' w-full'}
-          aria-label="Select doctor"
+          value={mobileDoctor} onChange={e => setMobileDoctor(e.target.value)}
+          className="input-cyber w-full h-8 text-xs" aria-label="Select doctor"
         >
-          {doctors.map(d => (
-            <option key={d.id} value={d.id} style={{ background: '#0D1B2A', color: 'white' }}>{d.name}</option>
-          ))}
+          {doctors.map(d => (<option key={d.id} value={d.id}>{d.name}</option>))}
         </select>
       )}
 
@@ -742,9 +678,7 @@ export default function SchedulePage() {
         {showMiniCalendar && (
           <div className="w-52 shrink-0 hidden lg:block">
             <MiniCalendar
-              year={miniYear}
-              month={miniMonth}
-              selectedDate={currentDate}
+              year={miniYear} month={miniMonth} selectedDate={currentDate}
               onDateSelect={(d) => { setCurrentDate(d); setMiniYear(d.getFullYear()); setMiniMonth(d.getMonth()); }}
               onMonthChange={(y, m) => { setMiniYear(y); setMiniMonth(m); }}
             />
@@ -754,7 +688,7 @@ export default function SchedulePage() {
         {/* Calendar Views */}
         <div className="flex-1 min-w-0">
           {apptsLoading ? (
-            <div className="rounded-[20px] overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="card-cyber overflow-hidden">
               <div className="p-4 space-y-3">
                 <Skeleton className="h-8 w-48" />
                 <Skeleton className="h-6 w-full" />
@@ -766,12 +700,20 @@ export default function SchedulePage() {
                 ))}
               </div>
             </div>
+          ) : filteredAppointments.length === 0 ? (
+            <div className="card-cyber">
+              <EmptyState
+                icon="📅"
+                title="No appointments"
+                description="No appointments scheduled for this period. Try adjusting your filters or create a new appointment."
+                action={{ label: 'Create Appointment', onClick: () => { setEditingAppointment(null); setDefaultSlotDate(undefined); setDefaultSlotDoctorId(undefined); setBookingOpen(true); } }}
+              />
+            </div>
           ) : (
             <>
               {view === 'Month' && (
                 <MonthView
-                  year={currentDate.getFullYear()}
-                  month={currentDate.getMonth()}
+                  year={currentDate.getFullYear()} month={currentDate.getMonth()}
                   appointments={filteredAppointments}
                   onAppointmentClick={handleAppointmentClick}
                   onAppointmentContextMenu={(e, app) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, appointment: app }); }}
@@ -830,8 +772,7 @@ export default function SchedulePage() {
       {/* ===== CONTEXT MENU ===== */}
       {contextMenu && (
         <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
+          x={contextMenu.x} y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           sections={contextSections}
           isAdmin={isAdmin}
@@ -840,44 +781,47 @@ export default function SchedulePage() {
 
       {/* ===== QUICK ACTION BAR ===== */}
       {selectedAppointment && !detailsPanelAppointment && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 p-3" style={{ zIndex: 100 }}>
-          <div className="max-w-3xl mx-auto rounded-2xl p-3 flex items-center gap-3 flex-wrap shadow-2xl" style={{ background: 'rgba(13,24,40,0.98)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)' }}>
+        <div className="fixed bottom-0 left-0 right-0 z-[var(--z-notification)] p-3">
+          <div className="max-w-3xl mx-auto rounded-2xl p-3 flex items-center gap-3 flex-wrap shadow-2xl glass-strong">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className="text-sm font-bold text-white truncate">{selectedAppointment.patient_name || 'Unknown'}</div>
+              <div className="text-sm font-bold text-[var(--app-text)] truncate font-sans">{selectedAppointment.patient_name || 'Unknown'}</div>
               {selectedAppointment.status && (
-                <span className="text-[9px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0" style={{
-                  background: selectedAppointment.status === 'scheduled' ? 'rgba(79,209,255,0.15)' : selectedAppointment.status === 'checked_in' ? 'rgba(255,152,0,0.15)' : selectedAppointment.status === 'working' ? 'rgba(156,39,176,0.15)' : 'rgba(76,175,80,0.15)',
-                  color: selectedAppointment.status === 'scheduled' ? '#4FD1FF' : selectedAppointment.status === 'checked_in' ? '#FF9800' : selectedAppointment.status === 'working' ? '#9C27B0' : '#4CAF50',
-                }}>
-                  {selectedAppointment.status.replace('_', ' ')}
-                </span>
+                <StatusBadge status={selectedAppointment.status} />
               )}
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
               {selectedAppointment.status === 'scheduled' && (
-                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'checked_in')} className="h-9 px-3 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center gap-1.5" style={{ background: 'rgba(255,152,0,0.15)', color: '#FF9800' }}>
+                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'checked_in')} className="btn-sm h-9 px-3 rounded-xl text-xs font-bold"
+                  style={{ background: 'rgba(255,152,0,0.15)', color: '#FF9800' }}>
                   <ChevronRight className="w-3 h-3" /> Check In
                 </button>
               )}
               {selectedAppointment.status === 'checked_in' && (
-                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'working')} className="h-9 px-3 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center gap-1.5" style={{ background: 'rgba(156,39,176,0.15)', color: '#9C27B0' }}>
+                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'working')} className="btn-sm h-9 px-3 rounded-xl text-xs font-bold"
+                  style={{ background: 'rgba(156,39,176,0.15)', color: '#9C27B0' }}>
                   <Clock className="w-3 h-3" /> Start
                 </button>
               )}
               {selectedAppointment.status === 'working' && (
-                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'completed')} className="h-9 px-3 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center gap-1.5" style={{ background: 'rgba(76,175,80,0.15)', color: '#4CAF50' }}>
+                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'completed')} className="btn-sm h-9 px-3 rounded-xl text-xs font-bold"
+                  style={{ background: 'rgba(76,175,80,0.15)', color: '#4CAF50' }}>
                   <CalendarDays className="w-3 h-3" /> Complete
                 </button>
               )}
               {!['completed', 'cancelled', 'no_show'].includes(selectedAppointment.status) && (
-                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'cancelled')} className="h-9 px-3 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center gap-1.5" style={{ background: 'rgba(244,67,54,0.12)', color: '#F44336' }}>
+                <button onClick={() => handleSelectionQuickAction(selectedAppointment.id, 'cancelled')} className="btn-sm h-9 px-3 rounded-xl text-xs font-bold"
+                  style={{ background: 'rgba(244,67,54,0.12)', color: '#F44336' }}>
                   <XCircle className="w-3 h-3" /> Cancel
                 </button>
               )}
-              <button onClick={() => { setSelectedAppointment(null); setSelectedAppointmentId(null); setEditingAppointment(selectedAppointment); setDefaultSlotDate(undefined); setBookingOpen(true); }} className="h-9 px-3 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center gap-1.5" style={{ background: 'rgba(79,209,255,0.1)', color: '#4FD1FF' }}>
+              <button onClick={() => { setSelectedAppointment(null); setSelectedAppointmentId(null); setEditingAppointment(selectedAppointment); setDefaultSlotDate(undefined); setBookingOpen(true); }}
+                className="btn-sm h-9 px-3 rounded-xl text-xs font-bold"
+                style={{ background: 'var(--color-primary-container)', color: 'var(--color-primary)' }}>
                 <Calendar className="w-3 h-3" /> Edit
               </button>
-              <button onClick={() => { setSelectedAppointment(null); setSelectedAppointmentId(null); }} className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              <button onClick={() => { setSelectedAppointment(null); setSelectedAppointmentId(null); }}
+                className="btn-ghost btn-xs w-9 h-9 rounded-xl p-0 flex items-center justify-center"
+                aria-label="Close quick actions">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -896,8 +840,8 @@ export default function SchedulePage() {
       )}
 
       {/* ===== STATUS LEGEND ===== */}
-      <div className="flex items-center gap-3 px-4 py-2 rounded-xl flex-wrap" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }} aria-label="Status legend">Legend:</span>
+      <div className="flex items-center gap-3 px-4 py-2 rounded-xl flex-wrap" style={{ background: 'var(--app-hover)', border: '1px solid var(--app-border)' }}>
+        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--app-text-muted)' }} aria-label="Status legend">Legend:</span>
         {[
           { label: 'Scheduled', color: '#4FD1FF' },
           { label: 'Checked In', color: '#FF9800' },
@@ -909,11 +853,11 @@ export default function SchedulePage() {
         ].map(s => (
           <div key={s.label} className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
-            <span className="text-[9px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{s.label}</span>
+            <span className="text-[9px] font-sans" style={{ color: 'var(--app-text-dim)' }}>{s.label}</span>
           </div>
         ))}
         <div className="flex-1" />
-        <span className="text-[8px]" style={{ color: 'rgba(255,255,255,0.2)' }} role="status" aria-live="polite">
+        <span className="text-[8px]" style={{ color: 'var(--app-text-muted)' }} role="status" aria-live="polite">
           {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? 's' : ''}
         </span>
       </div>

@@ -10,20 +10,21 @@ import {
 import { toast } from 'sonner';
 import { useLanguage } from '../../context/LanguageContext';
 import FixedOverlay from '../../components/ui/FixedOverlay';
+import EmptyState from '../../components/ui/EmptyState';
 
 const healingColors: Record<HealingStatus, { bg: string; text: string; glow: string }> = {
-  OnTrack: { bg: 'rgba(0,229,168,0.12)', text: '#00E5A8', glow: 'rgba(0,229,168,0.3)' },
-  Healing: { bg: 'rgba(79,209,255,0.12)', text: '#4FD1FF', glow: 'rgba(79,209,255,0.3)' },
-  Critical: { bg: 'rgba(255,193,7,0.12)', text: '#FFC107', glow: 'rgba(255,193,7,0.3)' },
-  Failure: { bg: 'rgba(239,68,68,0.15)', text: '#ef4444', glow: 'rgba(239,68,68,0.3)' },
-  Completed: { bg: 'rgba(0,229,168,0.12)', text: '#00E5A8', glow: 'rgba(0,229,168,0.3)' },
+  OnTrack: { bg: 'var(--color-success-container)', text: 'var(--color-success)', glow: 'rgba(52,211,153,0.3)' },
+  Healing: { bg: 'var(--color-primary-container)', text: 'var(--color-primary)', glow: 'rgba(79,209,255,0.3)' },
+  Critical: { bg: 'var(--color-warning-container)', text: 'var(--color-warning)', glow: 'rgba(251,191,36,0.3)' },
+  Failure: { bg: 'var(--color-error-container)', text: 'var(--color-error)', glow: 'rgba(244,63,94,0.3)' },
+  Completed: { bg: 'var(--color-success-container)', text: 'var(--color-success)', glow: 'rgba(52,211,153,0.3)' },
 };
 
 function HealthScoreCircle({ score }: { score: number }) {
   const r = 28;
   const circ = 2 * Math.PI * r;
   const offset = circ - (score / 100) * circ;
-  const color = score >= 70 ? '#00E5A8' : score >= 40 ? '#FFC107' : '#ef4444';
+  const color = score >= 70 ? 'var(--color-success)' : score >= 40 ? 'var(--color-warning)' : 'var(--color-error)';
   return (
     <div className="relative w-16 h-16 flex items-center justify-center">
       <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
@@ -37,10 +38,10 @@ function HealthScoreCircle({ score }: { score: number }) {
 
 function PainMeter({ level }: { level: number }) {
   const pct = Math.min(level / 10 * 100, 100);
-  const color = level <= 3 ? '#00E5A8' : level <= 6 ? '#FFC107' : '#ef4444';
+  const color = level <= 3 ? 'var(--color-success)' : level <= 6 ? 'var(--color-warning)' : 'var(--color-error)';
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>Pain</span>
+      <span className="text-[11px] font-medium" style={{ color: 'var(--app-text-dim)' }}>Pain</span>
       <div className="flex-1 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
       </div>
@@ -48,8 +49,6 @@ function PainMeter({ level }: { level: number }) {
     </div>
   );
 }
-
-const inputCls = 'w-full h-10 px-3 rounded-xl text-sm outline-none bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-white placeholder-gray-500 transition-all';
 
 export default function FollowUps() {
   const queryClient = useQueryClient();
@@ -189,26 +188,22 @@ export default function FollowUps() {
   });
 
   return (
-    <div className="font-sans select-auto space-y-5">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">{t('follow_ups.title')}</h1>
-          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--color-on-surface)]">{t('follow_ups.title')}</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--app-text-muted)' }}>
             {isLoading ? '...' : t('follow_ups.subtitle', { count: followUps.length })}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative max-w-xs w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--app-text-muted)' }} />
             <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              placeholder={t('follow_ups.search_placeholder')}
-              className="w-full h-10 pl-10 pr-4 rounded-xl text-sm outline-none transition-all"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)' }} />
+              placeholder={t('follow_ups.search_placeholder')} className="input-cyber pl-10" />
           </div>
-          <button onClick={openCreateModal}
-            className="h-10 px-4 rounded-xl flex items-center gap-2 text-sm font-bold transition-all active:scale-[0.98]"
-            style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14', boxShadow: '0 4px 20px rgba(69,214,255,0.25)' }}>
+          <button onClick={openCreateModal} className="btn-primary">
             <Plus className="w-4 h-4" /> {t('follow_ups.add')}
           </button>
         </div>
@@ -216,14 +211,14 @@ export default function FollowUps() {
 
       {/* Failure Alert */}
       {failureCount > 0 && (
-        <div className="rounded-[18px] p-5 animate-fadeIn flex items-start gap-4"
-          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-          <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(239,68,68,0.15)' }}>
-            <AlertTriangle className="w-5 h-5 text-[#ef4444]" />
+        <div className="p-5 glass-strong animate-fadeIn flex items-start gap-4"
+          style={{ borderColor: 'rgba(244,63,94,0.2)', background: 'var(--color-error-container)' }}>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(244,63,94,0.15)' }}>
+            <AlertTriangle className="w-5 h-5" style={{ color: 'var(--color-error)' }} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-[#ef4444]">{t('follow_ups.failure_detected')}</h3>
-            <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--color-error)' }}>{t('follow_ups.failure_detected')}</h3>
+            <p className="text-xs mt-1" style={{ color: 'var(--app-text-dim)' }}>
               {t('follow_ups.failure_desc', { count: failureCount })}
             </p>
           </div>
@@ -232,227 +227,205 @@ export default function FollowUps() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="rounded-[18px] p-5 flex items-center gap-4"
-          style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
-          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(79,209,255,0.1)' }}>
-            <Activity className="w-5 h-5 text-[#4FD1FF]" />
+        <div className="card-cyber flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--color-primary-container)' }}>
+            <Activity className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
           </div>
           <div>
-            <div className="text-2xl font-bold text-white">{followUps.length}</div>
-            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('follow_ups.stat_total')}</div>
+            <div className="text-2xl font-bold text-[var(--color-on-surface)]">{followUps.length}</div>
+            <div className="text-[11px] font-medium" style={{ color: 'var(--app-text-dim)' }}>{t('follow_ups.stat_total')}</div>
           </div>
         </div>
-        <div className="rounded-[18px] p-5 flex items-center gap-4"
-          style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
-          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,229,168,0.1)' }}>
-            <TrendingUp className="w-5 h-5 text-[#00E5A8]" />
+        <div className="card-cyber flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--color-success-container)' }}>
+            <TrendingUp className="w-5 h-5" style={{ color: 'var(--color-success)' }} />
           </div>
           <div>
-            <div className="text-2xl font-bold text-white">{avgHealth}</div>
-            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('follow_ups.stat_avg_health')}</div>
+            <div className="text-2xl font-bold text-[var(--color-on-surface)]">{avgHealth}</div>
+            <div className="text-[11px] font-medium" style={{ color: 'var(--app-text-dim)' }}>{t('follow_ups.stat_avg_health')}</div>
           </div>
         </div>
-        <div className="rounded-[18px] p-5 flex items-center gap-4"
-          style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
-          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,193,7,0.1)' }}>
-            <AlertCircle className="w-5 h-5 text-[#FFC107]" />
+        <div className="card-cyber flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--color-warning-container)' }}>
+            <AlertCircle className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
           </div>
           <div>
-            <div className="text-2xl font-bold text-[#FFC107]">{criticalCount}</div>
-            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('follow_ups.stat_critical')}</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--color-warning)' }}>{criticalCount}</div>
+            <div className="text-[11px] font-medium" style={{ color: 'var(--app-text-dim)' }}>{t('follow_ups.stat_critical')}</div>
           </div>
         </div>
-        <div className="rounded-[18px] p-5 flex items-center gap-4"
-          style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)' }}>
-          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.1)' }}>
-            <Heart className="w-5 h-5 text-[#ef4444]" />
+        <div className="card-cyber flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--color-error-container)' }}>
+            <Heart className="w-5 h-5" style={{ color: 'var(--color-error)' }} />
           </div>
           <div>
-            <div className="text-2xl font-bold text-[#ef4444]">{failureCount}</div>
-            <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('follow_ups.stat_failures')}</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--color-error)' }}>{failureCount}</div>
+            <div className="text-[11px] font-medium" style={{ color: 'var(--app-text-dim)' }}>{t('follow_ups.stat_failures')}</div>
           </div>
         </div>
       </div>
 
       {/* Follow-ups List */}
-      <div className="overflow-x-auto rounded-[22px]"
-        style={{ background: 'rgba(13,24,40,0.82)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
-        <div className="min-w-[700px]">
-        <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b border-[rgba(255,255,255,0.05)]"
-          style={{ color: 'rgba(255,255,255,0.25)' }}>
-          <div className="flex-[2]">{t('follow_ups.table_patient')}</div>
-          <div className="flex-[1.5]">{t('follow_ups.table_procedure')}</div>
-          <div className="flex-[1.5]">{t('follow_ups.table_health')}</div>
-          <div className="flex-[1]">{t('follow_ups.table_pain')}</div>
-          <div className="flex-[1.5]">{t('follow_ups.table_healing')}</div>
-          <div className="flex-[1.5]">{t('follow_ups.table_notes')}</div>
-          <div className="flex-[1.5]">{t('follow_ups.table_date')}</div>
-          <div className="w-20">{t('follow_ups.table_actions')}</div>
-        </div>
+      <div className="card-cyber p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <div className="min-w-[700px]">
+            <div className="flex text-[11px] font-semibold uppercase tracking-wider px-6 py-4 border-b" style={{ borderColor: 'var(--app-border)', color: 'var(--app-text-muted)' }}>
+              <div className="flex-[2]">{t('follow_ups.table_patient')}</div>
+              <div className="flex-[1.5]">{t('follow_ups.table_procedure')}</div>
+              <div className="flex-[1.5]">{t('follow_ups.table_health')}</div>
+              <div className="flex-[1]">{t('follow_ups.table_pain')}</div>
+              <div className="flex-[1.5]">{t('follow_ups.table_healing')}</div>
+              <div className="flex-[1.5]">{t('follow_ups.table_notes')}</div>
+              <div className="flex-[1.5]">{t('follow_ups.table_date')}</div>
+              <div className="w-20">{t('follow_ups.table_actions')}</div>
+            </div>
 
-        <div className="divide-y divide-[rgba(255,255,255,0.04)]">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-6 h-6 border-2 border-[#4FD1FF] border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : isError ? (
-            <div className="py-16 text-center text-sm" style={{ color: '#FF6B6B' }}>
-              {t('follow_ups.empty_failed')}{' '}
-              <button onClick={() => refetch()} className="underline" style={{ color: '#4FD1FF' }}>{t('common.retry')}</button>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="py-16 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              {searchQuery ? t('follow_ups.empty_search') : t('follow_ups.empty_all')}
-            </div>
-          ) : filtered.map(f => (
-            <div key={f.id} className="flex items-center px-6 py-4 transition-all duration-150"
-              style={{
-                background: f.healing_status === 'Failure' ? 'rgba(239,68,68,0.04)' :
-                  f.healing_status === 'Critical' ? 'rgba(255,193,7,0.03)' : 'transparent',
-                borderLeft: f.healing_status === 'Failure' ? '3px solid #ef4444' :
-                  f.healing_status === 'Critical' ? '3px solid #FFC107' : '3px solid transparent',
-              }}>
-              <div className="flex-[2] flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                  style={{ background: 'rgba(79,209,255,0.1)', border: '1px solid rgba(79,209,255,0.12)', color: '#4FD1FF' }}>
-                  {(patientMap.get(f.patient_id) || '??').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+            <div className="divide-y" style={{ borderColor: 'var(--app-border)' }}>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="w-6 h-6 border-2 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin" />
                 </div>
-                <span className="text-sm font-medium text-white">{patientMap.get(f.patient_id) || 'Unknown'}</span>
-              </div>
-              <div className="flex-[1.5] text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                {f.procedure_id ? (procedureMap.get(f.procedure_id) || '—') : '—'}
-              </div>
-              <div className="flex-[1.5]"><HealthScoreCircle score={f.health_score ?? 100} /></div>
-              <div className="flex-[1]"><PainMeter level={f.pain_level ?? 0} /></div>
-              <div className="flex-[1.5]"><HealingBadge status={f.healing_status || 'OnTrack'} /></div>
-              <div className="flex-[1.5] text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                {(f.notes || '').slice(0, 40)}{(f.notes || '').length > 40 ? '...' : ''}
-              </div>
-              <div className="flex-[1.5] text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                {f.created_at ? new Date(f.created_at).toLocaleDateString() : '—'}
-              </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => openEditModal(f)}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-[rgba(255,255,255,0.05)]"
-                  style={{ color: 'rgba(255,255,255,0.3)' }}>
-                  <Edit2 className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => setDeleteConfirmId(f.id)}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-[rgba(239,68,68,0.1)]"
-                  style={{ color: 'rgba(255,255,255,0.3)' }}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              ) : isError ? (
+                <div className="py-16 text-center text-sm" style={{ color: 'var(--color-error)' }}>
+                  {t('follow_ups.empty_failed')}{' '}
+                  <button onClick={() => refetch()} className="underline" style={{ color: 'var(--color-primary)' }}>{t('common.retry')}</button>
+                </div>
+              ) : filtered.length === 0 ? (
+                <EmptyState
+                  title={searchQuery ? t('follow_ups.empty_search') : t('follow_ups.empty_all')}
+                  description=""
+                />
+              ) : filtered.map(f => (
+                <div key={f.id} className="flex items-center px-6 py-4 transition-all duration-150 hover:bg-[var(--app-table-hover)]"
+                  style={{
+                    background: f.healing_status === 'Failure' ? 'rgba(244,63,94,0.04)' :
+                      f.healing_status === 'Critical' ? 'rgba(251,191,36,0.03)' : 'transparent',
+                    borderLeft: f.healing_status === 'Failure' ? '3px solid var(--color-error)' :
+                      f.healing_status === 'Critical' ? '3px solid var(--color-warning)' : '3px solid transparent',
+                  }}>
+                  <div className="flex-[2] flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                      style={{ background: 'var(--color-primary-container)', border: '1px solid rgba(79,209,255,0.12)', color: 'var(--color-primary)' }}>
+                      {(patientMap.get(f.patient_id) || '??').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium text-[var(--color-on-surface)]">{patientMap.get(f.patient_id) || 'Unknown'}</span>
+                  </div>
+                  <div className="flex-[1.5] text-xs" style={{ color: 'var(--app-text-dim)' }}>
+                    {f.procedure_id ? (procedureMap.get(f.procedure_id) || '\u2014') : '\u2014'}
+                  </div>
+                  <div className="flex-[1.5]"><HealthScoreCircle score={f.health_score ?? 100} /></div>
+                  <div className="flex-[1]"><PainMeter level={f.pain_level ?? 0} /></div>
+                  <div className="flex-[1.5]"><HealingBadge status={f.healing_status || 'OnTrack'} /></div>
+                  <div className="flex-[1.5] text-xs" style={{ color: 'var(--app-text-dim)' }}>
+                    {(f.notes || '').slice(0, 40)}{(f.notes || '').length > 40 ? '...' : ''}
+                  </div>
+                  <div className="flex-[1.5] text-xs" style={{ color: 'var(--app-text-dim)' }}>
+                    {f.created_at ? new Date(f.created_at).toLocaleDateString() : '\u2014'}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => openEditModal(f)}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-[rgba(255,255,255,0.05)]"
+                      style={{ color: 'var(--app-text-dim)' }}>
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => setDeleteConfirmId(f.id)}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-[rgba(244,63,94,0.1)]"
+                      style={{ color: 'var(--app-text-dim)' }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
         </div>
       </div>
 
       {/* Follow-up Modal (Create / Edit) */}
       {showModal && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowModal(false); resetForm(); }}>
-          <div className="w-full max-w-lg rounded-[24px] flex flex-col max-h-[90vh]" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.05)] flex-shrink-0">
-              <h2 className="text-lg font-bold text-white">{editingId ? t('follow_ups.modal_edit') : t('follow_ups.modal_new')}</h2>
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.4)' }}><X className="w-4 h-4" /></button>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => { setShowModal(false); resetForm(); }}>
+          <div className="w-full max-w-lg rounded-[24px] flex flex-col max-h-[90vh]" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border-light)' }}>
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--app-border)' }}>
+              <h2 className="text-lg font-bold text-[var(--color-on-surface)]">{editingId ? t('follow_ups.modal_edit') : t('follow_ups.modal_new')}</h2>
+              <button onClick={() => { setShowModal(false); resetForm(); }} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ color: 'var(--app-text-dim)' }}><X className="w-4 h-4" /></button>
             </div>
             <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1 min-h-0">
-              {/* Patient */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_patient')} *</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('follow_ups.modal_patient')} *</label>
                 <select value={form.patient_id} onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))} disabled={!!editingId}
-                  className={inputCls + ' cursor-pointer'}>
-                  <option value="" style={{ background: '#0D1B2A' }}>{t('follow_ups.placeholder_patient')}</option>
-                  {patients.map(p => (
-                    <option key={p.id} value={p.id} style={{ background: '#0D1B2A' }}>{p.full_name}</option>
-                  ))}
+                  className="input-cyber cursor-pointer">
+                  <option value="">{t('follow_ups.placeholder_patient')}</option>
+                  {patients.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                 </select>
               </div>
-
-              {/* Procedure */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_procedure')} *</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('follow_ups.modal_procedure')} *</label>
                 <select value={form.procedure_id} onChange={e => setForm(f => ({ ...f, procedure_id: e.target.value }))} disabled={!form.patient_id || !!editingId}
-                  className={inputCls + ' cursor-pointer'}>
-                  <option value="" style={{ background: '#0D1B2A' }}>{form.patient_id ? t('follow_ups.placeholder_procedure') : t('follow_ups.placeholder_procedure_first')}</option>
-                  {patientProcedures.map(p => (
-                    <option key={p.id} value={p.id} style={{ background: '#0D1B2A' }}>{p.procedure_name} ({p.status})</option>
-                  ))}
+                  className="input-cyber cursor-pointer">
+                  <option value="">{form.patient_id ? t('follow_ups.placeholder_procedure') : t('follow_ups.placeholder_procedure_first')}</option>
+                  {patientProcedures.map(p => <option key={p.id} value={p.id}>{p.procedure_name} ({p.status})</option>)}
                 </select>
               </div>
-
-              {/* Health Score */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_health', { value: form.health_score })}</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('follow_ups.modal_health', { value: form.health_score })}</label>
                 <input type="range" min="0" max="100" value={form.health_score} onChange={e => setForm(f => ({ ...f, health_score: Number(e.target.value) }))}
                   className="w-full h-2 rounded-full appearance-none cursor-pointer"
-                  style={{ background: 'rgba(255,255,255,0.08)', accentColor: '#4FD1FF' }} />
-                <div className="flex justify-between text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                  style={{ background: 'rgba(255,255,255,0.08)', accentColor: 'var(--color-primary)' }} />
+                <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--app-text-dim)' }}>
                   <span>0</span><span>50</span><span>100</span>
                 </div>
               </div>
-
-              {/* Pain Level */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_pain', { value: form.pain_level })}</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('follow_ups.modal_pain', { value: form.pain_level })}</label>
                 <input type="range" min="0" max="10" value={form.pain_level} onChange={e => setForm(f => ({ ...f, pain_level: Number(e.target.value) }))}
                   className="w-full h-2 rounded-full appearance-none cursor-pointer"
-                  style={{ background: 'rgba(255,255,255,0.08)', accentColor: '#4FD1FF' }} />
-                <div className="flex justify-between text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                  style={{ background: 'rgba(255,255,255,0.08)', accentColor: 'var(--color-primary)' }} />
+                <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--app-text-dim)' }}>
                   <span>0</span><span>5</span><span>10</span>
                 </div>
               </div>
-
-              {/* Healing Status — Normal Flow Stepper */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_healing_status')}</label>
-                <div className="overflow-x-auto pb-2"
-                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(79,209,255,0.25) rgba(255,255,255,0.04)' }}>
-                  <style>{`div::-webkit-scrollbar { height: 4px; } div::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 4px; } div::-webkit-scrollbar-thumb { background: rgba(79,209,255,0.25); border-radius: 4px; } div::-webkit-scrollbar-thumb:hover { background: rgba(79,209,255,0.4); }`}</style>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('follow_ups.modal_healing_status')}</label>
+                <div className="overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(79,209,255,0.25) rgba(255,255,255,0.04)' }}>
                   <div className="flex items-start gap-0">
                     {['OnTrack', 'Healing', 'Completed'].map((s, idx) => {
                       const status = s as HealingStatus;
                       const selectedIdx = ['OnTrack', 'Healing', 'Completed'].indexOf(form.healing_status);
                       const isActive = idx === selectedIdx;
                       const isPast = idx < selectedIdx;
-                      const lineColor = isPast ? '#00E5A8' : 'rgba(255,255,255,0.06)';
+                      const lineColor = isPast ? 'var(--color-success)' : 'rgba(255,255,255,0.06)';
                       return (
                         <div key={s} className="flex items-start flex-shrink-0">
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 76 }}>
                             <button type="button" onClick={() => setForm(f => ({ ...f, healing_status: status }))}
                               className="relative w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 active:scale-90"
                               style={{
-                                background: isPast ? '#00E5A8' : isActive ? '#4FD1FF' : 'rgba(255,255,255,0.06)',
+                                background: isPast ? 'var(--color-success)' : isActive ? 'var(--color-primary)' : 'rgba(255,255,255,0.06)',
                                 border: isActive ? '2px solid rgba(79,209,255,0.5)' : '2px solid transparent',
                                 boxShadow: isActive ? '0 0 16px rgba(79,209,255,0.45)' : 'none',
                               }}>
                               {isPast ? (
-                                <Check className="w-3.5 h-3.5" style={{ color: '#050B14' }} />
+                                <Check className="w-3.5 h-3.5" style={{ color: 'var(--color-on-primary)' }} />
                               ) : isActive ? (
-                                <span className="w-2 h-2 rounded-full" style={{ background: '#050B14' }} />
+                                <span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-on-primary)' }} />
                               ) : (
                                 <span className="w-2 h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }} />
                               )}
                             </button>
                             <span className="text-[9px] font-semibold text-center leading-tight transition-all"
-                              style={{ color: isPast ? 'rgba(0,229,168,0.7)' : isActive ? '#4FD1FF' : 'rgba(255,255,255,0.25)' }}>
+                              style={{ color: isPast ? 'rgba(52,211,153,0.7)' : isActive ? 'var(--color-primary)' : 'var(--app-text-dim)' }}>
                               {s === 'OnTrack' ? t('follow_ups.stepper_on_track') : s === 'Healing' ? t('follow_ups.stepper_healing') : t('follow_ups.stepper_completed')}
                             </span>
                           </div>
-                          {idx < 2 && (
-                            <div className="flex-shrink-0 self-center" style={{ width: 20, height: 2, background: lineColor, marginBottom: 22 }} />
-                          )}
+                          {idx < 2 && <div className="flex-shrink-0 self-center" style={{ width: 20, height: 2, background: lineColor, marginBottom: 22 }} />}
                         </div>
                       );
                     })}
                   </div>
                 </div>
               </div>
-
-              {/* Special Cases — Critical & Failure */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>{t('follow_ups.modal_special_cases')}</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-dim)' }}>{t('follow_ups.modal_special_cases')}</label>
                 <div className="flex gap-2">
                   {(['Critical', 'Failure'] as HealingStatus[]).map(s => {
                     const isSelected = form.healing_status === s;
@@ -461,8 +434,8 @@ export default function FollowUps() {
                         className="flex-1 h-12 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all duration-300 active:scale-[0.97]"
                         style={{
                           background: isSelected ? healingColors[s].bg : 'rgba(255,255,255,0.03)',
-                          border: `1px solid ${isSelected ? healingColors[s].text : 'rgba(255,255,255,0.06)'}`,
-                          color: isSelected ? healingColors[s].text : 'rgba(255,255,255,0.3)',
+                          border: `1px solid ${isSelected ? healingColors[s].text : 'var(--app-border)'}`,
+                          color: isSelected ? healingColors[s].text : 'var(--app-text-muted)',
                           boxShadow: isSelected ? `0 0 16px ${healingColors[s].glow}` : 'none',
                         }}>
                         <span className="w-2 h-2 rounded-full" style={{ background: isSelected ? healingColors[s].text : 'rgba(255,255,255,0.15)' }} />
@@ -472,31 +445,25 @@ export default function FollowUps() {
                   })}
                 </div>
               </div>
-
-              {/* Failure Warning */}
               {form.healing_status === 'Failure' && (
-                <div className="rounded-xl p-4 animate-fadeIn flex items-start gap-3"
-                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                  <AlertTriangle className="w-5 h-5 text-[#ef4444] flex-shrink-0 mt-0.5" />
+                <div className="rounded-xl p-4 animate-fadeIn flex items-start gap-3" style={{ background: 'var(--color-error-container)', border: '1px solid rgba(244,63,94,0.2)' }}>
+                  <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-error)' }} />
                   <div>
-                    <p className="text-sm font-bold text-[#ef4444]">{t('follow_ups.failure_warning')}</p>
-                    <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>{t('follow_ups.failure_warning_desc')}</p>
+                    <p className="text-sm font-bold" style={{ color: 'var(--color-error)' }}>{t('follow_ups.failure_warning')}</p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--app-text-dim)' }}>{t('follow_ups.failure_warning_desc')}</p>
                   </div>
                 </div>
               )}
-
-              {/* Notes */}
               <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{t('follow_ups.modal_notes')}</label>
-                <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} className={inputCls + ' h-20 pt-2 resize-none'} />
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('follow_ups.modal_notes')}</label>
+                <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} className="input-cyber h-20 pt-2 resize-none" />
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[rgba(255,255,255,0.05)] flex-shrink-0">
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('follow_ups.modal_cancel')}</button>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t flex-shrink-0" style={{ borderColor: 'var(--app-border)' }}>
+              <button onClick={() => { setShowModal(false); resetForm(); }} className="btn-ghost">{t('follow_ups.modal_cancel')}</button>
               <button onClick={() => editingId ? updateMut.mutate() : createMut.mutate()}
                 disabled={!form.patient_id || !form.procedure_id || createMut.isPending || updateMut.isPending}
-                className="h-10 px-6 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #45D6FF, #53C7F0)', color: '#050B14' }}>
+                className="btn-primary">
                 {editingId ? (updateMut.isPending ? t('follow_ups.modal_saving') : t('follow_ups.modal_save')) : (createMut.isPending ? t('follow_ups.modal_creating') : t('follow_ups.modal_create'))}
               </button>
             </div>
@@ -506,29 +473,27 @@ export default function FollowUps() {
 
       {/* Delete Confirmation */}
       {deleteConfirmId && (
-        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'rgba(5,11,20,0.85)', backdropFilter: 'blur(8px)' }} onClose={() => setDeleteConfirmId(null)}>
-          <div className="w-full max-w-sm rounded-[24px] p-6" style={{ background: 'rgba(13,24,40,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <FixedOverlay className="flex items-center justify-center p-4" style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(8px)' }} onClose={() => setDeleteConfirmId(null)}>
+          <div className="w-full max-w-sm rounded-[24px] p-6" style={{ background: 'var(--app-surface-modal)', border: '1px solid var(--app-border-light)' }}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}>
-                <AlertTriangle className="w-5 h-5 text-[#ef4444]" />
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--color-error-container)' }}>
+                <AlertTriangle className="w-5 h-5" style={{ color: 'var(--color-error)' }} />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white">{t('follow_ups.delete_title')}</h3>
-                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>{t('follow_ups.delete_desc')}</p>
+                <h3 className="text-sm font-bold text-[var(--color-on-surface)]">{t('follow_ups.delete_title')}</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--app-text-dim)' }}>{t('follow_ups.delete_desc')}</p>
               </div>
             </div>
             <div className="flex items-center justify-end gap-3">
-              <button onClick={() => setDeleteConfirmId(null)} className="h-10 px-5 rounded-xl text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>{t('follow_ups.delete_cancel')}</button>
+              <button onClick={() => setDeleteConfirmId(null)} className="btn-ghost">{t('follow_ups.delete_cancel')}</button>
               <button onClick={() => deleteMut.mutate({ id: deleteConfirmId })} disabled={deleteMut.isPending}
-                className="h-10 px-5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-                style={{ background: '#ef4444', color: '#fff' }}>
+                className="btn-danger btn-sm">
                 {deleteMut.isPending ? t('follow_ups.delete_deleting') : t('follow_ups.delete_confirm')}
               </button>
             </div>
           </div>
         </FixedOverlay>
       )}
-
     </div>
   );
 }
