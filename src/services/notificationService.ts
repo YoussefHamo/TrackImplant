@@ -182,16 +182,21 @@ export const notificationService = {
       'stock_request', 'delivery', 'follow_up', 'reminder', 'crm',
       'system', 'general',
     ];
-
     const counts: Record<string, number> = {};
-    for (const cat of categories) {
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('is_read', false)
-        .eq('category', cat);
-      counts[cat] = error ? 0 : (count ?? 0);
+    for (const cat of categories) counts[cat] = 0;
+
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('category')
+      .eq('user_id', userId)
+      .eq('is_read', false);
+    if (error) {
+      console.error('getUnreadByCategory error:', error.message);
+      return counts as Record<NotificationCategory, number>;
+    }
+    for (const row of data || []) {
+      const cat = row.category as NotificationCategory;
+      if (cat && cat in counts) counts[cat]++;
     }
     return counts as Record<NotificationCategory, number>;
   },

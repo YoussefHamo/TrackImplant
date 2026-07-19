@@ -61,7 +61,6 @@ export const Login = () => {
       toast.error(error);
     } else {
       toast.success('Access granted');
-      setTimeout(() => navigate('/dashboard'), 0);
     }
   };
 

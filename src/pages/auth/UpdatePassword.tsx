@@ -16,10 +16,13 @@ function MedicalCrossIcon({ className }: { className?: string }) {
 export default function UpdatePassword() {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [recoveryMode, setRecoveryMode] = useState<'loading' | 'ready' | 'invalid'>('loading');
   const [errorDetail, setErrorDetail] = useState('');
+  const passwordMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +86,10 @@ export default function UpdatePassword() {
 
     if (password.length < 6) {
       toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.error('Passwords do not match');
       return;
     }
 
@@ -231,6 +238,38 @@ export default function UpdatePassword() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+            </div>
+
+            <div>
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#4FD1FF] transition-colors duration-300">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type={showConfirm ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="w-full h-[50px] pl-11 pr-11 rounded-xl text-sm text-white placeholder-gray-500 outline-none transition-all duration-300 focus:shadow-[0_0_20px_rgba(79,209,255,0.08)]"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: passwordMismatch ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)',
+                    caretColor: '#4FD1FF',
+                  }}
+                  onFocus={(e) => { if (!passwordMismatch) e.target.style.borderColor = 'rgba(79,209,255,0.4)'; }}
+                  onBlur={(e) => { if (!passwordMismatch) e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {passwordMismatch && (
+                <p className="text-[11px] mt-1.5 ml-1" style={{ color: '#ef4444' }}>Passwords do not match</p>
+              )}
             </div>
 
             <button

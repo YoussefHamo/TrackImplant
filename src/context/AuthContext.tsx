@@ -1,7 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
-import { auditLogService, getCurrentUserInfo } from '../services/auditLogService';
+import { auditLogService, getCurrentUserExtendedInfo } from '../services/auditLogService';
 import { userService } from '../services/userService';
 import type { AuthUser, UserRole } from '../types';
 
@@ -20,6 +21,7 @@ export const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const initialized = useRef(false);
@@ -40,18 +42,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUser({
           id: authUserId,
-          role: 'Admin' as UserRole,
+          role: 'Assistant' as UserRole,
           full_name: '',
           username: '',
           is_active: true,
         });
       }
     } catch {
+      console.error('[AUTH] Failed to fetch profile for user', authUserId);
       const metaRole = (await supabase.auth.getSession()).data.session?.user?.user_metadata?.role as string | undefined;
       const validRoles: UserRole[] = ['Manager', 'Admin', 'Doctor', 'Assistant', 'Receptionist'];
+      const safeRole = validRoles.includes(metaRole as UserRole) ? (metaRole as UserRole) : 'Assistant';
       setUser({
         id: authUserId,
-        role: validRoles.includes(metaRole as UserRole) ? (metaRole as UserRole) : 'Admin',
+        role: safeRole,
         full_name: '',
         username: '',
         is_active: true,
@@ -88,13 +92,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        console.log('[AUTH] onAuthStateChange event:', _event, 'user:', !!session?.user);
+      async (event, session) => {
+        console.log('[AUTH] onAuthStateChange event:', event, 'user:', !!session?.user);
         if (session?.user) {
-          // Don't await — must not block setLoading(false)
-          fetchProfile(session.user.id, session.user.email || '');
+          // Only refetch profile on explicit login, not on token refresh or initial restore
+          if (event === 'SIGNED_IN') {
+            await fetchProfile(session.user.id, session.user.email || '');
+          }
         } else {
           setUser(null);
+          queryClient.clear();
+          localStorage.removeItem('trackimplant_active_branch');
+          localStorage.removeItem('remembered_identifier');
         }
         setLoading(false);
       }
@@ -109,7 +118,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let username: string | undefined;
 
       if (identifier.includes('@')) {
-        email = identifier;
+        const { data: emailRecord, error: emailLookupError } = await supabase
+          .rpc('get_user_by_email', { lookup_email: identifier })
+          .maybeSingle();
+        if (emailLookupError || !emailRecord) return { error: 'Invalid email or password' };
+        const emailRec = emailRecord as { is_active?: boolean; email?: string };
+        if (!emailRec.is_active) return { error: 'Your account has been disabled. Contact administrator.' };
+        email = emailRec.email || identifier;
       } else {
         const { data: userRecord, error: lookupError } = await supabase
           .rpc('get_user_email_by_username', { lookup_username: identifier })
@@ -153,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Log the login event (fire-and-forget — must not block login)
-      getCurrentUserInfo().then(actor => {
+      getCurrentUserExtendedInfo().then(actor => {
         if (actor) {
           console.log('[AUTH] Logging login audit');
           auditLogService.log({
@@ -162,6 +177,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             action: 'LOGIN',
             table_name: 'users',
             record_id: actor.user_id,
+            role: actor.role,
+            branch_id: actor.branch_id,
           });
         }
       }).catch(() => {});
@@ -177,6 +194,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    queryClient.clear();
+    localStorage.removeItem('trackimplant_active_branch');
+    localStorage.removeItem('remembered_identifier');
   };
 
   return (

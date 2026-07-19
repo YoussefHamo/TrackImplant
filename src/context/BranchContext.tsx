@@ -41,11 +41,21 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     else localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  // Load branches
+  // Load branches and validate stored branch ID
   useEffect(() => {
     branchService.getAll()
       .then(branches => {
         setAvailableBranches(branches);
+        // Validate stored branch ID still exists
+        if (activeBranchId && !branches.find(b => b.id === activeBranchId)) {
+          if (isAdmin && branches.length > 0) {
+            setActiveBranchId(branches[0].id);
+          } else {
+            setActiveBranchIdState(null);
+            localStorage.removeItem(STORAGE_KEY);
+          }
+          return;
+        }
         // For Admin: if no active branch and branches exist, set first
         if (isAdmin && !activeBranchId && branches.length > 0) {
           setActiveBranchId(branches[0].id);
@@ -53,7 +63,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {})
       .finally(() => setBranchLoading(false));
-  }, []);
+  }, [isAdmin, activeBranchId, setActiveBranchId]);
 
   // For non-admin users, always follow their user.branch_id
   useEffect(() => {

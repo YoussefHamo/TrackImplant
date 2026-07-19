@@ -74,10 +74,11 @@ export default function Register() {
             <input
               type="password"
               required
+              minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-[#0d0f12] border border-[#2d3341] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-colors"
-              placeholder="••••••••"
+              placeholder="•••••••• (min. 6 characters)"
             />
           </div>
 
@@ -90,7 +91,6 @@ export default function Register() {
             >
               <option value="Doctor">Doctor / Consultant</option>
               <option value="Assistant">Assistant / Staff</option>
-              <option value="Admin">System Administrator</option>
             </select>
           </div>
 
