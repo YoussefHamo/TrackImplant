@@ -92,12 +92,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         console.log('[AUTH] onAuthStateChange event:', event, 'user:', !!session?.user);
         if (session?.user) {
-          // Only refetch profile on explicit login, not on token refresh or initial restore
+          // Fire-and-forget: signIn() already awaits fetchProfile before returning
           if (event === 'SIGNED_IN') {
-            await fetchProfile(session.user.id, session.user.email || '');
+            fetchProfile(session.user.id, session.user.email || '');
           }
         } else {
           setUser(null);
